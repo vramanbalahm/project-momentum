@@ -1,0 +1,5 @@
+ingredient_id,language_code,display_name,category
+ING-01,en,Coconut,Perishable
+ING-01,ta,தேங்காய்,Perishable
+ING-02,en,Tomato,Perishable
+ING-02,ta,தக்காளி,Perishable
