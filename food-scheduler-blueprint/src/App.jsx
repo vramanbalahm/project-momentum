@@ -1,27 +1,15 @@
-import React, { useState } from 'react';
-import { 
-  DndContext, 
-  useDraggable, 
-  useDroppable, 
-  PointerSensor, 
-  useSensor, 
-  useSensors 
-} from '@dnd-kit/core';
+import React, { useState, useEffect } from 'react';
+import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { mockWeek } from './mockData';
 
-// --- Draggable Meal Card (Option 1) ---
+// --- COMPONENTS (No changes to MealCard or DayColumn) ---
+
 function MealCard({ day, type, meal, onClick }) {
-  // 1. Define the unique ID
   const mealId = `meal-${day}-${type}`;
-
-  // 2. Set up Droppable (The landing zone)
   const { setNodeRef: setDropRef } = useDroppable({ id: mealId });
-
-  // 3. Set up Draggable (The moving object)
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
     id: mealId,
     data: { day, type, meal },
-    // Removed 'disabled: !meal' so we can drag into skipped slots!
   });
 
   const style = transform ? {
@@ -31,7 +19,7 @@ function MealCard({ day, type, meal, onClick }) {
 
   return (
     <div
-      ref={(node) => { setDragRef(node); setDropRef(node); }} // Combine refs
+      ref={(node) => { setDragRef(node); setDropRef(node); }}
       style={style}
       {...listeners}
       {...attributes}
@@ -46,7 +34,7 @@ function MealCard({ day, type, meal, onClick }) {
           <p className="text-xs font-bold leading-tight pointer-events-none">{meal.name}</p>
         </>
       ) : (
-        <div className="flex flex-col items-center justify-center h-16 border border-gray-50 rounded-md">
+        <div className="flex flex-col items-center justify-center h-16 border border-gray-100 rounded-md">
            <p className="text-[10px] text-gray-300 font-bold uppercase tracking-widest">Skipped</p>
         </div>
       )}
@@ -54,40 +42,23 @@ function MealCard({ day, type, meal, onClick }) {
   );
 }
 
-// --- Droppable Day Column (Option 2 Handle) ---
-// --- REPLACE your existing DayColumn function with this ---
-// --- REPLACE your existing DayColumn function with this ---
 function DayColumn({ day, children }) {
-  // 1. Draggable logic for the handle
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
     id: `day-${day}`,
     data: { type: 'day', day }
   });
-
-  // 2. Droppable logic for the WHOLE column
-  const { setNodeRef: setDropRef } = useDroppable({ 
-    id: `day-${day}`,
-    data: { type: 'day', day }
-  });
+  const { setNodeRef: setDropRef } = useDroppable({ id: `day-${day}`, data: { type: 'day', day } });
 
   const style = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     zIndex: isDragging ? 50 : 1,
-    opacity: isDragging ? 0.5 : 1, // Visual feedback while dragging
+    opacity: isDragging ? 0.5 : 1,
   };
 
   return (
-    <div 
-      ref={setDropRef} // Entire column is a landing zone
-      className="flex flex-col gap-4 bg-black/5 p-2 rounded-2xl min-h-[500px] border-2 border-transparent transition-colors hover:bg-black/10"
-    >
-      <div 
-        ref={setDragRef} 
-        style={style}
-        {...listeners} 
-        {...attributes}
-        className="text-center font-bold text-satvik-teal py-3 uppercase text-[10px] tracking-widest cursor-grab active:cursor-grabbing bg-white/40 rounded-xl mb-1 shadow-sm border border-white/50"
-      >
+    <div ref={setDropRef} className="flex flex-col gap-4 bg-black/5 p-2 rounded-2xl min-h-[500px]">
+      <div ref={setDragRef} style={style} {...listeners} {...attributes}
+        className="text-center font-bold text-satvik-teal py-3 uppercase text-[10px] tracking-widest cursor-grab active:cursor-grabbing bg-white/40 rounded-xl mb-1 shadow-sm border border-white/50">
         ⋮⋮ {day}
       </div>
       {children}
@@ -96,134 +67,161 @@ function DayColumn({ day, children }) {
 }
 
 export default function App() {
-  const [weekData, setWeekData] = useState(mockWeek);
+  // 1. STORAGE: Existing (Baseline) vs Changed (Live)
+  const [baselineData] = useState(JSON.parse(JSON.stringify(mockWeek))); // Original retrieval
+  const [weekData, setWeekData] = useState(mockWeek); // Edited data
   const [selectedMeal, setSelectedMeal] = useState(null);
+  const [showAudit, setShowAudit] = useState(false);
 
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const mealTypes = ['Breakfast', 'Lunch', 'Dinner'];
 
-  // --- FIX: Sensors to distinguish between CLICK and DRAG ---
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // User must move 8px before it's a drag. Tap stays a click!
-      },
-    })
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-  // --- Logic for Drag & Drop (Options 1 & 2) ---
-  // --- REPLACE your entire handleDragEnd with this robust version ---
-const handleDragEnd = (event) => {
-  const { active, over } = event;
-  if (!over || active.id === over.id) return;
+  // 2. LOGIC: Comparison Engine (Identifies what changed)
+  // --- REPLACE your existing getChanges function with this ---
+  const getChanges = () => {
+    let changes = [];
+    days.forEach(day => {
+      mealTypes.forEach(type => {
+        const original = baselineData[day][type]?.name;
+        const current = weekData[day][type]?.name;
+        
+        if (original !== current) {
+          // MOCK CHECK: In production, this calls the Python Backend
+          // For now, we simulate availability based on the recipe name
+          const isAvailable = current !== "Paneer Butter Masala"; // Example: Out of Paneer
 
-  const isActiveDay = active.id.startsWith('day-');
+          changes.append({ 
+            day, 
+            type, 
+            from: original || "Skipped", 
+            to: current || "Skipped",
+            isAvailable: current === "Skipped" ? true : isAvailable 
+          });
+        }
+      });
+    });
+    return changes;
+  };
+  const activeChanges = getChanges();
 
-  setWeekData((prev) => {
-    const newData = JSON.parse(JSON.stringify(prev));
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const isActiveDay = active.id.startsWith('day-');
 
-    if (isActiveDay) {
-      // --- ROBUST DAY SWAP ---
-      const sourceDay = active.id.replace('day-', '');
-      
-      // Target extraction: If we drop on a meal card, we extract the day from it
-      const targetDay = over.id.startsWith('day-') 
-        ? over.id.replace('day-', '') 
-        : over.id.split('-')[1]; // Extracts 'Tue' from 'meal-Tue-Lunch'
-
-      if (sourceDay && targetDay && sourceDay !== targetDay) {
-        const tempDayData = newData[sourceDay];
+    setWeekData((prev) => {
+      const newData = JSON.parse(JSON.stringify(prev));
+      if (isActiveDay) {
+        const sourceDay = active.id.replace('day-', '');
+        const targetDay = over.id.startsWith('day-') ? over.id.replace('day-', '') : over.id.split('-')[1];
+        const temp = newData[sourceDay];
         newData[sourceDay] = newData[targetDay];
-        newData[targetDay] = tempDayData;
+        newData[targetDay] = temp;
+      } else {
+        const [ , sDay, sType] = active.id.split('-');
+        const isTargetADay = over.id.startsWith('day-');
+        const tDay = isTargetADay ? over.id.replace('day-', '') : over.id.split('-')[1];
+        const tType = isTargetADay ? sType : over.id.split('-')[2];
+        const sMeal = newData[sDay][sType];
+        newData[sDay][sType] = newData[tDay][tType];
+        newData[tDay][tType] = sMeal;
       }
-    } else {
-      // --- ROBUST MEAL SWAP ---
-      const [ , sourceDay, sourceType] = active.id.split('-');
-      
-      // If we drop a meal on a Day Header, we find a slot for it
-      const isTargetADay = over.id.startsWith('day-');
-      const targetDay = isTargetADay ? over.id.replace('day-', '') : over.id.split('-')[1];
-      const targetType = isTargetADay ? sourceType : over.id.split('-')[2];
-
-      const sourceMeal = newData[sourceDay][sourceType];
-      const targetMeal = newData[targetDay][targetType];
-
-      newData[targetDay][targetType] = sourceMeal;
-      newData[sourceDay][sourceType] = targetMeal;
-    }
-    return newData;
-  });
-};
+      return newData;
+    });
+  };
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-      <div className="min-h-screen bg-culinary-sand p-8 text-gray-800">
+      <div className="min-h-screen bg-culinary-sand p-8 text-gray-800 pb-32">
         <header className="mb-8 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-satvik-teal uppercase tracking-tighter">Weekly Blueprint</h1>
-          <div className="text-xs font-mono bg-white px-3 py-1 rounded border shadow-sm">INVENTORY: 85%</div>
+          <h1 className="text-2xl font-bold text-satvik-teal tracking-tighter uppercase">Weekly Blueprint</h1>
+          <div className="text-xs font-mono bg-white px-3 py-1 rounded border shadow-sm">STRESS: ₹1,277</div>
         </header>
 
         <div className="grid grid-cols-7 gap-4">
           {days.map((day) => (
             <DayColumn key={day} day={day}>
               {mealTypes.map((type) => (
-                <MealCard 
-                  key={`${day}-${type}`} 
-                  day={day} 
-                  type={type} 
-                  meal={weekData[day][type]} 
-                  onClick={setSelectedMeal}
-                />
+                <MealCard key={`${day}-${type}`} day={day} type={type} meal={weekData[day][type]} onClick={setSelectedMeal} />
               ))}
             </DayColumn>
           ))}
         </div>
 
-        {/* --- Options 3 & 4: Surgical Edit & Skip --- */}
+        {/* 3. UI: Review Changes Button (Only shows if there are changes) */}
+        {activeChanges.length > 0 && (
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40">
+            <button 
+              onClick={() => setShowAudit(true)}
+              className="bg-satvik-teal text-white px-8 py-4 rounded-full font-bold shadow-2xl flex items-center gap-3 animate-bounce"
+            >
+              Review {activeChanges.length} Changes
+            </button>
+          </div>
+        )}
+
+        {/* Surgical Edit Drawer (Option 3 & 4) */}
         {selectedMeal && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-end">
-            <div className="w-full bg-white rounded-t-[3rem] p-8 shadow-2xl animate-in slide-in-from-bottom">
+            <div className="w-full bg-white rounded-t-[3rem] p-8 shadow-2xl">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-satvik-teal">Edit {selectedMeal.day} {selectedMeal.type}</h2>
-                <button onClick={() => setSelectedMeal(null)} className="text-2xl text-gray-400 font-bold">✕</button>
+                <h2 className="text-xl font-bold">Edit {selectedMeal.day} {selectedMeal.type}</h2>
+                <button onClick={() => setSelectedMeal(null)} className="text-2xl text-gray-400">✕</button>
               </div>
-
-              {/* Option 3: Replace Alone */}
-              <p className="text-[10px] font-bold text-gray-400 uppercase mb-4">Alternatives</p>
               <div className="grid grid-cols-3 gap-4 mb-8">
                 {selectedMeal.current?.alternatives?.map(alt => (
-                  <div 
-                    key={alt.name} 
-                    onClick={() => {
-                      const newData = { ...weekData };
-                      newData[selectedMeal.day][selectedMeal.type] = alt;
-                      setWeekData(newData);
-                      setSelectedMeal(null);
-                    }}
-                    className="border-2 border-gray-100 p-3 rounded-2xl hover:border-satvik-gold transition cursor-pointer"
-                  >
+                  <div key={alt.name} onClick={() => {
+                    const newData = JSON.parse(JSON.stringify(weekData));
+                    newData[selectedMeal.day][selectedMeal.type] = alt;
+                    setWeekData(newData);
+                    setSelectedMeal(null);
+                  }} className="border p-3 rounded-2xl hover:border-satvik-gold cursor-pointer">
                     <img src={alt.img} className="w-full h-20 object-cover rounded-xl mb-2" />
                     <p className="text-xs font-bold">{alt.name}</p>
                   </div>
-                )) || <p className="col-span-3 text-center text-gray-400 py-4">No alternatives for this slot.</p>}
+                ))}
+              </div>
+              <button onClick={() => {
+                const newData = JSON.parse(JSON.stringify(weekData));
+                newData[selectedMeal.day][selectedMeal.type] = null;
+                setWeekData(newData);
+                setSelectedMeal(null);
+              }} className="w-full py-4 rounded-2xl bg-red-50 text-red-600 font-bold uppercase text-xs">Skip Meal</button>
+            </div>
+          </div>
+        )}
+
+        {/* 4. UI: Comparative Audit Drawer */}
+        {/* --- REPLACE the content inside the showAudit div with this --- */}
+        {showAudit && (
+          <div className="fixed inset-0 bg-satvik-teal/90 z-50 flex items-center justify-center p-6">
+            <div className="bg-white w-full max-w-lg rounded-[2rem] p-8 shadow-2xl">
+              <h2 className="text-2xl font-bold text-satvik-teal mb-6">Stock Audit</h2>
+              
+              <div className="space-y-4 mb-8">
+                {activeChanges.map((change, i) => (
+                  <div key={i} className="flex items-center justify-between border-b pb-4 border-gray-100">
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">{change.day} • {change.type}</p>
+                      <div className="flex items-center gap-2">
+                         <p className="text-sm font-bold">{change.to}</p>
+                         {/* Availability Badge */}
+                         {change.isAvailable ? (
+                           <span className="text-[9px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase">In Stock</span>
+                         ) : (
+                           <span className="text-[9px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold uppercase">Missing Items</span>
+                         )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              {/* Option 4: Skip */}
               <div className="flex gap-4">
-                <button 
-                  onClick={() => {
-                    const newData = { ...weekData };
-                    newData[selectedMeal.day][selectedMeal.type] = null;
-                    setWeekData(newData);
-                    setSelectedMeal(null);
-                  }}
-                  className="flex-1 py-4 rounded-2xl bg-red-50 text-red-600 font-bold uppercase text-xs border border-red-100"
-                >
-                  Skip Meal
-                </button>
-                <button onClick={() => setSelectedMeal(null)} className="flex-1 py-4 rounded-2xl bg-gray-100 text-gray-600 font-bold uppercase text-xs">
-                  Cancel
-                </button>
+                <button onClick={() => setShowAudit(false)} className="flex-1 py-4 font-bold text-gray-500 uppercase text-xs">Edit More</button>
+                <button className="flex-1 py-4 bg-satvik-teal text-white rounded-2xl font-bold uppercase text-xs shadow-lg">Confirm Plan</button>
               </div>
             </div>
           </div>
