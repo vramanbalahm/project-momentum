@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+@theme {
+  --color-culinary-sand: #f4f1ea;
+  --color-satvik-teal: #2d5a5a;
+  --color-satvik-gold: #d4af37;
+}
