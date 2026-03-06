@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { mockWeek } from './mockData';
 
+// path declaration 
+
+<Route path="/manage-events" element={<EventManagement householdId={myUuid} />} />
+
 // --- UI COMPONENTS ---
 
 function MealCard({ day, type, meal, auditResult, onClick }) {
