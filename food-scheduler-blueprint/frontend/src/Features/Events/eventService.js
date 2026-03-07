@@ -1,13 +1,13 @@
 // src/features/Events/eventService.js
 
-const API_BASE_URL = '/api/events'; // Adjust based on your backend config
+const API_BASE_URL = '/api/events'; 
 
 export const eventService = {
   
-  // 1. FETCH ALL: Gets both Admin (NULL house_id) and User events
-  getEvents: async (householdId) => {
+  // 1. FETCH BY YEAR: Gets Admin (NULL house_id) and User events for a specific year
+  getEvents: async (householdId, year) => {
     try {
-      const response = await fetch(`${API_BASE_URL}?household_id=${householdId}`);
+      const response = await fetch(`${API_BASE_URL}?household_id=${householdId}&year=${year}`);
       if (!response.ok) throw new Error('Failed to fetch events');
       return await response.json();
     } catch (error) {
@@ -16,13 +16,13 @@ export const eventService = {
     }
   },
 
-  // 2. CREATE: Handles the "Add to Family Calendar" action
+  // 2. CREATE: Handles adding a new UE00x2026 event
   createUserEvent: async (eventData) => {
     try {
       const response = await fetch(`${API_BASE_URL}/user-event`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(eventData), // Includes local_name, date, is_sattvic, icon, household_id
+        body: JSON.stringify(eventData),
       });
       return await response.json();
     } catch (error) {
@@ -31,22 +31,7 @@ export const eventService = {
     }
   },
 
-  // 3. UPDATE: For editing existing personal events
-  updateUserEvent: async (eventCode, updateData) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/${eventCode}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateData),
-      });
-      return await response.json();
-    } catch (error) {
-      console.error("Service Error [updateUserEvent]:", error);
-      throw error;
-    }
-  },
-
-  // 4. DELETE: Removes personal events only
+  // 3. DELETE: Removes a personal event
   deleteUserEvent: async (eventCode) => {
     try {
       const response = await fetch(`${API_BASE_URL}/${eventCode}`, {

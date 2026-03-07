@@ -45,3 +45,4 @@ const IconPickerModal = ({ selected, onSelect, onClose }) => {
     </div>
   );
 };
+export default IconPickerModal;
