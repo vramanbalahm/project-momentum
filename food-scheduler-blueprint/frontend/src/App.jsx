@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { mockWeek } from './constants/mockData';
 import EventManagement from './features/Events/EventManagement';
 
 // --- UI COMPONENTS ---
@@ -38,7 +37,7 @@ function MealCard({ day, type, meal, auditResult, onClick }) {
       <span className="text-[9px] uppercase text-gray-400 block mb-2 font-bold">{type}</span>
       {meal ? (
         <>
-          <img src={meal.img} className="w-full h-16 object-cover rounded-md mb-2 pointer-events-none" />
+          <img src={meal.img || "https://via.placeholder.com/150?text=Meal"} className="w-full h-16 object-cover rounded-md mb-2 pointer-events-none" />
           <p className="text-xs font-bold leading-tight pointer-events-none">{meal.name}</p>
         </>
       ) : (
@@ -108,19 +107,59 @@ export default function App() {
   const myUuid = "HOUSEHOLD_001";
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const dates = { 
-    'Mon':'2026-03-02', 'Tue':'2026-03-03', 'Wed':'2026-03-04', 
-    'Thu':'2026-03-05', 'Fri':'2026-03-06', 'Sat':'2026-03-07', 'Sun':'2026-03-08' 
+    'Mon':'2026-03-09', 'Tue':'2026-03-10', 'Wed':'2026-03-11', 
+    'Thu':'2026-03-12', 'Fri':'2026-03-13', 'Sat':'2026-03-14', 'Sun':'2026-03-15' 
   };
   const mealTypes = ['Breakfast', 'Lunch', 'Dinner'];
 
   const sensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
   const sensors = useSensors(sensor);
 
-  const [baselineData, setBaselineData] = useState(JSON.parse(JSON.stringify(mockWeek)));
-  const [weekData, setWeekData] = useState(mockWeek);
+  // Helper to create blank week structure
+  const createEmptyWeek = () => days.reduce((acc, day) => ({
+    ...acc, [day]: { Breakfast: null, Lunch: null, Dinner: null }
+  }), {});
+
+  const [baselineData, setBaselineData] = useState(createEmptyWeek());
+  const [weekData, setWeekData] = useState(createEmptyWeek());
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [isReviewed, setIsReviewed] = useState(false);
   const [auditResults, setAuditResults] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  // --- INITIAL DATA LOAD ---
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const planRes = await fetch(`http://127.0.0.1:8000/get-plan/${myUuid}`);
+        const savedPlan = await planRes.json();
+
+        if (savedPlan.plan && savedPlan.plan.length > 0) {
+          const transformed = createEmptyWeek();
+          savedPlan.plan.forEach(p => {
+            const dayKey = days.find(d => dates[d] === p.date);
+            if (dayKey) transformed[dayKey][p.type] = { name: p.meal_name };
+          });
+          setWeekData(transformed);
+          setBaselineData(JSON.parse(JSON.stringify(transformed)));
+        } else {
+          const sugRes = await fetch('http://127.0.0.1:8000/generate-suggestions');
+          const suggestions = await sugRes.json();
+          const autoPlan = createEmptyWeek();
+          days.forEach(d => mealTypes.forEach(t => {
+            const random = suggestions[Math.floor(Math.random() * suggestions.length)];
+            autoPlan[d][t] = { name: random.name };
+          }));
+          setWeekData(autoPlan);
+        }
+      } catch (e) {
+        console.error("Backend offline, using empty grid");
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
+  }, []);
 
   const hasChanges = JSON.stringify(baselineData) !== JSON.stringify(weekData);
 
@@ -168,10 +207,7 @@ export default function App() {
       const response = await fetch('http://127.0.0.1:8000/save-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          household_id: myUuid,
-          plan: fullPlan
-        }),
+        body: JSON.stringify({ household_id: myUuid, plan: fullPlan }),
       });
 
       if (response.ok) {
@@ -179,12 +215,8 @@ export default function App() {
         setIsReviewed(false);
         setAuditResults({});
         alert("Plan successfully saved to the database!");
-      } else {
-        throw new Error("Save failed");
       }
-    } catch (e) {
-      alert("Error saving plan. Check backend connection.");
-    }
+    } catch (e) { alert("Error saving plan."); }
   };
 
   const handleMealUpdate = (updatedMeal) => {
@@ -209,6 +241,15 @@ export default function App() {
       return newData;
     });
   };
+
+  if (loading) return (
+    <div className="min-h-screen bg-orange-50/30 flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="font-black text-orange-600 uppercase tracking-widest">Restoring Blueprint...</p>
+      </div>
+    </div>
+  );
 
   return (
     <Router>
