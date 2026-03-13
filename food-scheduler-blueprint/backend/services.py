@@ -8,16 +8,19 @@ def get_dietary_pref(db: Session, h_id: str):
     return result[0] if result else "Veg"
 
 def get_suggestions(db: Session, pref: str):
-    filter_sql = "WHERE diet_type IN ('Veg', 'Vegan')" if pref == "Veg" else "WHERE 1=1"
-    query = text(f"SELECT dish_name, recipe_code FROM recipe_dna_master {filter_sql} ORDER BY RANDOM() LIMIT 20")
+    filter_sql = "WHERE r.diet_type IN ('Veg', 'Vegan')" if pref == "Veg" else "WHERE 1=1"
+    # CRUX: Added JOIN to fetch image URLs
+    query = text(f"""
+        SELECT r.dish_name, r.recipe_code, v.hero_image_url, v.carousel_thumb_url 
+        FROM recipe_dna_master r
+        LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
+        {filter_sql} 
+        ORDER BY RANDOM() LIMIT 20
+    """)
     rows = db.execute(query).fetchall()
-    return [{"name": r[0], "code": r[1]} for r in rows]
+    return [{"name": r[0], "code": r[1], "hero": r[2], "thumb": r[3]} for r in rows]
 
 def check_momentum_divergence(db: Session, r_id: str, h_id: str):
-    """
-    CRUX: Fetches the latest price for the user's specific region and compares 
-    it against the peak_threshold defined in the Ingredient Master.
-    """
     query = text("""
         SELECT COUNT(*) 
         FROM recipe_dna_master r
@@ -33,7 +36,6 @@ def check_momentum_divergence(db: Session, r_id: str, h_id: str):
     return result > 0
 
 def execute_audit(db: Session, h_id: str, changes: list):
-    # Fetch pantry stock
     pantry_rows = db.execute(text("""
         SELECT staple_id FROM household_inventory 
         WHERE house_id = CAST(:h_id AS uuid) AND stock_status = 'In-Stock'
@@ -42,7 +44,6 @@ def execute_audit(db: Session, h_id: str, changes: list):
 
     results = []
     for item in changes:
-        # Fetch recipe details
         recipe_row = db.execute(text("""
             SELECT r.recipe_id, r.primary_staple_id, s.item_name 
             FROM recipe_dna_master r
@@ -55,13 +56,9 @@ def execute_audit(db: Session, h_id: str, changes: list):
         
         if recipe_row:
             r_id = str(recipe_row[0])
-            # Check 1: Inventory Availability
             if recipe_row[1] and recipe_row[1] not in pantry_stock:
                 is_valid, msg = False, f"Missing: {recipe_row[2] or recipe_row[1]}"
-            
-            # Check 2: Dynamic Momentum Divergence
             is_peaked = check_momentum_divergence(db, r_id, h_id)
-            
         elif item.to_meal == "Skipped":
             msg = "Meal skipped."
         else:
@@ -77,11 +74,6 @@ def execute_audit(db: Session, h_id: str, changes: list):
     return results
 
 def persist_plan(db: Session, h_id: str, plan: list):
-    """
-    CRUX: Locks the planning session and persists each meal with 
-    the correct user action status.
-    """
-    # 1. Update the Weekly Planning Session to 'Plan Locked'
     db.execute(text("""
         UPDATE weekly_planning_session 
         SET session_status = 'Plan Locked' 
@@ -89,7 +81,6 @@ def persist_plan(db: Session, h_id: str, plan: list):
     """), {"h_id": h_id})
 
     for item in plan:
-        # 2. Manage Event Headers
         header = db.execute(text("""
             SELECT event_id FROM meal_event_header 
             WHERE event_date = :e_date AND house_id = CAST(:h_id AS uuid) 
@@ -104,18 +95,13 @@ def persist_plan(db: Session, h_id: str, plan: list):
                 VALUES (CAST(:e_id AS uuid), CAST(:h_id AS uuid), :slot, :e_date)
             """), {"e_id": e_id, "h_id": h_id, "slot": item.type, "e_date": item.date})
 
-        # 3. Resolve Recipe and Persist Details
         recipe = db.execute(text("SELECT recipe_id FROM recipe_dna_master WHERE dish_name ILIKE :d_name"), 
                             {"d_name": item.meal_name}).fetchone()
         
-        # Clear existing details for this specific event slot before re-inserting
         db.execute(text("DELETE FROM meal_event_detail WHERE event_id = CAST(:e_id AS uuid)"), {"e_id": e_id})
         
         if recipe:
-            # Determine if this was a forced save (Override) or standard acceptance
-            # Note: Extension logic can be added here to check against original suggestions
             action = 'Accepted' 
-            
             db.execute(text("""
                 INSERT INTO meal_event_detail (detail_id, event_id, recipe_id, action_taken)
                 VALUES (CAST(:d_id AS uuid), CAST(:e_id AS uuid), CAST(:r_id AS uuid), CAST(:action AS user_action))
@@ -125,16 +111,17 @@ def persist_plan(db: Session, h_id: str, plan: list):
                 "r_id": str(recipe[0]),
                 "action": action
             })
-    
     db.commit()
 
 def fetch_plan(db: Session, h_id: str):
+    # CRUX: Added JOIN to fetch images for the existing plan
     query = text("""
-        SELECT h.event_date, CAST(h.meal_slot AS text), r.dish_name, r.recipe_code
+        SELECT h.event_date, CAST(h.meal_slot AS text), r.dish_name, r.recipe_code, v.hero_image_url, v.carousel_thumb_url
         FROM meal_event_header h
         JOIN meal_event_detail d ON h.event_id = d.event_id
         JOIN recipe_dna_master r ON d.recipe_id = r.recipe_id
+        LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
         WHERE h.house_id = CAST(:h_id AS uuid)
     """)
     rows = db.execute(query, {"h_id": h_id}).fetchall()
-    return {"plan": [{"date": str(r[0]), "type": r[1], "meal_name": r[2], "code": r[3]} for r in rows]}
+    return {"plan": [{"date": str(r[0]), "type": r[1], "meal_name": r[2], "code": r[3], "hero": r[4], "thumb": r[5]} for r in rows]}
