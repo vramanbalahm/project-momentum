@@ -442,9 +442,8 @@ export default function App() {
                 <div style={{ fontSize: 17, fontWeight: 500, margin: "2px 0", color: active ? "#fff" : "#2C2C2A" }}>
                   {formatDisplayDate(day)}
                 </div>
-                <div style={{ height: 3, borderRadius: 2, background: active ? "#5DCAA5" : "#EDE8E0", marginTop: 4, overflow: "hidden" }}>
-                  <div style={{ height: "100%", borderRadius: 2, background: "#1D9E75", width: `${Math.max(10, 90 - DAYS.indexOf(day) * 12)}%` }} />
-                </div>
+                {/* Inventory bar — neutral placeholder until FT-011 is built */}
+                <div style={{ height: 3, borderRadius: 2, background: active ? "rgba(255,255,255,0.2)" : "#EDE8E0", marginTop: 4 }} />
                 {/* FIX 1: Event dot only on days that actually have events */}
                 {hasEvent && (
                   <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#EF9F27", margin: "3px auto 0" }} />
