@@ -417,7 +417,7 @@ export default function App() {
         </div>
 
         {/* ── DAY RIBBON ── */}
-        <div style={{ background: "#FFF9F2", padding: "8px 12px", display: "flex", gap: 6, overflowX: "auto", borderBottom: "1px solid #EDE8E0" }}>
+        <div style={{ background: "#FFF9F2", padding: "8px 12px", display: "flex", borderBottom: "1px solid #EDE8E0" }}>
           {DAYS.map(day => {
             const active = day === selectedDay;
             const today = isToday(day);
@@ -428,9 +428,9 @@ export default function App() {
                 key={day}
                 onClick={() => { setSelectedDay(day); setViewMode('day'); }}
                 style={{
-                  flexShrink: 0, textAlign: "center",
-                  padding: "7px 8px", borderRadius: 14,
-                  cursor: "pointer", minWidth: 44,
+                  flex: 1, textAlign: "center",
+                  padding: "7px 4px", borderRadius: 14,
+                  cursor: "pointer",
                   background: active ? "#1A3A2E" : "transparent",
                   border: today && !active ? "1.5px solid #EF9F27" : "1.5px solid transparent",
                   transition: "all 0.15s"
