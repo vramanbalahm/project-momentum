@@ -416,8 +416,8 @@ export default function App() {
           )}
         </div>
 
-        {/* ── DAY RIBBON ── */}
-        <div style={{ background: "#FFF9F2", padding: "8px 12px", display: "flex", borderBottom: "1px solid #EDE8E0" }}>
+        {/* ── DAY RIBBON — hidden in week view ── */}
+        {viewMode === 'day' && <div style={{ background: "#FFF9F2", padding: "8px 12px", display: "flex", borderBottom: "1px solid #EDE8E0" }}>
           {DAYS.map(day => {
             const active = day === selectedDay;
             const today = isToday(day);
@@ -451,7 +451,7 @@ export default function App() {
               </div>
             );
           })}
-        </div>
+        </div>}
 
         {/* ── CONTENT AREA ── */}
         <div style={{ flex: 1, overflowY: "auto" }}>
