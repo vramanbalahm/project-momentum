@@ -55,9 +55,10 @@ const MEAL_CONFIG = {
   Dinner:    { icon: '🌙', color: '#EEEDFE', time: '7:30 – 9:00 pm' }
 };
 
-// FIX 3: Week overview thumbnail card
+// FIX 3: Week overview thumbnail card — with +N sides indicator
 const WeekThumbCard = ({ meal, onClick }) => {
   const main = meal?.main;
+  const sides = meal?.sides || [];
   let imgUrl = main?.thumb || main?.hero;
   if (!imgUrl && main?.name) {
     imgUrl = `/assets/meals/${main.name.toLowerCase().replace(/\s+/g, '_')}.png`;
@@ -83,6 +84,22 @@ const WeekThumbCard = ({ meal, onClick }) => {
           }}
         />
       ) : null}
+
+      {/* +N sides badge — top right corner */}
+      {sides.length > 0 && (
+        <div style={{
+          position: "absolute", top: 4, right: 4,
+          background: "rgba(26,58,46,0.85)",
+          color: "#9FE1CB",
+          fontSize: 8, fontWeight: 500,
+          padding: "2px 5px", borderRadius: 8,
+          lineHeight: 1.2
+        }}>
+          +{sides.length}
+        </div>
+      )}
+
+      {/* Dish name overlay — bottom */}
       <div style={{
         position: "absolute", bottom: 0, left: 0, right: 0,
         background: "linear-gradient(to top, rgba(26,58,46,0.85), transparent)",
