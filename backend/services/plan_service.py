@@ -2,50 +2,73 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 import uuid
 
-# --- 1. PLAN RETRIEVAL (Sprint 3: DB-First Logic) ---
+# --- 1. PLAN RETRIEVAL (FT-033: Multi-dish per slot) ---
 def fetch_active_plan(db: Session, h_id: str):
     clean_h_id = "733b3f63-0fb4-4170-877c-eb2a70f29ccb" if h_id == "HOUSEHOLD_001" else h_id
-    
+
+    # FT-033: Query now returns ALL dishes per slot (main + sides)
+    # dish_type and dish_sequence added in schema V2
     query = text("""
         SELECT 
             h.event_date as date, 
-            CAST(h.meal_slot AS text) as slot, 
+            CAST(h.meal_slot AS text) as slot,
+            h.event_id,
             r.dish_name as name, 
             r.recipe_code as code, 
             v.hero_image_url as hero, 
             v.carousel_thumb_url as thumb,
             v.prep_steps as steps,
-            d.recipe_id
+            d.recipe_id,
+            COALESCE(d.dish_type, 'Main') as dish_type,
+            COALESCE(d.dish_sequence, 1) as dish_sequence,
+            r.is_sattvic,
+            r.diet_type
         FROM meal_event_header h
         LEFT JOIN meal_event_detail d ON h.event_id = d.event_id
         LEFT JOIN recipe_dna_master r ON d.recipe_id = r.recipe_id
         LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
         WHERE h.house_id = CAST(:h_id AS uuid)
-        ORDER BY h.event_date ASC, h.meal_slot DESC
+        ORDER BY h.event_date ASC, h.meal_slot DESC, d.dish_sequence ASC
     """)
-    
+
     rows = db.execute(query, {"h_id": clean_h_id}).fetchall()
-    
-    return {
-        "plan": [
-            {
-                "date": str(r.date), 
-                "type": r.slot, 
-                "name": r.name if r.name else "Skipped", 
-                "recipe_id": str(r.recipe_id) if r.recipe_id else "",
-                "hero": r.hero,   # Maps to hero_image_url from script
-                "thumb": r.thumb, # Maps to carousel_thumb_url from script
-                "steps": r.steps  # Maps to prep_steps from script
-            } for r in rows
-        ]
-    }
+
+    # FT-033: Group dishes by date+slot into slots with main + sides
+    slots = {}
+    for r in rows:
+        key = f"{str(r.date)}_{r.slot}"
+        if key not in slots:
+            slots[key] = {
+                "date": str(r.date),
+                "type": r.slot,
+                "event_id": str(r.event_id),
+                "main": None,
+                "sides": []
+            }
+        dish = {
+            "name": r.name if r.name else "Skipped",
+            "recipe_id": str(r.recipe_id) if r.recipe_id else "",
+            "hero": r.hero,
+            "thumb": r.thumb,
+            "steps": r.steps,
+            "dish_type": r.dish_type,
+            "dish_sequence": r.dish_sequence,
+            "is_sattvic": r.is_sattvic,
+            "diet_type": str(r.diet_type) if r.diet_type else "Veg"
+        }
+        if r.dish_type == "Main":
+            slots[key]["main"] = dish
+        else:
+            slots[key]["sides"].append(dish)
+
+    return {"plan": list(slots.values())}
+
+
 # --- 2. SUGGESTIONS & SCORING (Fixed: UUID Capture) ---
 def get_suggestions(db: Session, pref: str, h_id: str):
     current_pref = str(pref).strip() if pref else "Veg"
-    test_uuid = "733b3f63-0fb4-4170-877c-eb2a70f29ccb" 
+    test_uuid = "733b3f63-0fb4-4170-877c-eb2a70f29ccb"
     clean_h_id = test_uuid if h_id == "HOUSEHOLD_001" else h_id
-
-
 
     filter_sql = "AND r.diet_type IN ('Veg', 'Vegan')" if current_pref == "Veg" else ""
 
@@ -59,7 +82,9 @@ def get_suggestions(db: Session, pref: str, h_id: str):
                 CASE WHEN inv.stock_status = 'In-Stock' THEN 50 ELSE 0 END - 
                 CASE WHEN lp.recorded_price >= s.peak_threshold AND s.peak_threshold > 0 THEN 80 ELSE 0 END
             ) as match_score,
-            r.recipe_id  -- Crucial: Added for UUID persistence
+            r.recipe_id,
+            r.is_sattvic,
+            r.diet_type
         FROM recipe_dna_master r
         LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
         LEFT JOIN staple_master_registry s ON r.primary_staple_id = s.staple_id
@@ -77,24 +102,27 @@ def get_suggestions(db: Session, pref: str, h_id: str):
 
     rows = db.execute(query, {"h_id": clean_h_id}).fetchall()
     return [{
-        "name": r[0], 
-        "code": r[1], 
-        "hero": r[2], 
-        "thumb": r[3], 
+        "name": r[0],
+        "code": r[1],
+        "hero": r[2],
+        "thumb": r[3],
         "score": r[4],
-        "recipe_id": str(r[5]) 
+        "recipe_id": str(r[5]),
+        "is_sattvic": r[6],
+        "diet_type": str(r[7]) if r[7] else "Veg"
     } for r in rows]
+
 
 # --- 3. AUDIT LOGIC (Highlights) ---
 def execute_audit(db: Session, h_id: str, changes: list):
     result_map = []
-    seen_meals = {} 
+    seen_meals = {}
 
     for change in changes:
         status = "Success"
         message = "Ready"
         score = 90
-        
+
         if change.to_meal in seen_meals and change.to_meal != "Skipped":
             status = "Conflict"
             message = f"Divergence: {change.to_meal} is repeated. High fatigue risk!"
@@ -103,9 +131,9 @@ def execute_audit(db: Session, h_id: str, changes: list):
             status = "Warning"
             message = "Single Challenge: Heavy protein load for this slot."
             score = 65
-            
+
         seen_meals[change.to_meal] = True
-        
+
         result_map.append({
             "day": change.day,
             "type": change.type,
@@ -113,16 +141,17 @@ def execute_audit(db: Session, h_id: str, changes: list):
             "message": message,
             "score": score
         })
-    
+
     return result_map
 
-# --- 4. PERSISTENCE (Continuous Save Shield) ---
+
+# --- 4. PERSISTENCE (FT-033: Multi-dish save + bug fix) ---
 from uuid import uuid4
 from sqlalchemy import text
 
 def persist_plan(db: Session, h_id: str, plan_data: list):
     clean_h_id = "733b3f63-0fb4-4170-877c-eb2a70f29ccb" if h_id == "HOUSEHOLD_001" else h_id
-    
+
     try:
         # 1. Purge existing operational records
         db.execute(
@@ -131,41 +160,61 @@ def persist_plan(db: Session, h_id: str, plan_data: list):
         )
 
         for entry in plan_data:
-            if not entry.recipe_id:
+            # FT-033: entry now has main dish + sides list
+            # Skip slots where main dish has no recipe_id
+            main = entry.get("main") if isinstance(entry, dict) else getattr(entry, "main", None)
+            sides = entry.get("sides", []) if isinstance(entry, dict) else getattr(entry, "sides", [])
+            slot = entry.get("type") if isinstance(entry, dict) else entry.type
+            date = entry.get("date") if isinstance(entry, dict) else entry.date
+
+            if not main or not main.get("recipe_id"):
                 continue
 
             new_event_id = uuid4()
 
-            # 2. Update Operational Tables (Header)
+            # 2. Insert Header (one per slot)
             db.execute(
                 text("""
                     INSERT INTO meal_event_header (event_id, house_id, meal_slot, event_date)
                     VALUES (:e_id, CAST(:h_id AS uuid), CAST(:slot AS meal_slot_type), CAST(:dt AS date))
                 """),
-                {"e_id": new_event_id, "h_id": clean_h_id, "slot": entry.type, "dt": entry.date}
+                {"e_id": new_event_id, "h_id": clean_h_id, "slot": slot, "dt": date}
             )
 
-            # 3. Update Operational Tables (Detail)
+            # 3. Insert Main dish into Detail
             db.execute(
                 text("""
-                    INSERT INTO meal_event_detail (event_id, recipe_id, action_taken)
-                    VALUES (:e_id, CAST(:r_id AS uuid), 'Accepted')
+                    INSERT INTO meal_event_detail 
+                        (event_id, recipe_id, action_taken, dish_type, dish_sequence)
+                    VALUES (:e_id, CAST(:r_id AS uuid), 'Accepted', 'Main', 1)
                 """),
-                {"e_id": new_event_id, "r_id": entry.recipe_id}
+                {"e_id": new_event_id, "r_id": main["recipe_id"]}
             )
 
-            # 4. COMMIT TO LOG TABLE (The Snapshot)
-            # This records exactly what was saved for historical tracking
+            # 4. Insert Side dishes into Detail (FT-033)
+            for seq, side in enumerate(sides, start=2):
+                if not side.get("recipe_id"):
+                    continue
+                db.execute(
+                    text("""
+                        INSERT INTO meal_event_detail 
+                            (event_id, recipe_id, action_taken, dish_type, dish_sequence)
+                        VALUES (:e_id, CAST(:r_id AS uuid), 'Accepted', 'Side', :seq)
+                    """),
+                    {"e_id": new_event_id, "r_id": side["recipe_id"], "seq": seq}
+                )
+
+            # 5. Log to meal_audit_logs (FIXED: was meal_event_log — table does not exist)
             db.execute(
                 text("""
-                    INSERT INTO meal_event_log (house_id, event_date, meal_slot, recipe_id, log_type)
-                    VALUES (CAST(:h_id AS uuid), CAST(:dt AS date), CAST(:slot AS meal_slot_type), CAST(:r_id AS uuid), 'Manual_Save')
+                    INSERT INTO meal_audit_logs 
+                        (event_id, house_id, recipe_id, issue_type, message, audit_type)
+                    VALUES (:e_id, CAST(:h_id AS uuid), CAST(:r_id AS uuid), 'Save', 'Manual_Save', 'Manual')
                 """),
                 {
-                    "h_id": clean_h_id, 
-                    "dt": entry.date, 
-                    "slot": entry.type, 
-                    "r_id": entry.recipe_id
+                    "e_id": new_event_id,
+                    "h_id": clean_h_id,
+                    "r_id": main["recipe_id"]
                 }
             )
 
@@ -175,9 +224,13 @@ def persist_plan(db: Session, h_id: str, plan_data: list):
     except Exception as e:
         db.rollback()
         raise e
-    
+
+
 # --- 5. HOUSEHOLD PREFERENCES ---
 def get_dietary_pref(db: Session, h_id: str):
     clean_h_id = "550e8400-e29b-41d4-a716-446655440000" if h_id == "HOUSEHOLD_001" else h_id
-    res = db.execute(text("SELECT dietary_preference FROM household_master WHERE household_id = CAST(:h_id AS uuid)"), {"h_id": clean_h_id}).fetchone()
+    res = db.execute(
+        text("SELECT dietary_preference FROM household_master WHERE household_id = CAST(:h_id AS uuid)"),
+        {"h_id": clean_h_id}
+    ).fetchone()
     return res[0] if res else "All"

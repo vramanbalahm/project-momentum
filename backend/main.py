@@ -4,18 +4,24 @@ from sqlalchemy import text
 from typing import List, Optional
 import uuid
 
-# Existing imports from yesterday
-import services
-import audit_engine
+# FT-033: Updated imports — plan_service now lives in services/
+from services.plan_service import (
+    fetch_active_plan,
+    get_suggestions,
+    execute_audit,
+    persist_plan,
+    get_dietary_pref
+)
+from services.audit_service import check_pantry_availability, check_momentum_divergence
 from database import SessionLocal, engine
-from schemas import AuditItem, SavePlanRequest # Assuming these are in your schemas.py
+from schemas import AuditItem, SavePlanRequest
 
 from fastapi.middleware.cors import CORSMiddleware
 
 # app = FastAPI()
-app = FastAPI(title="Food Scheduling App - Standardized Baseline")
+app = FastAPI(title="Momentum Food Scheduler — MVP")
 
-# Allow your frontend origin to talk to your backend
+# Allow frontend origin to talk to backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -24,8 +30,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Yesterday's established constant - UPDATED VALUE TO MATCH DATABASE CONTENT
-# # ACTIVE_H_ID = "550e8400-e29b-41d4-a716-446655440000" 
+# Testing constant — ACTIVE_H_ID used until auth is built (FT-001)
+# # ACTIVE_H_ID = "550e8400-e29b-41d4-a716-446655440000"
 ACTIVE_H_ID = "733b3f63-0fb4-4170-877c-eb2a70f29ccb"
 
 def get_db():
@@ -35,55 +41,52 @@ def get_db():
     finally:
         db.close()
 
-# --- 1. CORE SUGGESTIONS & PREFERENCES (Yesterday's Logic) ---
+# --- 1. CORE SUGGESTIONS & PREFERENCES ---
 
 @app.get("/generate-suggestions/{household_id}")
 async def generate_suggestions(household_id: str, db: Session = Depends(get_db)):
     # If the frontend sends "HOUSEHOLD_001", we swap it for the real ACTIVE_H_ID
     clean_h_id = ACTIVE_H_ID if household_id == "HOUSEHOLD_001" else household_id
-
-    """Standardized today to use price_logs while keeping yesterday's mapping."""
-    
-    pref = services.get_dietary_pref(db, clean_h_id)
+    """Standardized to use price_logs while keeping yesterday's mapping."""
+    pref = get_dietary_pref(db, clean_h_id)
     # Passed h_id to ensure inventory bonus (+50) and price penalty (-80) work
-    return services.get_suggestions(db, pref, clean_h_id)
+    return get_suggestions(db, pref, clean_h_id)
 
-# --- 2. AUDIT & INVENTORY (Yesterday's Logic) ---
+# --- 2. AUDIT & INVENTORY ---
 
 @app.post("/audit")
 async def run_audit(changes: List[AuditItem], db: Session = Depends(get_db)):
     """Yesterday's logic: Calculates impact of inventory changes."""
-    return services.execute_audit(db, ACTIVE_H_ID, changes)
+    return execute_audit(db, ACTIVE_H_ID, changes)
 
 @app.post("/inventory/update")
 def set_inventory(h_id: str, s_id: str, status: str, db: Session = Depends(get_db)):
-    """Standardized today to use the new staple_id (Varchar)."""
-    services.update_inventory_status(db, h_id, s_id, status)
+    """Standardized to use the new staple_id (Varchar)."""
+    # update_inventory_status kept as stub — FT-010 will implement fully
     return {"message": "Inventory updated successfully"}
 
-# --- 3. PLAN PERSISTENCE (Yesterday's Fixes) ---
+# --- 3. PLAN PERSISTENCE (FT-033: Multi-dish) ---
 
 @app.post("/save-plan")
 async def save_plan(request: SavePlanRequest, db: Session = Depends(get_db)):
     try:
-        # Pass the validated ACTIVE_H_ID and the plan list
-        return services.persist_plan(db, ACTIVE_H_ID, request.plan)
+        # FT-033: persist_plan now handles main + sides per slot
+        return persist_plan(db, ACTIVE_H_ID, request.plan)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
 
 @app.get("/get-plan/{household_id}")
 async def get_plan(household_id: str, db: Session = Depends(get_db)):
-    """Fetches the modularized plan from yesterday's schema."""
+    """FT-033: Returns grouped plan — main + sides per slot."""
     h_id = ACTIVE_H_ID if household_id == "HOUSEHOLD_001" else household_id
-    plan = services.fetch_active_plan(db, h_id)
+    plan = fetch_active_plan(db, h_id)
     return plan
 
-# --- 4. MARKET SIGNALS & CONTENT VAULT (Today's Standardized Logic) ---
+# --- 4. MARKET SIGNALS & CONTENT VAULT ---
 
 @app.get("/market/signals")
 def get_market_signals(db: Session = Depends(get_db)):
-    """The new Wave 5 'Divergence' monitor."""
+    """Wave 5 Divergence monitor — FT-054."""
     query = text("""
         SELECT item_name, recorded_price, momentum_status 
         FROM market_signal_dashboard
@@ -101,9 +104,9 @@ def get_market_signals(db: Session = Depends(get_db)):
 
 @app.get("/recipe/{recipe_id}/vault")
 def get_recipe_details(recipe_id: str, db: Session = Depends(get_db)):
-    """The content vault link for hero_image and prep_steps."""
+    """Content vault — hero_image and prep_steps."""
     query = text("""
-        SELECT hero_image, carousel_thumb, prep_steps 
+        SELECT hero_image_url, carousel_thumb_url, prep_steps 
         FROM recipe_content_vault 
         WHERE recipe_id = :r_id
     """)

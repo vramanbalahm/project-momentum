@@ -9,23 +9,40 @@ class AuditItem(BaseModel):
     to_meal: str
     date: str
 
-# --- 2. PLAN PERSISTENCE SCHEMA ---
-# Used for the "Save Plan" functionality
-class SaveItem(BaseModel):
-    day: str
-    type: str
-    meal_name: str
-    recipe_id: str  # Matches the DB column name
+# --- 2. DISH SCHEMA (FT-033: Multi-dish per slot) ---
+# Represents a single dish — main or side
+class DishItem(BaseModel):
+    recipe_id: str
+    dish_type: str = "Main"     # Main or Side
+    dish_sequence: int = 1      # Order within slot
+
+# --- 3. PLAN PERSISTENCE SCHEMA (FT-033: Updated for multi-dish) ---
+# One SaveSlotItem per meal slot — contains main dish + list of sides
+class SaveSlotItem(BaseModel):
     date: str
-    # Added for Sprint 3: Allows saving the 'Momentum' highlights to history
+    type: str                           # Breakfast / Lunch / Dinner
+    main: Optional[DishItem] = None     # Main dish
+    sides: Optional[List[DishItem]] = []  # Side dishes
+    # Audit metadata
     status: Optional[str] = "Success"
     message: Optional[str] = ""
 
 class SavePlanRequest(BaseModel):
     household_id: str
-    plan: List[SaveItem]
+    plan: List[SaveSlotItem]
 
-# --- 3. HOUSEHOLD / PREFERENCE SCHEMAS ---
+# --- 4. LEGACY SCHEMA (kept for backward compatibility — do not remove) ---
+# Used by existing /save-plan calls that send flat meal list
+class SaveItem(BaseModel):
+    day: str
+    type: str
+    meal_name: str
+    recipe_id: str
+    date: str
+    status: Optional[str] = "Success"
+    message: Optional[str] = ""
+
+# --- 5. HOUSEHOLD / PREFERENCE SCHEMAS ---
 class PreferenceUpdate(BaseModel):
     household_id: str
     dietary_preference: str
