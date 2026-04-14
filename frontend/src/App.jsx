@@ -17,7 +17,8 @@ const getCurrentWeekMonday = () => {
   const today = new Date();
   const day = today.getDay();
   const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(today.setDate(diff));
+  const monday = new Date(today);
+  monday.setDate(diff);
   monday.setHours(0, 0, 0, 0);
   return monday;
 };
@@ -29,28 +30,74 @@ const getTargetDate = (dayName) => {
 };
 
 const formatDisplayDate = (dayName) => {
-  const dateStr = getTargetDate(dayName);
-  const d = new Date(dateStr + 'T00:00:00');
+  const d = new Date(getTargetDate(dayName) + 'T00:00:00');
   return d.getDate();
 };
 
 const getMonthLabel = (dayName) => {
-  const dateStr = getTargetDate(dayName);
-  const d = new Date(dateStr + 'T00:00:00');
+  const d = new Date(getTargetDate(dayName) + 'T00:00:00');
   return d.toLocaleDateString('en-IN', { month: 'short' }).toUpperCase();
 };
 
 const isToday = (dayName) => {
-  const dateStr = getTargetDate(dayName);
-  const today = new Date().toISOString().split('T')[0];
-  return dateStr === today;
+  return getTargetDate(dayName) === new Date().toISOString().split('T')[0];
 };
 
-// MEAL TYPE CONFIG
+// FIX 1: Get event date string for this week dynamically
+const getEventDateLabel = (dayName) => {
+  const d = new Date(getTargetDate(dayName) + 'T00:00:00');
+  return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+};
+
 const MEAL_CONFIG = {
   Breakfast: { icon: '☀️', color: '#FFF3DC', time: '7:00 – 9:00 am' },
   Lunch:     { icon: '🌿', color: '#E1F5EE', time: '12:30 – 2:00 pm' },
   Dinner:    { icon: '🌙', color: '#EEEDFE', time: '7:30 – 9:00 pm' }
+};
+
+// FIX 3: Week overview thumbnail card
+const WeekThumbCard = ({ meal, onClick }) => {
+  const main = meal?.main;
+  let imgUrl = main?.thumb || main?.hero;
+  if (!imgUrl && main?.name) {
+    imgUrl = `/assets/meals/${main.name.toLowerCase().replace(/\s+/g, '_')}.png`;
+  }
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        width: "100%", height: 64, borderRadius: 10,
+        overflow: "hidden", background: "#EDE8E0",
+        position: "relative", cursor: "pointer",
+        border: "1px solid #E0DBD3"
+      }}
+    >
+      {imgUrl ? (
+        <img
+          src={imgUrl}
+          alt={main?.name || "Meal"}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.style.display = "none";
+          }}
+        />
+      ) : null}
+      <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0,
+        background: "linear-gradient(to top, rgba(26,58,46,0.85), transparent)",
+        padding: "16px 5px 4px"
+      }}>
+        <div style={{
+          color: "#fff", fontSize: 8, fontWeight: 500,
+          lineHeight: 1.2, textAlign: "center",
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+        }}>
+          {main?.name ? main.name.split(' ').slice(0, 2).join(' ') : "—"}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default function App() {
@@ -60,14 +107,18 @@ export default function App() {
   const [editing, setEditing] = useState(null);
   const [isAudited, setIsAudited] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [isPlanLocked, setIsPlanLocked] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // FIX 3: View mode — 'day' or 'week'
+  const [viewMode, setViewMode] = useState('day');
+
   const [selectedDay, setSelectedDay] = useState(() => {
     const today = new Date();
     const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
     const todayName = dayNames[today.getDay()];
     return DAYS.includes(todayName) ? todayName : 'Monday';
   });
-  const [isPlanLocked, setIsPlanLocked] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
 
@@ -127,8 +178,7 @@ export default function App() {
         const auditPayload = Object.entries(initialMap).map(([key, val]) => {
           const [day, type] = key.split('-');
           return {
-            day,
-            type,
+            day, type,
             to_meal: val?.main?.name || "Skipped",
             date: getTargetDate(day)
           };
@@ -149,18 +199,12 @@ export default function App() {
     init();
   }, []);
 
-  // RETAINED: Manual Audit triggered ONLY by the button
+  // RETAINED: Manual Audit
   const runAudit = async () => {
     const payload = Object.entries(blueprint).map(([key, val]) => {
       const [day, type] = key.split('-');
-      return {
-        day,
-        type,
-        to_meal: val?.main?.name || "Skipped",
-        date: getTargetDate(day)
-      };
+      return { day, type, to_meal: val?.main?.name || "Skipped", date: getTargetDate(day) };
     });
-
     try {
       const res = await axios.post(`${API_BASE}/audit`, payload);
       const resultMap = {};
@@ -168,43 +212,28 @@ export default function App() {
       setAuditResults(resultMap);
       setIsAudited(true);
       setIsDirty(false);
-    } catch {
-      console.error("Audit failed");
-    }
+    } catch { console.error("Audit failed"); }
   };
 
   const savePlan = async () => {
-    // FT-033: Build multi-dish payload
     const payload = {
       household_id: HH_ID,
       plan: Object.entries(blueprint).map(([key, val]) => {
         const [day, type] = key.split('-');
         const audit = auditResults[key] || {};
         return {
-          date: getTargetDate(day),
-          type,
-          main: val?.main ? {
-            recipe_id: val.main.recipe_id || "",
-            dish_type: "Main",
-            dish_sequence: 1
-          } : null,
-          sides: (val?.sides || []).map((s, idx) => ({
-            recipe_id: s.recipe_id || "",
-            dish_type: "Side",
-            dish_sequence: idx + 2
-          })),
+          date: getTargetDate(day), type,
+          main: val?.main ? { recipe_id: val.main.recipe_id || "", dish_type: "Main", dish_sequence: 1 } : null,
+          sides: (val?.sides || []).map((s, idx) => ({ recipe_id: s.recipe_id || "", dish_type: "Side", dish_sequence: idx + 2 })),
           status: audit.status || "Success",
           message: audit.message || ""
         };
       }).filter(s => s.main && s.main.recipe_id)
     };
-
     try {
       const response = await axios.post(`${API_BASE}/save-plan`, payload);
       if (response.data.status === "success") {
-        setIsDirty(false);
-        setIsAudited(true);
-        setIsPlanLocked(true);
+        setIsDirty(false); setIsAudited(true); setIsPlanLocked(true);
       }
     } catch (err) {
       console.error("Critical: Save failed:", err);
@@ -218,7 +247,6 @@ export default function App() {
     const targetSlot = over.id;
     const draggedMeal = active.data.current?.meal;
     const sourceId = String(active.id);
-
     setBlueprint(prev => {
       const newBlueprint = { ...prev };
       if (sourceId.startsWith('drag-')) {
@@ -230,77 +258,75 @@ export default function App() {
       }
       return newBlueprint;
     });
-
-    setIsDirty(true);
-    setIsAudited(false);
-    setIsPlanLocked(false);
+    setIsDirty(true); setIsAudited(false); setIsPlanLocked(false);
   };
 
-  // Determine CTA button state
+  // FIX 2: CTA button — more visible
   const getCtaButton = () => {
     if (isPlanLocked) return {
-      label: "Plan locked",
-      bg: "#5DCAA5", color: "#085041",
+      label: "Plan locked ✓",
+      bg: "#5DCAA5", color: "#085041", border: "none",
       onClick: () => { setIsPlanLocked(false); setIsDirty(true); }
     };
     if (!isAudited || isDirty) return {
       label: "Review plan",
-      bg: "#EF9F27", color: "#2C2C2A",
+      bg: "#EF9F27", color: "#2C2C2A", border: "none",
       onClick: runAudit
     };
     return {
       label: "Save & lock",
-      bg: "#1A3A2E", color: "#FDFCF8",
+      bg: "#FDFCF8", color: "#1A3A2E", border: "2px solid #5DCAA5",
       onClick: savePlan
     };
   };
 
   const cta = getCtaButton();
 
-  // Selected day's meals
+  // FIX 1: Demo events matched to actual current week dates
+  const demoEvents = [
+    { dayName: "Wednesday", emoji: "🎂", title: "Amma's Birthday", pill: "Feast day", pillBg: "#FAECE7", pillColor: "#712B13" },
+    { dayName: "Friday",    emoji: "🕉",  title: "Amavasai",       pill: "Satvik required", pillBg: "#E1F5EE", pillColor: "#085041" }
+  ];
+
   const selectedDayMeals = MEAL_TYPES.map(type => ({
     type,
     meal: blueprint[`${selectedDay}-${type}`] || null,
     auditResult: auditResults[`${selectedDay}-${type}`] || null
   }));
 
+  const greeting = new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 17 ? "Good afternoon" : "Good evening";
+
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#F5F0E8",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      fontFamily: "system-ui, -apple-system, sans-serif"
-    }}>
-      {/* Phone frame wrapper — mobile-first */}
-      <div style={{
-        width: "100%",
-        maxWidth: 430,
-        minHeight: "100vh",
-        background: "#FFF9F2",
-        display: "flex",
-        flexDirection: "column",
-        position: "relative"
-      }}>
+    <div style={{ minHeight: "100vh", background: "#F5F0E8", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      <div style={{ width: "100%", maxWidth: 430, minHeight: "100vh", background: "#FFF9F2", display: "flex", flexDirection: "column" }}>
 
         {/* ── HEADER ── */}
-        <div style={{ background: "#1A3A2E", padding: "48px 20px 16px" }}>
+        <div style={{ background: "#1A3A2E", padding: "48px 20px 14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
             <div>
-              <div style={{ color: "#9FE1CB", fontSize: 12, marginBottom: 2 }}>
-                Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"} 👋
-              </div>
-              <div style={{ color: "#FDFCF8", fontSize: 20, fontWeight: 500, letterSpacing: -0.3 }}>
-                Your week awaits
-              </div>
+              <div style={{ color: "#9FE1CB", fontSize: 12, marginBottom: 2 }}>{greeting} 👋</div>
+              <div style={{ color: "#FDFCF8", fontSize: 20, fontWeight: 500, letterSpacing: -0.3 }}>Your week awaits</div>
             </div>
-            <div style={{
-              width: 36, height: 36, borderRadius: "50%",
-              background: "#2C4A3E", border: "2px solid #5DCAA5",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#9FE1CB", fontSize: 13, fontWeight: 500
-            }}>V</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {/* FIX 4: Save & lock in header too */}
+              <button
+                onClick={cta.onClick}
+                style={{
+                  background: cta.bg, color: cta.color,
+                  border: cta.border || "none",
+                  borderRadius: 12, padding: "8px 14px",
+                  fontSize: 12, fontWeight: 500, cursor: "pointer"
+                }}
+              >
+                {cta.label}
+              </button>
+              <div style={{
+                width: 34, height: 34, borderRadius: "50%",
+                background: "#2C4A3E", border: "2px solid #5DCAA5",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#9FE1CB", fontSize: 13, fontWeight: 500, flexShrink: 0
+              }}>V</div>
+            </div>
           </div>
 
           {/* Context chips */}
@@ -308,13 +334,9 @@ export default function App() {
             {[
               { icon: "🛒", val: "Market", label: "Check signals" },
               { icon: "🧊", val: "Fridge", label: "Update stock" },
-              { icon: "👨‍👩‍👧", val: "4", label: "Members this week" }
+              { icon: "👨‍👩‍👧", val: "4 members", label: "This week" }
             ].map((chip, i) => (
-              <div key={i} style={{
-                flex: 1, background: "rgba(255,255,255,0.08)",
-                borderRadius: 10, padding: "8px 8px",
-                border: "0.5px solid rgba(255,255,255,0.12)"
-              }}>
+              <div key={i} style={{ flex: 1, background: "rgba(255,255,255,0.08)", borderRadius: 10, padding: "8px 8px", border: "0.5px solid rgba(255,255,255,0.12)" }}>
                 <div style={{ fontSize: 14, marginBottom: 2 }}>{chip.icon}</div>
                 <div style={{ color: "#FDFCF8", fontSize: 11, fontWeight: 500 }}>{chip.val}</div>
                 <div style={{ color: "#9FE1CB", fontSize: 9, marginTop: 1 }}>{chip.label}</div>
@@ -323,25 +345,25 @@ export default function App() {
           </div>
         </div>
 
-        {/* ── EVENT BANNER ── */}
+        {/* ── EVENT BANNER — FIX 1: dates match current week ── */}
         <div style={{ background: "#FFF3DC", borderBottom: "1.5px solid #FAC775", padding: "10px 16px" }}>
           <div style={{ fontSize: 9, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.1em", color: "#854F0B", marginBottom: 8 }}>
             Special this week
           </div>
           <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
-            {[
-              { emoji: "🎂", title: "Amma's Birthday", date: "Wed, 15 Apr", pill: "Feast day", pillBg: "#FAECE7", pillColor: "#712B13" },
-              { emoji: "🕉", title: "Amavasai", date: "Fri, 18 Apr", pill: "Satvik required", pillBg: "#E1F5EE", pillColor: "#085041" }
-            ].map((ev, i) => (
+            {demoEvents.map((ev, i) => (
               <div key={i} style={{
                 flexShrink: 0, background: "#fff", borderRadius: 14,
                 padding: "8px 12px", border: "1px solid #FAC775",
-                display: "flex", alignItems: "center", gap: 8, minWidth: 160
+                display: "flex", alignItems: "center", gap: 8, minWidth: 165
               }}>
                 <span style={{ fontSize: 22 }}>{ev.emoji}</span>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 500, color: "#2C2C2A" }}>{ev.title}</div>
-                  <div style={{ fontSize: 10, color: "#888780", marginTop: 1 }}>{ev.date}</div>
+                  {/* FIX 1: Dynamic date from actual current week */}
+                  <div style={{ fontSize: 10, color: "#888780", marginTop: 1 }}>
+                    {getEventDateLabel(ev.dayName)}
+                  </div>
                   <div style={{
                     display: "inline-block", fontSize: 9, padding: "1px 7px",
                     borderRadius: 20, fontWeight: 500, marginTop: 3,
@@ -353,94 +375,179 @@ export default function App() {
           </div>
         </div>
 
+        {/* ── VIEW TOGGLE — FIX 3 ── */}
+        <div style={{ background: "#FFF9F2", padding: "8px 16px", display: "flex", gap: 8, borderBottom: "1px solid #EDE8E0", alignItems: "center" }}>
+          {['day', 'week'].map(mode => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              style={{
+                padding: "5px 14px", borderRadius: 20,
+                border: viewMode === mode ? "none" : "1px solid #EDE8E0",
+                background: viewMode === mode ? "#1A3A2E" : "transparent",
+                color: viewMode === mode ? "#9FE1CB" : "#888780",
+                fontSize: 11, fontWeight: 500, cursor: "pointer"
+              }}
+            >
+              {mode === 'day' ? '📅 Day view' : '📆 Week view'}
+            </button>
+          ))}
+          {isDirty && (
+            <div style={{ marginLeft: "auto", fontSize: 10, color: "#EF9F27", fontWeight: 500 }}>
+              ● Unsaved changes
+            </div>
+          )}
+        </div>
+
         {/* ── DAY RIBBON ── */}
-        <div style={{
-          background: "#FFF9F2", padding: "10px 12px",
-          display: "flex", gap: 6, overflowX: "auto",
-          borderBottom: "1px solid #EDE8E0"
-        }}>
+        <div style={{ background: "#FFF9F2", padding: "8px 12px", display: "flex", gap: 6, overflowX: "auto", borderBottom: "1px solid #EDE8E0" }}>
           {DAYS.map(day => {
             const active = day === selectedDay;
             const today = isToday(day);
+            // FIX 1: Check if this day has an event
+            const hasEvent = demoEvents.some(ev => ev.dayName === day);
             return (
               <div
                 key={day}
-                onClick={() => setSelectedDay(day)}
+                onClick={() => { setSelectedDay(day); setViewMode('day'); }}
                 style={{
                   flexShrink: 0, textAlign: "center",
                   padding: "7px 8px", borderRadius: 14,
                   cursor: "pointer", minWidth: 44,
                   background: active ? "#1A3A2E" : "transparent",
-                  border: today && !active ? "1.5px solid #EF9F27" : "none",
+                  border: today && !active ? "1.5px solid #EF9F27" : "1.5px solid transparent",
                   transition: "all 0.15s"
                 }}
               >
-                <div style={{
-                  fontSize: 9, fontWeight: 500,
-                  textTransform: "uppercase", letterSpacing: "0.04em",
-                  color: active ? "#9FE1CB" : "#B4B2A9"
-                }}>{day.substring(0, 3)}</div>
-                <div style={{
-                  fontSize: 17, fontWeight: 500, margin: "2px 0",
-                  color: active ? "#fff" : "#2C2C2A"
-                }}>{formatDisplayDate(day)}</div>
-                {/* Inventory bar */}
+                <div style={{ fontSize: 9, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", color: active ? "#9FE1CB" : "#B4B2A9" }}>
+                  {day.substring(0, 3)}
+                </div>
+                <div style={{ fontSize: 17, fontWeight: 500, margin: "2px 0", color: active ? "#fff" : "#2C2C2A" }}>
+                  {formatDisplayDate(day)}
+                </div>
                 <div style={{ height: 3, borderRadius: 2, background: active ? "#5DCAA5" : "#EDE8E0", marginTop: 4, overflow: "hidden" }}>
                   <div style={{ height: "100%", borderRadius: 2, background: "#1D9E75", width: `${Math.max(10, 90 - DAYS.indexOf(day) * 12)}%` }} />
                 </div>
+                {/* FIX 1: Event dot only on days that actually have events */}
+                {hasEvent && (
+                  <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#EF9F27", margin: "3px auto 0" }} />
+                )}
               </div>
             );
           })}
         </div>
 
-        {/* ── SELECTED DAY MEALS ── */}
-        <div style={{ flex: 1, padding: "12px 14px", overflowY: "auto" }}>
+        {/* ── CONTENT AREA ── */}
+        <div style={{ flex: 1, overflowY: "auto" }}>
+
           {isLoading ? (
-            <div style={{ textAlign: "center", padding: "40px 0", color: "#B4B2A9", fontSize: 14 }}>
+            <div style={{ textAlign: "center", padding: "48px 0", color: "#B4B2A9", fontSize: 14 }}>
               Loading your plan...
             </div>
+          ) : viewMode === 'day' ? (
+
+            /* ── DAY VIEW ── */
+            <div style={{ padding: "12px 14px" }}>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                {selectedDayMeals.map(({ type, meal, auditResult }) => (
+                  <div key={type} style={{ marginBottom: 4 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 2px 4px" }}>
+                      <div style={{ width: 26, height: 26, borderRadius: "50%", background: MEAL_CONFIG[type].color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>
+                        {MEAL_CONFIG[type].icon}
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: "#2C2C2A" }}>{type}</span>
+                      <span style={{ fontSize: 10, color: "#B4B2A9", marginLeft: "auto" }}>{MEAL_CONFIG[type].time}</span>
+                    </div>
+                    <MealCard
+                      key={`${selectedDay}-${type}`}
+                      day={selectedDay}
+                      type={type}
+                      meal={meal}
+                      auditResult={auditResult}
+                      onClick={(data) => setEditing(data)}
+                    />
+                  </div>
+                ))}
+              </DndContext>
+            </div>
+
           ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              {selectedDayMeals.map(({ type, meal, auditResult }) => (
-                <div key={type} style={{ marginBottom: 4 }}>
-                  {/* Meal type label */}
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    padding: "6px 2px 4px"
-                  }}>
+
+            /* ── WEEK VIEW — FIX 3: Read-only overview ── */
+            <div style={{ padding: "12px 14px" }}>
+              <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 12, fontStyle: "italic" }}>
+                Tap any meal to edit that day
+              </div>
+
+              {/* Column headers */}
+              <div style={{ display: "grid", gridTemplateColumns: "60px repeat(7, 1fr)", gap: 4, marginBottom: 6 }}>
+                <div />
+                {DAYS.map(day => (
+                  <div key={day} style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 9, fontWeight: 500, color: "#B4B2A9", textTransform: "uppercase" }}>
+                      {day.substring(0, 3)}
+                    </div>
                     <div style={{
-                      width: 26, height: 26, borderRadius: "50%",
-                      background: MEAL_CONFIG[type].color,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 13
-                    }}>{MEAL_CONFIG[type].icon}</div>
-                    <span style={{ fontSize: 12, fontWeight: 500, color: "#2C2C2A" }}>{type}</span>
-                    <span style={{ fontSize: 10, color: "#B4B2A9", marginLeft: "auto" }}>{MEAL_CONFIG[type].time}</span>
+                      fontSize: 13, fontWeight: 500,
+                      color: isToday(day) ? "#EF9F27" : "#2C2C2A",
+                      background: day === selectedDay ? "#E1F5EE" : "transparent",
+                      borderRadius: 6, padding: "1px 0"
+                    }}>
+                      {formatDisplayDate(day)}
+                    </div>
+                    {/* Event dot */}
+                    {demoEvents.some(ev => ev.dayName === day) && (
+                      <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#EF9F27", margin: "2px auto 0" }} />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Meal rows */}
+              {MEAL_TYPES.map(type => (
+                <div key={type} style={{ display: "grid", gridTemplateColumns: "60px repeat(7, 1fr)", gap: 4, marginBottom: 6, alignItems: "start" }}>
+                  {/* Meal type label */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8 }}>
+                    <div style={{ fontSize: 14 }}>{MEAL_CONFIG[type].icon}</div>
+                    <div style={{ fontSize: 8, color: "#B4B2A9", fontWeight: 500, textTransform: "uppercase", marginTop: 2 }}>
+                      {type.substring(0, 5)}
+                    </div>
                   </div>
 
-                  <MealCard
-                    key={`${selectedDay}-${type}`}
-                    day={selectedDay}
-                    type={type}
-                    meal={meal}
-                    auditResult={auditResult}
-                    onClick={(data) => setEditing(data)}
-                  />
+                  {/* Meal thumbnail per day */}
+                  {DAYS.map(day => (
+                    <WeekThumbCard
+                      key={`${day}-${type}`}
+                      meal={blueprint[`${day}-${type}`]}
+                      onClick={() => { setSelectedDay(day); setViewMode('day'); }}
+                    />
+                  ))}
                 </div>
               ))}
-            </DndContext>
+
+              {/* Weekly summary */}
+              <div style={{
+                marginTop: 12, padding: "10px 14px",
+                background: "#1A3A2E", borderRadius: 14,
+                display: "flex", justifyContent: "space-around"
+              }}>
+                {[
+                  { val: "21", label: "Total meals" },
+                  { val: "C2.4", label: "Avg level" },
+                  { val: "78%", label: "Fridge use" }
+                ].map((s, i) => (
+                  <div key={i} style={{ textAlign: "center" }}>
+                    <div style={{ color: "#FDFCF8", fontSize: 15, fontWeight: 500 }}>{s.val}</div>
+                    <div style={{ color: "#5DCAA5", fontSize: 9, marginTop: 1 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
-        {/* ── BOTTOM NAV BAR ── */}
-        <div style={{
-          background: "#1A3A2E",
-          padding: "12px 20px 28px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center"
-        }}>
-          {/* Weekly stats */}
+        {/* ── BOTTOM NAV BAR — FIX 2: more visible CTA ── */}
+        <div style={{ background: "#1A3A2E", padding: "12px 20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           {[
             { val: "21", label: "Meals" },
             { val: "C2.4", label: "Avg level" },
@@ -451,20 +558,15 @@ export default function App() {
               <div style={{ color: "#5DCAA5", fontSize: 9, marginTop: 1 }}>{stat.label}</div>
             </div>
           ))}
-
-          {/* CTA Button */}
+          {/* FIX 2: High contrast button */}
           <button
             onClick={cta.onClick}
             style={{
-              background: cta.bg,
-              color: cta.color,
-              border: "none",
-              borderRadius: 14,
-              padding: "10px 18px",
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: "all 0.15s"
+              background: cta.bg, color: cta.color,
+              border: cta.border || "none",
+              borderRadius: 14, padding: "11px 20px",
+              fontSize: 13, fontWeight: 500, cursor: "pointer",
+              boxShadow: isPlanLocked ? "none" : "0 0 0 3px rgba(239,159,39,0.3)"
             }}
           >
             {cta.label}
@@ -478,10 +580,7 @@ export default function App() {
             onClose={() => setEditing(null)}
             suggestions={suggestions}
             onSave={(updated) => {
-              setBlueprint(prev => ({
-                ...prev,
-                [`${editing.day}-${editing.type}`]: updated
-              }));
+              setBlueprint(prev => ({ ...prev, [`${editing.day}-${editing.type}`]: updated }));
               setEditing(null);
               setIsDirty(true);
               setIsAudited(false);
