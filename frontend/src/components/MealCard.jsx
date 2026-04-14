@@ -38,9 +38,6 @@ export default function MealCard({ day, type, meal, auditResult, onClick }) {
     : auditResult?.status === "Conflict" ? "#E24B4A"
     : "#B4B2A9";
 
-  // Meal type icon
-  const mealIcon = type === "Breakfast" ? "☀️" : type === "Lunch" ? "🌿" : "🌙";
-
   return (
     <div
       ref={setDroppableRef}
@@ -58,23 +55,6 @@ export default function MealCard({ day, type, meal, auditResult, onClick }) {
         {...listeners}
         {...attributes}
       >
-        {/* Meal type label */}
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "8px 14px 0"
-        }}>
-          <span style={{ fontSize: 14 }}>{mealIcon}</span>
-          <span style={{
-            fontSize: 10,
-            fontWeight: 500,
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            color: "#B4B2A9"
-          }}>{type}</span>
-        </div>
-
         {/* Main dish hero image */}
         <div
           style={{ height: 110, position: "relative", overflow: "hidden", cursor: "pointer" }}
