@@ -321,7 +321,7 @@ export default function App() {
         <div style={{ background: "#1A3A2E", padding: "48px 20px 14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
             <div>
-              <div style={{ color: "#9FE1CB", fontSize: 12, marginBottom: 2 }}>{greeting} 👋</div>
+              <div style={{ color: "#9FE1CB", fontSize: 12, marginBottom: 2 }}>{greeting}, Bala 👋</div>
               <div style={{ color: "#FDFCF8", fontSize: 20, fontWeight: 500, letterSpacing: -0.3 }}>Your week awaits</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
