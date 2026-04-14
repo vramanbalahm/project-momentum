@@ -114,3 +114,7 @@ def get_recipe_details(recipe_id: str, db: Session = Depends(get_db)):
     if not result:
         raise HTTPException(status_code=404, detail="Recipe content not found")
     return {"hero": result[0], "thumb": result[1], "steps": result[2]}
+
+# --- 5. WEEKLY PLAN ROUTER (FT-030) ---
+from routers.weekly_plan import router as weekly_plan_router
+app.include_router(weekly_plan_router)
