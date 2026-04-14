@@ -124,7 +124,8 @@ export default function App() {
   const [editing, setEditing] = useState(null);
   const [isAudited, setIsAudited] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  const [isPlanLocked, setIsPlanLocked] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // FIX 3: View mode — 'day' or 'week'
@@ -248,11 +249,16 @@ export default function App() {
       }).filter(s => s.main && s.main.recipe_id)
     };
     try {
+      setIsSaving(true);
       const response = await axios.post(`${API_BASE}/save-plan`, payload);
       if (response.data.status === "success") {
-        setIsDirty(false); setIsAudited(true); setIsPlanLocked(true);
+        setIsDirty(false);
+        setIsAudited(true);
+        setIsSaved(true);
+        setIsSaving(false);
       }
     } catch (err) {
+      setIsSaving(false);
       console.error("Critical: Save failed:", err);
       alert("Saving Failed. Please check your connection or database.");
     }
@@ -275,15 +281,23 @@ export default function App() {
       }
       return newBlueprint;
     });
-    setIsDirty(true); setIsAudited(false); setIsPlanLocked(false);
+    setIsDirty(true); setIsAudited(false); setIsSaved(false);
   };
 
-  // FIX 2: CTA button — more visible
+  // Button state — no lock concept. Always invite the user to review.
+  // Saved plan on load → Review plan (warm, inviting)
+  // After audit → Save plan (ready to persist)
+  // After save → Saved ✓ briefly, then back to Review plan
   const getCtaButton = () => {
-    if (isPlanLocked) return {
-      label: "Plan locked ✓",
+    if (isSaving) return {
+      label: "Saving...",
+      bg: "#B4B2A9", color: "#fff", border: "none",
+      onClick: () => {}
+    };
+    if (isSaved && !isDirty) return {
+      label: "Saved ✓",
       bg: "#5DCAA5", color: "#085041", border: "none",
-      onClick: () => { setIsPlanLocked(false); setIsDirty(true); }
+      onClick: runAudit   // Tap saved → re-review anytime
     };
     if (!isAudited || isDirty) return {
       label: "Review plan",
@@ -291,7 +305,7 @@ export default function App() {
       onClick: runAudit
     };
     return {
-      label: "Save & lock",
+      label: "Save plan",
       bg: "#FDFCF8", color: "#1A3A2E", border: "2px solid #5DCAA5",
       onClick: savePlan
     };
@@ -325,7 +339,7 @@ export default function App() {
               <div style={{ color: "#FDFCF8", fontSize: 20, fontWeight: 500, letterSpacing: -0.3 }}>Your week awaits</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {/* FIX 4: Save & lock in header too */}
+              {/* Save button in header — same state as bottom bar */}
               <button
                 onClick={cta.onClick}
                 style={{
@@ -562,7 +576,7 @@ export default function App() {
           )}
         </div>
 
-        {/* ── BOTTOM NAV BAR — FIX 2: more visible CTA ── */}
+        {/* ── BOTTOM NAV BAR ── */}
         <div style={{ background: "#1A3A2E", padding: "12px 20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           {[
             { val: "21", label: "Meals" },
@@ -574,7 +588,7 @@ export default function App() {
               <div style={{ color: "#5DCAA5", fontSize: 9, marginTop: 1 }}>{stat.label}</div>
             </div>
           ))}
-          {/* FIX 2: High contrast button */}
+          {/* Save button — high contrast, always visible */}
           <button
             onClick={cta.onClick}
             style={{
@@ -582,7 +596,7 @@ export default function App() {
               border: cta.border || "none",
               borderRadius: 14, padding: "11px 20px",
               fontSize: 13, fontWeight: 500, cursor: "pointer",
-              boxShadow: isPlanLocked ? "none" : "0 0 0 3px rgba(239,159,39,0.3)"
+              boxShadow: !isSaved ? "0 0 0 3px rgba(239,159,39,0.3)" : "none"
             }}
           >
             {cta.label}
@@ -600,7 +614,7 @@ export default function App() {
               setEditing(null);
               setIsDirty(true);
               setIsAudited(false);
-              setIsPlanLocked(false);
+              setIsSaved(false);
             }}
           />
         )}
