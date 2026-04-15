@@ -146,6 +146,7 @@ export default function App() {
   // Week navigation — 0 = current week, negative = past weeks, positive blocked for MVP
   const [weekOffset, setWeekOffset] = useState(0);
   const [showCopyConfirm, setShowCopyConfirm] = useState(false);
+  const [hasNextWeekData, setHasNextWeekData] = useState(false);
 
   // FIX 3: View mode — 'day' or 'week'
   const [viewMode, setViewMode] = useState('day');
@@ -204,23 +205,33 @@ export default function App() {
 
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
 
-  // Load plan when week offset changes (navigating to past weeks)
+  // Load plan when week offset changes + always check if next week has data
   useEffect(() => {
-    if (weekOffset === 0) return; // current week handled by init()
-    const loadPastWeek = async () => {
+    const loadWeekPlan = async () => {
+      // Check if next week has data (to enable/disable >> button)
+      try {
+        const nextMonday = getCurrentWeekMonday();
+        nextMonday.setDate(nextMonday.getDate() + (weekOffset + 1) * 7);
+        const nextMondayStr = toLocalDateString(nextMonday);
+        const nextRes = await axios.get(`${API_BASE}/get-plan/${HH_ID}?week_start=${nextMondayStr}`);
+        setHasNextWeekData(nextRes.data?.plan && nextRes.data.plan.length > 0);
+      } catch { setHasNextWeekData(false); }
+
+      if (weekOffset === 0) return; // current week handled by init()
+
       setIsLoading(true);
       try {
         const monday = getOffsetWeekMonday();
         const mondayStr = toLocalDateString(monday);
         const planRes = await axios.get(`${API_BASE}/get-plan/${HH_ID}?week_start=${mondayStr}`);
-        const pastMap = {};
+        const weekMap = {};
         if (planRes.data?.plan && planRes.data.plan.length > 0) {
           planRes.data.plan.forEach(slot => {
             const [yyyy, mm, dd] = slot.date.split('-').map(Number);
             const dateObj = new Date(yyyy, mm - 1, dd);
             const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
             if (slot.main && slot.main.name !== "Skipped") {
-              pastMap[`${dayName}-${slot.type}`] = {
+              weekMap[`${dayName}-${slot.type}`] = {
                 main: slot.main,
                 sides: slot.sides || [],
                 event_id: slot.event_id
@@ -228,23 +239,24 @@ export default function App() {
             }
           });
         }
-        setBlueprint(pastMap);
+        setBlueprint(weekMap);
       } catch (err) {
-        console.error("Failed to load past week plan:", err);
+        console.error("Failed to load week plan:", err);
       } finally {
         setIsLoading(false);
       }
     };
-    loadPastWeek();
+    loadWeekPlan();
   }, [weekOffset]);
 
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
       try {
+        const currentMondayStr = toLocalDateString(getCurrentWeekMonday());
         const [suggRes, planRes] = await Promise.all([
           axios.get(`${API_BASE}/generate-suggestions/${HH_ID}`),
-          axios.get(`${API_BASE}/get-plan/${HH_ID}`)
+          axios.get(`${API_BASE}/get-plan/${HH_ID}?week_start=${currentMondayStr}`)
         ]);
 
         setSuggestions(suggRes.data);
@@ -537,37 +549,60 @@ export default function App() {
           )}
         </div>
 
-        {/* ── WEEK NAVIGATOR + DAY RIBBON — hidden in week view ── */}
-        {viewMode === 'day' && (
-          <div style={{ background: "#FFF9F2", borderBottom: "1px solid #EDE8E0" }}>
+        {/* ── WEEK NAVIGATOR — shown in both day and week view ── */}
+        <div style={{ background: "#FFF9F2", borderBottom: "1px solid #EDE8E0" }}>
 
-            {/* Week nav row — << week label >> */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px 2px" }}>
-              {/* Previous week */}
-              <button
-                onClick={() => { setWeekOffset(prev => prev - 1); setSelectedDay('Monday'); }}
-                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#1A3A2E", padding: "2px 6px", borderRadius: 8 }}
-              >‹‹</button>
+          {/* Week nav row — << week label [Today] >> */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px 2px" }}>
+            {/* Previous week */}
+            <button
+              onClick={() => { setWeekOffset(prev => prev - 1); setSelectedDay('Monday'); }}
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#1A3A2E", padding: "2px 6px", borderRadius: 8 }}
+            >‹‹</button>
 
-              {/* Week label */}
-              <div style={{ fontSize: 10, fontWeight: 500, color: weekOffset === 0 ? "#1A3A2E" : "#EF9F27", letterSpacing: "0.02em" }}>
-                {weekOffset === 0 ? "This week" : weekOffset === -1 ? "Last week" : `${Math.abs(weekOffset)} weeks ago`}
-                {"  "}
-                <span style={{ color: "#B4B2A9", fontWeight: 400 }}>{getWeekLabel()}</span>
+            {/* Week label + Today button */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 500, color: weekOffset === 0 ? "#1A3A2E" : "#EF9F27", letterSpacing: "0.02em", textAlign: "center" }}>
+                {weekOffset === 0 ? "This week" : weekOffset === -1 ? "Last week" : weekOffset === 1 ? "Next week" : weekOffset > 0 ? `${weekOffset} weeks ahead` : `${Math.abs(weekOffset)} weeks ago`}
+                <span style={{ color: "#B4B2A9", fontWeight: 400, display: "block", fontSize: 9 }}>{getWeekLabel()}</span>
               </div>
-
-              {/* Next week — blocked for MVP */}
-              <button
-                disabled={weekOffset >= 0}
-                style={{ background: "none", border: "none", fontSize: 16, padding: "2px 6px", borderRadius: 8,
-                  color: weekOffset >= 0 ? "#D0CEC8" : "#1A3A2E",
-                  cursor: weekOffset >= 0 ? "not-allowed" : "pointer"
-                }}
-              >››</button>
+              {/* Today button — only shown when not on current week */}
+              {!isCurrentWeek && (
+                <button
+                  onClick={() => { setWeekOffset(0); setSelectedDay(DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]); setViewMode('day'); }}
+                  style={{
+                    background: "#1A3A2E", color: "#9FE1CB",
+                    border: "none", borderRadius: 10, padding: "3px 10px",
+                    fontSize: 10, fontWeight: 500, cursor: "pointer"
+                  }}
+                >Today</button>
+              )}
             </div>
 
-            {/* Day pills */}
-            <div style={{ padding: "4px 12px 8px", display: "flex" }}>
+            {/* Next week — enabled only if next week has saved data */}
+            <button
+              onClick={() => { if (hasNextWeekData) { setWeekOffset(prev => prev + 1); setSelectedDay('Monday'); } }}
+              disabled={!hasNextWeekData}
+              style={{ background: "none", border: "none", fontSize: 16, padding: "2px 6px", borderRadius: 8,
+                color: hasNextWeekData ? "#1A3A2E" : "#D0CEC8",
+                cursor: hasNextWeekData ? "pointer" : "not-allowed"
+              }}
+            >››</button>
+          </div>
+
+          {/* Copy to this week banner — shown at top when viewing past/future week */}
+          {!isCurrentWeek && (
+            <div style={{ margin: "4px 12px", padding: "8px 12px", background: "#FFF3DC", borderRadius: 10, border: "1px solid #FAC775", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 11, color: "#854F0B", fontWeight: 500 }}>Viewing {weekOffset < 0 ? "past" : "future"} week</div>
+              <button
+                onClick={() => setShowCopyConfirm(true)}
+                style={{ background: "#EF9F27", color: "#2C2C2A", border: "none", borderRadius: 8, padding: "5px 12px", fontSize: 11, fontWeight: 500, cursor: "pointer" }}
+              >Copy to this week</button>
+            </div>
+          )}
+
+          {/* Day pills — only in day view */}
+          {viewMode === 'day' && <div style={{ padding: "4px 12px 8px", display: "flex" }}>
               {DAYS.map(day => {
                 const active = day === selectedDay;
                 const today = isCurrentWeek && isToday(day);
@@ -601,9 +636,9 @@ export default function App() {
                   </div>
                 );
               })}
-            </div>
-          </div>
-        )}
+            </div>}
+          {/* end day pills */}
+        </div>
 
         {/* ── CONTENT AREA ── */}
         <div style={{ flex: 1, overflowY: "auto" }}>
@@ -632,7 +667,8 @@ export default function App() {
                       type={type}
                       meal={meal}
                       auditResult={auditResult}
-                      onClick={(data) => setEditing(data)}
+                      isEditable={isCurrentWeek}
+                      onClick={(data) => isCurrentWeek && setEditing(data)}
                     />
                   </div>
                 ))}
@@ -641,34 +677,37 @@ export default function App() {
 
           ) : (
 
-            /* ── WEEK VIEW — FIX 3: Read-only overview ── */
+            /* ── WEEK VIEW — offset-aware, read-only for past weeks ── */
             <div style={{ padding: "12px 14px" }}>
               <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 12, fontStyle: "italic" }}>
-                Tap any meal to edit that day
+                {isCurrentWeek ? "Tap any meal to edit that day" : "Read-only view — use Copy to edit in current week"}
               </div>
 
-              {/* Column headers */}
+              {/* Column headers — offset-aware dates */}
               <div style={{ display: "grid", gridTemplateColumns: "60px repeat(7, 1fr)", gap: 4, marginBottom: 6 }}>
                 <div />
-                {DAYS.map(day => (
-                  <div key={day} style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 9, fontWeight: 500, color: "#B4B2A9", textTransform: "uppercase" }}>
-                      {day.substring(0, 3)}
+                {DAYS.map(day => {
+                  const dateStr = getOffsetTargetDate(day);
+                  const dayNum = parseInt(dateStr.split('-')[2], 10);
+                  return (
+                    <div key={day} style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 9, fontWeight: 500, color: "#B4B2A9", textTransform: "uppercase" }}>
+                        {day.substring(0, 3)}
+                      </div>
+                      <div style={{
+                        fontSize: 13, fontWeight: 500,
+                        color: isCurrentWeek && isToday(day) ? "#EF9F27" : "#2C2C2A",
+                        background: day === selectedDay ? "#E1F5EE" : "transparent",
+                        borderRadius: 6, padding: "1px 0"
+                      }}>
+                        {dayNum}
+                      </div>
+                      {isCurrentWeek && demoEvents.some(ev => ev.dayName === day) && (
+                        <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#EF9F27", margin: "2px auto 0" }} />
+                      )}
                     </div>
-                    <div style={{
-                      fontSize: 13, fontWeight: 500,
-                      color: isToday(day) ? "#EF9F27" : "#2C2C2A",
-                      background: day === selectedDay ? "#E1F5EE" : "transparent",
-                      borderRadius: 6, padding: "1px 0"
-                    }}>
-                      {formatDisplayDate(day)}
-                    </div>
-                    {/* Event dot */}
-                    {demoEvents.some(ev => ev.dayName === day) && (
-                      <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#EF9F27", margin: "2px auto 0" }} />
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Meal rows */}
