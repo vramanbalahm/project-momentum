@@ -132,3 +132,137 @@ async def session_constants(household_id: str, db: Session = Depends(get_db)):
 # --- 6. WEEKLY PLAN ROUTER (FT-030) ---
 from routers.weekly_plan import router as weekly_plan_router
 app.include_router(weekly_plan_router)
+
+# --- 7. FT-040: RECIPE SEARCH ---
+@app.get("/recipes/search")
+def search_recipes(q: str = "", db: Session = Depends(get_db)):
+    """Search recipe_dna_master + join content vault for thumbnails."""
+    query = text("""
+        SELECT
+            r.recipe_id,
+            r.dish_name,
+            r.diet_type,
+            r.is_sattvic,
+            r.intensity_level,
+            v.carousel_thumb_url,
+            v.hero_image_url,
+            v.prep_steps,
+            v.ingredients_json
+        FROM recipe_dna_master r
+        LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
+        WHERE (:q = '' OR LOWER(r.dish_name) LIKE LOWER(:pattern))
+        ORDER BY r.dish_name
+        LIMIT 30
+    """)
+    rows = db.execute(query, {"q": q, "pattern": f"%{q}%"}).fetchall()
+    return [
+        {
+            "recipe_id": str(row[0]),
+            "name": row[1],
+            "diet_type": row[2],
+            "is_sattvic": row[3],
+            "intensity_level": row[4],
+            "thumb": row[5],
+            "hero": row[6],
+            "prep_steps": row[7],
+            "ingredients_json": row[8]
+        }
+        for row in rows
+    ]
+
+# --- 8. FT-041: MEAL SLOT EDIT ---
+@app.post("/meal-slot/edit")
+def edit_meal_slot(payload: dict, db: Session = Depends(get_db)):
+    """
+    Replace a dish in a meal slot and log to behavioral_tracker.
+    payload: {
+        event_id, house_id, event_date, meal_slot,
+        dish_type (Main/Side), dish_sequence,
+        original_recipe_id, new_recipe_id,
+        swap_reason, swap_reason_text,
+        week_start_date
+    }
+    """
+    h_id = ACTIVE_H_ID if payload.get("house_id") == "HOUSEHOLD_001" else payload.get("house_id", ACTIVE_H_ID)
+
+    # 1. Update meal_event_detail — replace the recipe for this dish
+    db.execute(text("""
+        UPDATE meal_event_detail
+        SET recipe_id = CAST(:new_recipe_id AS uuid),
+            action_taken = 'Changed'
+        WHERE event_id = CAST(:event_id AS uuid)
+          AND dish_sequence = :dish_sequence
+    """), {
+        "new_recipe_id": payload["new_recipe_id"],
+        "event_id": payload["event_id"],
+        "dish_sequence": payload["dish_sequence"]
+    })
+
+    # 2. Log to behavioral_tracker
+    db.execute(text("""
+        INSERT INTO behavioral_tracker
+            (house_id, week_start_date, event_date, meal_slot,
+             original_recipe_id, new_recipe_id,
+             swap_reason, swap_reason_text, dish_type)
+        VALUES
+            (CAST(:h_id AS uuid), CAST(:week_start AS date), CAST(:event_date AS date),
+             CAST(:meal_slot AS meal_slot_type),
+             CAST(:orig AS uuid), CAST(:new AS uuid),
+             :reason, :reason_text, :dish_type)
+    """), {
+        "h_id": h_id,
+        "week_start": payload["week_start_date"],
+        "event_date": payload["event_date"],
+        "meal_slot": payload["meal_slot"],
+        "orig": payload.get("original_recipe_id"),
+        "new": payload["new_recipe_id"],
+        "reason": payload.get("swap_reason", "Other"),
+        "reason_text": payload.get("swap_reason_text", ""),
+        "dish_type": payload.get("dish_type", "Main")
+    })
+
+    db.commit()
+    return {"status": "success"}
+
+# --- 9. FT-033: ADD SIDE DISH TO SLOT ---
+@app.post("/meal-slot/add-side")
+def add_side_dish(payload: dict, db: Session = Depends(get_db)):
+    """
+    Add a new side dish to an existing meal slot.
+    payload: { event_id, recipe_id }
+    """
+    # Get current max dish_sequence for this event
+    result = db.execute(text("""
+        SELECT COALESCE(MAX(dish_sequence), 1)
+        FROM meal_event_detail
+        WHERE event_id = CAST(:event_id AS uuid)
+    """), {"event_id": payload["event_id"]}).scalar()
+
+    next_seq = result + 1
+
+    db.execute(text("""
+        INSERT INTO meal_event_detail
+            (event_id, recipe_id, action_taken, dish_type, dish_sequence)
+        VALUES
+            (CAST(:event_id AS uuid), CAST(:recipe_id AS uuid), 'Accepted', 'Side', :seq)
+    """), {
+        "event_id": payload["event_id"],
+        "recipe_id": payload["recipe_id"],
+        "seq": next_seq
+    })
+
+    db.commit()
+    return {"status": "success", "dish_sequence": next_seq}
+
+# --- 10. FT-033: DELETE SIDE DISH FROM SLOT ---
+@app.delete("/meal-slot/remove-side")
+def remove_side_dish(event_id: str, dish_sequence: int, db: Session = Depends(get_db)):
+    """Remove a side dish by event_id + dish_sequence."""
+    db.execute(text("""
+        DELETE FROM meal_event_detail
+        WHERE event_id = CAST(:event_id AS uuid)
+          AND dish_sequence = :seq
+          AND dish_type = 'Side'
+    """), {"event_id": event_id, "seq": dish_sequence})
+    db.commit()
+    return {"status": "success"}

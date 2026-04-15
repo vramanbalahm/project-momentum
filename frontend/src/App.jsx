@@ -6,6 +6,7 @@ import axios from 'axios';
 import DayColumn from './components/DayColumn';
 import MealCard from './components/MealCard';
 import MealEditor from './components/MealEditor';
+import MealEditScreen from './components/MealEditScreen';
 
 const API_BASE = "http://localhost:8000";
 const HH_ID = "HOUSEHOLD_001";
@@ -822,12 +823,11 @@ export default function App() {
           </div>
         )}
 
-        {/* ── MEAL EDITOR MODAL ── */}
+        {/* ── MEAL EDIT SCREEN ── */}
         {editing && (
-          <MealEditor
-            selected={editing}
+          <MealEditScreen
+            selected={{ ...editing, date: getTargetDate(editing.day) }}
             onClose={() => setEditing(null)}
-            suggestions={suggestions}
             onSave={(updated) => {
               setBlueprint(prev => ({ ...prev, [`${editing.day}-${editing.type}`]: updated }));
               setEditing(null);
