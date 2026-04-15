@@ -209,21 +209,26 @@ export default function App() {
 
         setBlueprint(initialMap);
 
-        // Auto audit on load
-        const auditPayload = Object.entries(initialMap).map(([key, val]) => {
-          const [day, type] = key.split('-');
-          return {
-            day, type,
-            to_meal: val?.main?.name || "Skipped",
-            date: getTargetDate(day)
-          };
-        });
-
-        const auditRes = await axios.post(`${API_BASE}/audit`, auditPayload);
-        const resultMap = {};
-        auditRes.data.forEach(r => { resultMap[`${r.day}-${r.type}`] = r; });
-        setAuditResults(resultMap);
-        setIsAudited(true);
+        // Auto audit only if a saved plan was retrieved from DB
+        // If no saved plan exists (fresh week), leave isAudited=false so user sees "Review plan" first
+        const hasSavedPlan = planRes.data?.plan && planRes.data.plan.length > 0;
+        if (hasSavedPlan) {
+          const auditPayload = Object.entries(initialMap).map(([key, val]) => {
+            const [day, type] = key.split('-');
+            return {
+              day, type,
+              to_meal: val?.main?.name || "Skipped",
+              date: getTargetDate(day)
+            };
+          });
+          const auditRes = await axios.post(`${API_BASE}/audit`, auditPayload);
+          const resultMap = {};
+          auditRes.data.forEach(r => { resultMap[`${r.day}-${r.type}`] = r; });
+          setAuditResults(resultMap);
+          setIsAudited(true);
+          setIsSaved(true); // plan came from DB — show "Review plan" (saved state)
+        }
+        // else: isAudited stays false → button shows "Review plan" inviting first audit
 
       } catch (err) {
         console.error("Critical: Sync Error during init:", err);
