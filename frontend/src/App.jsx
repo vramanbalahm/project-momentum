@@ -143,6 +143,10 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Week navigation — 0 = current week, negative = past weeks, positive blocked for MVP
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [showCopyConfirm, setShowCopyConfirm] = useState(false);
+
   // FIX 3: View mode — 'day' or 'week'
   const [viewMode, setViewMode] = useState('day');
 
@@ -153,7 +157,86 @@ export default function App() {
     return DAYS.includes(todayName) ? todayName : 'Monday';
   });
 
+  // Week-offset aware date helpers
+  const getOffsetWeekMonday = () => {
+    const monday = getCurrentWeekMonday();
+    monday.setDate(monday.getDate() + weekOffset * 7);
+    return monday;
+  };
+
+  const getOffsetTargetDate = (dayName) => {
+    const monday = getOffsetWeekMonday();
+    monday.setDate(monday.getDate() + DAYS.indexOf(dayName));
+    return toLocalDateString(monday);
+  };
+
+  const getWeekLabel = () => {
+    const monday = getOffsetWeekMonday();
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const fmt = (d) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    return `${fmt(monday)} – ${fmt(sunday)}`;
+  };
+
+  const isCurrentWeek = weekOffset === 0;
+
+  // Copy previous week blueprint into current week draft
+  const copyToCurrentWeek = () => {
+    // Remap blueprint keys from offset week dates → current week dates
+    const copied = {};
+    DAYS.forEach(day => {
+      MEAL_TYPES.forEach(type => {
+        const sourceKey = \`\${day}-\${type}\`;
+        if (blueprint[sourceKey]) {
+          copied[sourceKey] = { ...blueprint[sourceKey] };
+        }
+      });
+    });
+    setWeekOffset(0);
+    setBlueprint(copied);
+    setIsAudited(false);
+    setIsSaved(false);
+    setIsDirty(true);
+    setShowCopyConfirm(false);
+    setSelectedDay(DAYS[0]); // Jump to Monday of current week
+    setViewMode('day');
+  };
+
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
+
+  // Load plan when week offset changes (navigating to past weeks)
+  useEffect(() => {
+    if (weekOffset === 0) return; // current week handled by init()
+    const loadPastWeek = async () => {
+      setIsLoading(true);
+      try {
+        const monday = getOffsetWeekMonday();
+        const mondayStr = toLocalDateString(monday);
+        const planRes = await axios.get(`${API_BASE}/get-plan/${HH_ID}?week_start=${mondayStr}`);
+        const pastMap = {};
+        if (planRes.data?.plan && planRes.data.plan.length > 0) {
+          planRes.data.plan.forEach(slot => {
+            const [yyyy, mm, dd] = slot.date.split('-').map(Number);
+            const dateObj = new Date(yyyy, mm - 1, dd);
+            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+            if (slot.main && slot.main.name !== "Skipped") {
+              pastMap[`${dayName}-${slot.type}`] = {
+                main: slot.main,
+                sides: slot.sides || [],
+                event_id: slot.event_id
+              };
+            }
+          });
+        }
+        setBlueprint(pastMap);
+      } catch (err) {
+        console.error("Failed to load past week plan:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadPastWeek();
+  }, [weekOffset]);
 
   useEffect(() => {
     const init = async () => {
@@ -361,18 +444,20 @@ export default function App() {
               <div style={{ color: "#FDFCF8", fontSize: 20, fontWeight: 500, letterSpacing: -0.3 }}>Your week awaits</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {/* Save button in header — same state as bottom bar */}
-              <button
-                onClick={cta.onClick}
-                style={{
-                  background: cta.bg, color: cta.color,
-                  border: cta.border || "none",
-                  borderRadius: 12, padding: "8px 14px",
-                  fontSize: 12, fontWeight: 500, cursor: "pointer"
-                }}
-              >
-                {cta.label}
-              </button>
+              {/* Save button in header — hidden when viewing past weeks */}
+              {isCurrentWeek && (
+                <button
+                  onClick={cta.onClick}
+                  style={{
+                    background: cta.bg, color: cta.color,
+                    border: cta.border || "none",
+                    borderRadius: 12, padding: "8px 14px",
+                    fontSize: 12, fontWeight: 500, cursor: "pointer"
+                  }}
+                >
+                  {cta.label}
+                </button>
+              )}
               <div style={{
                 width: 34, height: 34, borderRadius: "50%",
                 background: "#2C4A3E", border: "2px solid #5DCAA5",
@@ -452,42 +537,73 @@ export default function App() {
           )}
         </div>
 
-        {/* ── DAY RIBBON — hidden in week view ── */}
-        {viewMode === 'day' && <div style={{ background: "#FFF9F2", padding: "8px 12px", display: "flex", borderBottom: "1px solid #EDE8E0" }}>
-          {DAYS.map(day => {
-            const active = day === selectedDay;
-            const today = isToday(day);
-            // FIX 1: Check if this day has an event
-            const hasEvent = demoEvents.some(ev => ev.dayName === day);
-            return (
-              <div
-                key={day}
-                onClick={() => { setSelectedDay(day); setViewMode('day'); }}
-                style={{
-                  flex: 1, textAlign: "center",
-                  padding: "7px 4px", borderRadius: 14,
-                  cursor: "pointer",
-                  background: active ? "#1A3A2E" : "transparent",
-                  border: today && !active ? "1.5px solid #EF9F27" : "1.5px solid transparent",
-                  transition: "all 0.15s"
-                }}
-              >
-                <div style={{ fontSize: 9, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", color: active ? "#9FE1CB" : "#B4B2A9" }}>
-                  {day.substring(0, 3)}
-                </div>
-                <div style={{ fontSize: 17, fontWeight: 500, margin: "2px 0", color: active ? "#fff" : "#2C2C2A" }}>
-                  {formatDisplayDate(day)}
-                </div>
-                {/* Inventory bar — neutral placeholder until FT-011 is built */}
-                <div style={{ height: 3, borderRadius: 2, background: active ? "rgba(255,255,255,0.2)" : "#EDE8E0", marginTop: 4 }} />
-                {/* FIX 1: Event dot only on days that actually have events */}
-                {hasEvent && (
-                  <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#EF9F27", margin: "3px auto 0" }} />
-                )}
+        {/* ── WEEK NAVIGATOR + DAY RIBBON — hidden in week view ── */}
+        {viewMode === 'day' && (
+          <div style={{ background: "#FFF9F2", borderBottom: "1px solid #EDE8E0" }}>
+
+            {/* Week nav row — << week label >> */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px 2px" }}>
+              {/* Previous week */}
+              <button
+                onClick={() => { setWeekOffset(prev => prev - 1); setSelectedDay('Monday'); }}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#1A3A2E", padding: "2px 6px", borderRadius: 8 }}
+              >‹‹</button>
+
+              {/* Week label */}
+              <div style={{ fontSize: 10, fontWeight: 500, color: weekOffset === 0 ? "#1A3A2E" : "#EF9F27", letterSpacing: "0.02em" }}>
+                {weekOffset === 0 ? "This week" : weekOffset === -1 ? "Last week" : `${Math.abs(weekOffset)} weeks ago`}
+                {"  "}
+                <span style={{ color: "#B4B2A9", fontWeight: 400 }}>{getWeekLabel()}</span>
               </div>
-            );
-          })}
-        </div>}
+
+              {/* Next week — blocked for MVP */}
+              <button
+                disabled={weekOffset >= 0}
+                style={{ background: "none", border: "none", fontSize: 16, padding: "2px 6px", borderRadius: 8,
+                  color: weekOffset >= 0 ? "#D0CEC8" : "#1A3A2E",
+                  cursor: weekOffset >= 0 ? "not-allowed" : "pointer"
+                }}
+              >››</button>
+            </div>
+
+            {/* Day pills */}
+            <div style={{ padding: "4px 12px 8px", display: "flex" }}>
+              {DAYS.map(day => {
+                const active = day === selectedDay;
+                const today = isCurrentWeek && isToday(day);
+                const hasEvent = demoEvents.some(ev => ev.dayName === day);
+                const dateStr = getOffsetTargetDate(day);
+                const dateParts = dateStr.split('-');
+                const dayNum = parseInt(dateParts[2], 10);
+                return (
+                  <div
+                    key={day}
+                    onClick={() => setSelectedDay(day)}
+                    style={{
+                      flex: 1, textAlign: "center",
+                      padding: "7px 4px", borderRadius: 14,
+                      cursor: "pointer",
+                      background: active ? "#1A3A2E" : "transparent",
+                      border: today && !active ? "1.5px solid #EF9F27" : "1.5px solid transparent",
+                      transition: "all 0.15s"
+                    }}
+                  >
+                    <div style={{ fontSize: 9, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", color: active ? "#9FE1CB" : "#B4B2A9" }}>
+                      {day.substring(0, 3)}
+                    </div>
+                    <div style={{ fontSize: 17, fontWeight: 500, margin: "2px 0", color: active ? "#fff" : "#2C2C2A" }}>
+                      {dayNum}
+                    </div>
+                    <div style={{ height: 3, borderRadius: 2, background: active ? "rgba(255,255,255,0.2)" : "#EDE8E0", marginTop: 4 }} />
+                    {hasEvent && isCurrentWeek && (
+                      <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#EF9F27", margin: "3px auto 0" }} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ── CONTENT AREA ── */}
         <div style={{ flex: 1, overflowY: "auto" }}>
@@ -610,20 +726,77 @@ export default function App() {
               <div style={{ color: "#5DCAA5", fontSize: 9, marginTop: 1 }}>{stat.label}</div>
             </div>
           ))}
-          {/* Save button — high contrast, always visible */}
-          <button
-            onClick={cta.onClick}
-            style={{
-              background: cta.bg, color: cta.color,
-              border: cta.border || "none",
-              borderRadius: 14, padding: "11px 20px",
-              fontSize: 13, fontWeight: 500, cursor: "pointer",
-              boxShadow: !isSaved ? "0 0 0 3px rgba(239,159,39,0.3)" : "none"
-            }}
-          >
-            {cta.label}
-          </button>
+
+          {/* Past week → Copy button only. Current week → normal CTA */}
+          {!isCurrentWeek ? (
+            <button
+              onClick={() => setShowCopyConfirm(true)}
+              style={{
+                background: "#EF9F27", color: "#2C2C2A",
+                border: "none", borderRadius: 14, padding: "11px 16px",
+                fontSize: 12, fontWeight: 500, cursor: "pointer",
+                boxShadow: "0 0 0 3px rgba(239,159,39,0.3)"
+              }}
+            >
+              Copy to this week
+            </button>
+          ) : (
+            <button
+              onClick={cta.onClick}
+              style={{
+                background: cta.bg, color: cta.color,
+                border: cta.border || "none",
+                borderRadius: 14, padding: "11px 20px",
+                fontSize: 13, fontWeight: 500, cursor: "pointer",
+                boxShadow: !isSaved ? "0 0 0 3px rgba(239,159,39,0.3)" : "none"
+              }}
+            >
+              {cta.label}
+            </button>
+          )}
         </div>
+
+        {/* ── COPY CONFIRMATION MODAL ── */}
+        {showCopyConfirm && (
+          <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+            zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center"
+          }}>
+            <div style={{
+              width: "100%", maxWidth: 430, background: "#FFF9F2",
+              borderRadius: "24px 24px 0 0", padding: "28px 24px 40px"
+            }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#2C2C2A", marginBottom: 8 }}>
+                Copy to this week?
+              </div>
+              <div style={{ fontSize: 13, color: "#888780", marginBottom: 24, lineHeight: 1.5 }}>
+                This will replace your current week's plan with the meals from {getWeekLabel()}. You can review before saving.
+              </div>
+              <div style={{ display: "flex", gap: 12 }}>
+                <button
+                  onClick={() => setShowCopyConfirm(false)}
+                  style={{
+                    flex: 1, padding: "13px", borderRadius: 14,
+                    border: "1.5px solid #EDE8E0", background: "transparent",
+                    color: "#888780", fontSize: 14, fontWeight: 500, cursor: "pointer"
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={copyToCurrentWeek}
+                  style={{
+                    flex: 2, padding: "13px", borderRadius: 14,
+                    border: "none", background: "#1A3A2E",
+                    color: "#9FE1CB", fontSize: 14, fontWeight: 500, cursor: "pointer"
+                  }}
+                >
+                  Yes, copy it
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── MEAL EDITOR MODAL ── */}
         {editing && (

@@ -76,10 +76,13 @@ async def save_plan(request: SavePlanRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/get-plan/{household_id}")
-async def get_plan(household_id: str, db: Session = Depends(get_db)):
-    """FT-033: Returns grouped plan — main + sides per slot."""
+async def get_plan(household_id: str, week_start: Optional[str] = None, db: Session = Depends(get_db)):
+    """FT-033: Returns grouped plan — main + sides per slot.
+    week_start (YYYY-MM-DD): if provided, returns plan for that specific week only.
+    If omitted, returns current week records.
+    """
     h_id = ACTIVE_H_ID if household_id == "HOUSEHOLD_001" else household_id
-    plan = fetch_active_plan(db, h_id)
+    plan = fetch_active_plan(db, h_id, week_start=week_start)
     return plan
 
 # --- 4. MARKET SIGNALS & CONTENT VAULT ---

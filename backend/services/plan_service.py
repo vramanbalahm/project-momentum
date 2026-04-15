@@ -3,12 +3,21 @@ from sqlalchemy import text
 import uuid
 
 # --- 1. PLAN RETRIEVAL (FT-033: Multi-dish per slot) ---
-def fetch_active_plan(db: Session, h_id: str):
+def fetch_active_plan(db: Session, h_id: str, week_start: str = None):
     clean_h_id = "733b3f63-0fb4-4170-877c-eb2a70f29ccb" if h_id == "HOUSEHOLD_001" else h_id
 
     # FT-033: Query now returns ALL dishes per slot (main + sides)
-    # dish_type and dish_sequence added in schema V2
-    query = text("""
+    # week_start (YYYY-MM-DD): if provided, filter to that 7-day window only
+    week_filter = ""
+    params = {"h_id": clean_h_id}
+    if week_start:
+        week_filter = "AND h.event_date >= CAST(:week_start AS date) AND h.event_date < CAST(:week_end AS date)"
+        from datetime import datetime, timedelta
+        start_dt = datetime.strptime(week_start, "%Y-%m-%d").date()
+        params["week_start"] = str(start_dt)
+        params["week_end"] = str(start_dt + timedelta(days=7))
+
+    query = text(f"""
         SELECT 
             h.event_date as date, 
             CAST(h.meal_slot AS text) as slot,
@@ -28,10 +37,11 @@ def fetch_active_plan(db: Session, h_id: str):
         LEFT JOIN recipe_dna_master r ON d.recipe_id = r.recipe_id
         LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
         WHERE h.house_id = CAST(:h_id AS uuid)
+        {week_filter}
         ORDER BY h.event_date ASC, h.meal_slot DESC, d.dish_sequence ASC
     """)
 
-    rows = db.execute(query, {"h_id": clean_h_id}).fetchall()
+    rows = db.execute(query, params).fetchall()
 
     # FT-033: Group dishes by date+slot into slots with main + sides
     slots = {}
