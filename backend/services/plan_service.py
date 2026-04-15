@@ -163,11 +163,16 @@ def persist_plan(db: Session, h_id: str, plan_data: list):
     clean_h_id = "733b3f63-0fb4-4170-877c-eb2a70f29ccb" if h_id == "HOUSEHOLD_001" else h_id
 
     try:
-        # 1. Purge existing operational records
-        db.execute(
-            text("DELETE FROM meal_event_header WHERE house_id = CAST(:h_id AS uuid)"),
-            {"h_id": clean_h_id}
-        )
+        # 1. Purge only the dates being saved — not the entire household
+        dates_being_saved = list({
+            (entry.get("date") if isinstance(entry, dict) else entry.date)
+            for entry in plan_data
+        })
+        for dt in dates_being_saved:
+            db.execute(
+                text("DELETE FROM meal_event_header WHERE house_id = CAST(:h_id AS uuid) AND event_date = CAST(:dt AS date)"),
+                {"h_id": clean_h_id, "dt": dt}
+            )
 
         for entry in plan_data:
             # FT-033: entry now has main dish + sides list
