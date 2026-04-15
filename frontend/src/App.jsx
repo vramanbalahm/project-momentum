@@ -732,23 +732,6 @@ export default function App() {
                 </div>
               ))}
 
-              {/* Weekly summary */}
-              <div style={{
-                marginTop: 12, padding: "10px 14px",
-                background: "#1A3A2E", borderRadius: 14,
-                display: "flex", justifyContent: "space-around"
-              }}>
-                {[
-                  { val: "21", label: "Total meals" },
-                  { val: "C2.4", label: "Avg level" },
-                  { val: "78%", label: "Fridge use" }
-                ].map((s, i) => (
-                  <div key={i} style={{ textAlign: "center" }}>
-                    <div style={{ color: "#FDFCF8", fontSize: 15, fontWeight: 500 }}>{s.val}</div>
-                    <div style={{ color: "#5DCAA5", fontSize: 9, marginTop: 1 }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
               </>
               )}
             </div>
