@@ -186,7 +186,7 @@ export default function App() {
     const copied = {};
     DAYS.forEach(day => {
       MEAL_TYPES.forEach(type => {
-        const sourceKey = \`\${day}-\${type}\`;
+        const sourceKey = `${day}-${type}`;
         if (blueprint[sourceKey]) {
           copied[sourceKey] = { ...blueprint[sourceKey] };
         }
