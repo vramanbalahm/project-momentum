@@ -155,8 +155,9 @@ export default function App() {
         // FT-033: Map from grouped plan (main + sides per slot)
         if (planRes.data?.plan && planRes.data.plan.length > 0) {
           planRes.data.plan.forEach(slot => {
-            const dateObj = new Date(slot.date + "T00:00:00");
-            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+            // Fix: append Z to treat date as UTC — prevents IST timezone shift moving days forward
+            const dateObj = new Date(slot.date + "T00:00:00Z");
+            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
             if (slot.main && slot.main.name !== "Skipped") {
               initialMap[`${dayName}-${slot.type}`] = {
                 main: slot.main,
