@@ -678,6 +678,7 @@ export default function App() {
                   >Go to current week</button>
                 </div>
               ) : (
+              <>
               <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 12, fontStyle: "italic" }}>
                 {isCurrentWeek ? "Tap any meal to edit that day" : "Read-only view — use Copy to Current Week to edit"}
               </div>
@@ -748,6 +749,7 @@ export default function App() {
                   </div>
                 ))}
               </div>
+              </>
               )}
             </div>
           )}
