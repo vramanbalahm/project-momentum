@@ -225,10 +225,10 @@ export default function App() {
           const resultMap = {};
           auditRes.data.forEach(r => { resultMap[`${r.day}-${r.type}`] = r; });
           setAuditResults(resultMap);
-          setIsAudited(true);
-          setIsSaved(true); // plan came from DB — show "Review plan" (saved state)
+          // isAudited and isSaved intentionally left false on load
+          // regardless of DB state — user always sees "Review plan" first
+          // this invites them to re-review before saving again
         }
-        // else: isAudited stays false → button shows "Review plan" inviting first audit
 
       } catch (err) {
         console.error("Critical: Sync Error during init:", err);
