@@ -110,14 +110,14 @@ def get_market_signals(db: Session = Depends(get_db)):
 def get_recipe_details(recipe_id: str, db: Session = Depends(get_db)):
     """Content vault — hero_image and prep_steps."""
     query = text("""
-        SELECT hero_image_url, carousel_thumb_url, prep_steps 
+        SELECT hero_image_url, carousel_thumb_url, prep_steps, ingredients_json, video_url
         FROM recipe_content_vault 
         WHERE recipe_id = :r_id
     """)
     result = db.execute(query, {"r_id": recipe_id}).fetchone()
     if not result:
         raise HTTPException(status_code=404, detail="Recipe content not found")
-    return {"hero": result[0], "thumb": result[1], "steps": result[2]}
+    return {"hero": result[0], "thumb": result[1], "steps": result[2], "ingredients_json": result[3], "video_url": result[4]}
 
 # --- 5. SESSION CONSTANTS (fetched once on load) ---
 @app.get("/session-constants/{household_id}")
