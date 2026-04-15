@@ -167,7 +167,9 @@ def persist_plan(db: Session, h_id: str, plan_data: list):
             slot = entry.get("type") if isinstance(entry, dict) else entry.type
             date = entry.get("date") if isinstance(entry, dict) else entry.date
 
-            if not main or not main.get("recipe_id"):
+            # FT-033: main is a DishItem Pydantic object — use attribute access, not dict
+            main_recipe_id = main.recipe_id if hasattr(main, "recipe_id") else main.get("recipe_id")
+            if not main or not main_recipe_id:
                 continue
 
             new_event_id = uuid4()
@@ -188,12 +190,13 @@ def persist_plan(db: Session, h_id: str, plan_data: list):
                         (event_id, recipe_id, action_taken, dish_type, dish_sequence)
                     VALUES (:e_id, CAST(:r_id AS uuid), 'Accepted', 'Main', 1)
                 """),
-                {"e_id": new_event_id, "r_id": main["recipe_id"]}
+                {"e_id": new_event_id, "r_id": main_recipe_id}
             )
 
             # 4. Insert Side dishes into Detail (FT-033)
             for seq, side in enumerate(sides, start=2):
-                if not side.get("recipe_id"):
+                side_recipe_id = side.recipe_id if hasattr(side, "recipe_id") else side.get("recipe_id")
+                if not side_recipe_id:
                     continue
                 db.execute(
                     text("""
@@ -201,7 +204,7 @@ def persist_plan(db: Session, h_id: str, plan_data: list):
                             (event_id, recipe_id, action_taken, dish_type, dish_sequence)
                         VALUES (:e_id, CAST(:r_id AS uuid), 'Accepted', 'Side', :seq)
                     """),
-                    {"e_id": new_event_id, "r_id": side["recipe_id"], "seq": seq}
+                    {"e_id": new_event_id, "r_id": side_recipe_id, "seq": seq}
                 )
 
             # 5. Log to meal_audit_logs (FIXED: was meal_event_log — table does not exist)
@@ -214,7 +217,7 @@ def persist_plan(db: Session, h_id: str, plan_data: list):
                 {
                     "e_id": new_event_id,
                     "h_id": clean_h_id,
-                    "r_id": main["recipe_id"]
+                    "r_id": main_recipe_id
                 }
             )
 
