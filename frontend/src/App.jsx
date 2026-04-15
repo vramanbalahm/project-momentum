@@ -147,6 +147,9 @@ export default function App() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [showCopyConfirm, setShowCopyConfirm] = useState(false);
   const [hasNextWeekData, setHasNextWeekData] = useState(false);
+  // Session constants — fetched once on load, cached for session
+  const [oldestPlanWeekOffset, setOldestPlanWeekOffset] = useState(null); // null = no history at all
+  const [memberCount, setMemberCount] = useState(0);
 
   // FIX 3: View mode — 'day' or 'week'
   const [viewMode, setViewMode] = useState('day');
@@ -205,27 +208,19 @@ export default function App() {
 
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
 
-  // Load plan when week offset changes + always check if next week has data
+  // Load plan whenever weekOffset changes
+  // weekOffset === 0 reloads current week (fixes returning from past week showing stale data)
   useEffect(() => {
     const loadWeekPlan = async () => {
-      // Check if next week has data (to enable/disable >> button)
-      try {
-        const nextMonday = getCurrentWeekMonday();
-        nextMonday.setDate(nextMonday.getDate() + (weekOffset + 1) * 7);
-        const nextMondayStr = toLocalDateString(nextMonday);
-        const nextRes = await axios.get(`${API_BASE}/get-plan/${HH_ID}?week_start=${nextMondayStr}`);
-        setHasNextWeekData(nextRes.data?.plan && nextRes.data.plan.length > 0);
-      } catch { setHasNextWeekData(false); }
-
-      if (weekOffset === 0) return; // current week handled by init()
-
       setIsLoading(true);
       try {
         const monday = getOffsetWeekMonday();
         const mondayStr = toLocalDateString(monday);
         const planRes = await axios.get(`${API_BASE}/get-plan/${HH_ID}?week_start=${mondayStr}`);
         const weekMap = {};
-        if (planRes.data?.plan && planRes.data.plan.length > 0) {
+        const hasPlan = planRes.data?.plan && planRes.data.plan.length > 0;
+
+        if (hasPlan) {
           planRes.data.plan.forEach(slot => {
             const [yyyy, mm, dd] = slot.date.split('-').map(Number);
             const dateObj = new Date(yyyy, mm - 1, dd);
@@ -239,6 +234,38 @@ export default function App() {
             }
           });
         }
+
+        // Check if next week (offset+1) has data — gates >> button
+        const nextMonday = new Date(monday);
+        nextMonday.setDate(monday.getDate() + 7);
+        const nextMondayStr = toLocalDateString(nextMonday);
+        const nextRes = await axios.get(`${API_BASE}/get-plan/${HH_ID}?week_start=${nextMondayStr}`);
+        setHasNextWeekData(nextRes.data?.plan && nextRes.data.plan.length > 0);
+
+        if (weekOffset === 0) {
+          // Current week: fill gaps with suggestions
+          let suggestionIdx = 0;
+          DAYS.forEach(day => {
+            MEAL_TYPES.forEach(type => {
+              const key = `${day}-${type}`;
+              if (!weekMap[key]) {
+                const sugg = suggestions[suggestionIdx % (suggestions.length || 1)];
+                if (sugg) {
+                  weekMap[key] = {
+                    main: { name: sugg.name, recipe_id: sugg.recipe_id, hero: sugg.hero, thumb: sugg.thumb, is_sattvic: sugg.is_sattvic, diet_type: sugg.diet_type },
+                    sides: []
+                  };
+                  suggestionIdx++;
+                }
+              }
+            });
+          });
+          // Reset plan state flags when returning to current week
+          setIsAudited(false);
+          setIsSaved(false);
+          setIsDirty(false);
+        }
+
         setBlueprint(weekMap);
       } catch (err) {
         console.error("Failed to load week plan:", err);
@@ -249,86 +276,30 @@ export default function App() {
     loadWeekPlan();
   }, [weekOffset]);
 
+  // Init — fetch suggestions + session constants once on load
+  // Plan loading is handled entirely by the weekOffset useEffect
   useEffect(() => {
     const init = async () => {
-      setIsLoading(true);
       try {
-        const currentMondayStr = toLocalDateString(getCurrentWeekMonday());
-        const [suggRes, planRes] = await Promise.all([
+        const [suggRes, sessionRes] = await Promise.all([
           axios.get(`${API_BASE}/generate-suggestions/${HH_ID}`),
-          axios.get(`${API_BASE}/get-plan/${HH_ID}?week_start=${currentMondayStr}`)
+          axios.get(`${API_BASE}/session-constants/${HH_ID}`)
         ]);
 
         setSuggestions(suggRes.data);
-        const initialMap = {};
 
-        // FT-033: Map from grouped plan (main + sides per slot)
-        // Parse YYYY-MM-DD directly — avoids any UTC/IST timezone shift
-        if (planRes.data?.plan && planRes.data.plan.length > 0) {
-          planRes.data.plan.forEach(slot => {
-            const [yyyy, mm, dd] = slot.date.split('-').map(Number);
-            const dateObj = new Date(yyyy, mm - 1, dd); // local midnight, no UTC conversion
-            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
-            if (slot.main && slot.main.name !== "Skipped") {
-              initialMap[`${dayName}-${slot.type}`] = {
-                main: slot.main,
-                sides: slot.sides || [],
-                event_id: slot.event_id
-              };
-            }
-          });
+        // Cache session constants — used throughout session without re-fetching
+        const sc = sessionRes.data;
+        setMemberCount(sc.member_count || 0);
+        if (sc.oldest_plan_week) {
+          const parts = sc.oldest_plan_week.split('-').map(Number);
+          const oldestMonday = new Date(parts[0], parts[1] - 1, parts[2]);
+          const currentMonday = getCurrentWeekMonday();
+          const diffWeeks = Math.round((currentMonday - oldestMonday) / (7 * 24 * 60 * 60 * 1000));
+          setOldestPlanWeekOffset(-diffWeeks); // e.g. -4 means 4 weeks back
         }
-
-        // Fill gaps with suggestions
-        let suggestionIdx = 0;
-        DAYS.forEach(day => {
-          MEAL_TYPES.forEach(type => {
-            const key = `${day}-${type}`;
-            if (!initialMap[key] && suggRes.data.length > 0) {
-              const pick = suggRes.data[suggestionIdx % suggRes.data.length];
-              initialMap[key] = {
-                main: {
-                  name: pick.name,
-                  recipe_id: pick.recipe_id,
-                  hero: pick.hero,
-                  thumb: pick.thumb,
-                  is_sattvic: pick.is_sattvic,
-                  diet_type: pick.diet_type
-                },
-                sides: []
-              };
-              suggestionIdx++;
-            }
-          });
-        });
-
-        setBlueprint(initialMap);
-
-        // Auto audit only if a saved plan was retrieved from DB
-        // If no saved plan exists (fresh week), leave isAudited=false so user sees "Review plan" first
-        const hasSavedPlan = planRes.data?.plan && planRes.data.plan.length > 0;
-        if (hasSavedPlan) {
-          const auditPayload = Object.entries(initialMap).map(([key, val]) => {
-            const [day, type] = key.split('-');
-            return {
-              day, type,
-              to_meal: val?.main?.name || "Skipped",
-              date: getTargetDate(day)
-            };
-          });
-          const auditRes = await axios.post(`${API_BASE}/audit`, auditPayload);
-          const resultMap = {};
-          auditRes.data.forEach(r => { resultMap[`${r.day}-${r.type}`] = r; });
-          setAuditResults(resultMap);
-          // isAudited and isSaved intentionally left false on load
-          // regardless of DB state — user always sees "Review plan" first
-          // this invites them to re-review before saving again
-        }
-
       } catch (err) {
-        console.error("Critical: Sync Error during init:", err);
-      } finally {
-        setIsLoading(false);
+        console.error("Critical: Init failed:", err);
       }
     };
     init();
@@ -554,10 +525,14 @@ export default function App() {
 
           {/* Week nav row — << week label [Today] >> */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px 2px" }}>
-            {/* Previous week */}
+            {/* Previous week — disabled at oldest recorded week */}
             <button
-              onClick={() => { setWeekOffset(prev => prev - 1); setSelectedDay('Monday'); }}
-              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#1A3A2E", padding: "2px 6px", borderRadius: 8 }}
+              onClick={() => { if (oldestPlanWeekOffset === null || weekOffset > oldestPlanWeekOffset) { setWeekOffset(prev => prev - 1); setSelectedDay('Monday'); } }}
+              disabled={oldestPlanWeekOffset !== null && weekOffset <= oldestPlanWeekOffset}
+              style={{ background: "none", border: "none", fontSize: 16, padding: "2px 6px", borderRadius: 8,
+                color: (oldestPlanWeekOffset !== null && weekOffset <= oldestPlanWeekOffset) ? "#D0CEC8" : "#1A3A2E",
+                cursor: (oldestPlanWeekOffset !== null && weekOffset <= oldestPlanWeekOffset) ? "not-allowed" : "pointer"
+              }}
             >‹‹</button>
 
             {/* Week label + Today button */}
@@ -579,25 +554,25 @@ export default function App() {
               )}
             </div>
 
-            {/* Next week — enabled only if next week has saved data */}
+            {/* Next week — always enabled when going back (offset<0), gated on data for future */}
             <button
-              onClick={() => { if (hasNextWeekData) { setWeekOffset(prev => prev + 1); setSelectedDay('Monday'); } }}
-              disabled={!hasNextWeekData}
+              onClick={() => { if (weekOffset < 0 || hasNextWeekData) { setWeekOffset(prev => prev + 1); setSelectedDay('Monday'); } }}
+              disabled={weekOffset >= 0 && !hasNextWeekData}
               style={{ background: "none", border: "none", fontSize: 16, padding: "2px 6px", borderRadius: 8,
-                color: hasNextWeekData ? "#1A3A2E" : "#D0CEC8",
-                cursor: hasNextWeekData ? "pointer" : "not-allowed"
+                color: (weekOffset < 0 || hasNextWeekData) ? "#1A3A2E" : "#D0CEC8",
+                cursor: (weekOffset < 0 || hasNextWeekData) ? "pointer" : "not-allowed"
               }}
             >››</button>
           </div>
 
-          {/* Copy to this week banner — shown at top when viewing past/future week */}
+          {/* Copy to Current Week banner — shown at top when viewing past/future week */}
           {!isCurrentWeek && (
             <div style={{ margin: "4px 12px", padding: "8px 12px", background: "#FFF3DC", borderRadius: 10, border: "1px solid #FAC775", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ fontSize: 11, color: "#854F0B", fontWeight: 500 }}>Viewing {weekOffset < 0 ? "past" : "future"} week</div>
               <button
                 onClick={() => setShowCopyConfirm(true)}
                 style={{ background: "#EF9F27", color: "#2C2C2A", border: "none", borderRadius: 8, padding: "5px 12px", fontSize: 11, fontWeight: 500, cursor: "pointer" }}
-              >Copy to this week</button>
+              >Copy to Current Week</button>
             </div>
           )}
 
@@ -651,6 +626,18 @@ export default function App() {
 
             /* ── DAY VIEW ── */
             <div style={{ padding: "12px 14px" }}>
+              {/* Empty state — past/future week with no plan */}
+              {!isCurrentWeek && Object.keys(blueprint).length === 0 && (
+                <div style={{ textAlign: "center", padding: "48px 20px", color: "#B4B2A9" }}>
+                  <div style={{ fontSize: 32, marginBottom: 12 }}>📭</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "#2C2C2A", marginBottom: 6 }}>No plan for this week</div>
+                  <div style={{ fontSize: 12, color: "#B4B2A9", marginBottom: 20 }}>No meals were saved for this period.</div>
+                  <button
+                    onClick={() => { setWeekOffset(0); setSelectedDay(DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]); }}
+                    style={{ background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 12, padding: "10px 20px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                  >Go to current week</button>
+                </div>
+              )}
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 {selectedDayMeals.map(({ type, meal, auditResult }) => (
                   <div key={type} style={{ marginBottom: 4 }}>
@@ -679,8 +666,20 @@ export default function App() {
 
             /* ── WEEK VIEW — offset-aware, read-only for past weeks ── */
             <div style={{ padding: "12px 14px" }}>
+              {/* Empty state for week view */}
+              {!isCurrentWeek && Object.keys(blueprint).length === 0 ? (
+                <div style={{ textAlign: "center", padding: "48px 20px", color: "#B4B2A9" }}>
+                  <div style={{ fontSize: 32, marginBottom: 12 }}>📭</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "#2C2C2A", marginBottom: 6 }}>No plan for this week</div>
+                  <div style={{ fontSize: 12, marginBottom: 20 }}>No meals were saved for this period.</div>
+                  <button
+                    onClick={() => { setWeekOffset(0); setSelectedDay(DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]); }}
+                    style={{ background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 12, padding: "10px 20px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+                  >Go to current week</button>
+                </div>
+              ) : (
               <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 12, fontStyle: "italic" }}>
-                {isCurrentWeek ? "Tap any meal to edit that day" : "Read-only view — use Copy to edit in current week"}
+                {isCurrentWeek ? "Tap any meal to edit that day" : "Read-only view — use Copy to Current Week to edit"}
               </div>
 
               {/* Column headers — offset-aware dates */}
@@ -749,6 +748,7 @@ export default function App() {
                   </div>
                 ))}
               </div>
+              )}
             </div>
           )}
         </div>
@@ -777,7 +777,7 @@ export default function App() {
                 boxShadow: "0 0 0 3px rgba(239,159,39,0.3)"
               }}
             >
-              Copy to this week
+              Copy to Current Week
             </button>
           ) : (
             <button
@@ -806,7 +806,7 @@ export default function App() {
               borderRadius: "24px 24px 0 0", padding: "28px 24px 40px"
             }}>
               <div style={{ fontSize: 18, fontWeight: 600, color: "#2C2C2A", marginBottom: 8 }}>
-                Copy to this week?
+                Copy to Current Week?
               </div>
               <div style={{ fontSize: 13, color: "#888780", marginBottom: 24, lineHeight: 1.5 }}>
                 This will replace your current week's plan with the meals from {getWeekLabel()}. You can review before saving.

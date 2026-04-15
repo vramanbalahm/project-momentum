@@ -10,7 +10,8 @@ from services.plan_service import (
     get_suggestions,
     execute_audit,
     persist_plan,
-    get_dietary_pref
+    get_dietary_pref,
+    get_session_constants
 )
 from services.audit_service import check_pantry_availability, check_momentum_divergence
 from database import SessionLocal, engine
@@ -118,6 +119,16 @@ def get_recipe_details(recipe_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Recipe content not found")
     return {"hero": result[0], "thumb": result[1], "steps": result[2]}
 
-# --- 5. WEEKLY PLAN ROUTER (FT-030) ---
+# --- 5. SESSION CONSTANTS (fetched once on load) ---
+@app.get("/session-constants/{household_id}")
+async def session_constants(household_id: str, db: Session = Depends(get_db)):
+    """
+    Single call on app load — returns oldest_plan_week, dietary_preference, member_count.
+    Frontend caches these for the session — no repeated DB hits per navigation.
+    """
+    h_id = ACTIVE_H_ID if household_id == "HOUSEHOLD_001" else household_id
+    return get_session_constants(db, h_id)
+
+# --- 6. WEEKLY PLAN ROUTER (FT-030) ---
 from routers.weekly_plan import router as weekly_plan_router
 app.include_router(weekly_plan_router)

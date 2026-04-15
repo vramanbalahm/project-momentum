@@ -247,3 +247,63 @@ def get_dietary_pref(db: Session, h_id: str):
         {"h_id": clean_h_id}
     ).fetchone()
     return res[0] if res else "All"
+
+
+# --- SESSION CONSTANTS (fetched once on load, cached in frontend) ---
+def get_session_constants(db: Session, h_id: str):
+    """
+    Fetches all session-level constants in a single DB call.
+    Called once on app load — stored in frontend memory, not re-fetched per navigation.
+    Returns:
+      - oldest_plan_week: ISO date string of Monday of the oldest week with any plan record
+      - dietary_preference: household dietary pref
+      - member_count: number of active household members
+    """
+    clean_h_id = "733b3f63-0fb4-4170-877c-eb2a70f29ccb" if h_id == "HOUSEHOLD_001" else h_id
+
+    # 1. Oldest week with any meal_event_header record
+    oldest_row = db.execute(
+        text("""
+            SELECT MIN(event_date) as oldest_date
+            FROM meal_event_header
+            WHERE house_id = CAST(:h_id AS uuid)
+        """),
+        {"h_id": clean_h_id}
+    ).fetchone()
+
+    oldest_plan_week = None
+    if oldest_row and oldest_row.oldest_date:
+        # Roll back to Monday of that week
+        from datetime import timedelta
+        d = oldest_row.oldest_date
+        days_since_monday = d.weekday()  # 0=Mon
+        monday = d - timedelta(days=days_since_monday)
+        oldest_plan_week = str(monday)
+
+    # 2. Dietary preference
+    pref_row = db.execute(
+        text("""
+            SELECT dietary_preference
+            FROM household_master
+            WHERE household_id = CAST(:h_id AS uuid)
+        """),
+        {"h_id": clean_h_id}
+    ).fetchone()
+    dietary_preference = str(pref_row[0]) if pref_row else "Veg"
+
+    # 3. Member count
+    member_row = db.execute(
+        text("""
+            SELECT COUNT(*) as cnt
+            FROM household_members
+            WHERE house_id = CAST(:h_id AS uuid)
+        """),
+        {"h_id": clean_h_id}
+    ).fetchone()
+    member_count = member_row.cnt if member_row else 0
+
+    return {
+        "oldest_plan_week": oldest_plan_week,
+        "dietary_preference": dietary_preference,
+        "member_count": member_count
+    }
