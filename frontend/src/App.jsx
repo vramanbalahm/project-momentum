@@ -12,40 +12,55 @@ const HH_ID = "HOUSEHOLD_001";
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner'];
 
-// Get current week's Monday
+// --- Date utilities — pure local arithmetic, no toISOString() to avoid IST/UTC shift ---
+
+// Format a Date object as YYYY-MM-DD using local date parts (never UTC)
+const toLocalDateString = (d) => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+// Get this week's Monday as a Date (local time)
 const getCurrentWeekMonday = () => {
   const today = new Date();
-  const day = today.getDay();
-  const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+  const day = today.getDay(); // 0=Sun, 1=Mon ... 6=Sat
+  const diff = day === 0 ? -6 : 1 - day;
   const monday = new Date(today);
-  monday.setDate(diff);
+  monday.setDate(today.getDate() + diff);
   monday.setHours(0, 0, 0, 0);
   return monday;
 };
 
+// Returns YYYY-MM-DD for a given day name in the current week (local date)
 const getTargetDate = (dayName) => {
   const monday = getCurrentWeekMonday();
   monday.setDate(monday.getDate() + DAYS.indexOf(dayName));
-  return monday.toISOString().split('T')[0];
+  return toLocalDateString(monday);
 };
 
+// Day-of-month number for ribbon display
 const formatDisplayDate = (dayName) => {
-  const d = new Date(getTargetDate(dayName) + 'T00:00:00');
-  return d.getDate();
+  const parts = getTargetDate(dayName).split('-');
+  return parseInt(parts[2], 10);
 };
 
 const getMonthLabel = (dayName) => {
-  const d = new Date(getTargetDate(dayName) + 'T00:00:00');
+  const parts = getTargetDate(dayName).split('-');
+  const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
   return d.toLocaleDateString('en-IN', { month: 'short' }).toUpperCase();
 };
 
+// Today check — compare local date strings directly
 const isToday = (dayName) => {
-  return getTargetDate(dayName) === new Date().toISOString().split('T')[0];
+  return getTargetDate(dayName) === toLocalDateString(new Date());
 };
 
-// FIX 1: Get event date string for this week dynamically
+// Event date label for event banner
 const getEventDateLabel = (dayName) => {
-  const d = new Date(getTargetDate(dayName) + 'T00:00:00');
+  const parts = getTargetDate(dayName).split('-');
+  const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
   return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 };
 
@@ -153,11 +168,12 @@ export default function App() {
         const initialMap = {};
 
         // FT-033: Map from grouped plan (main + sides per slot)
+        // Parse YYYY-MM-DD directly — avoids any UTC/IST timezone shift
         if (planRes.data?.plan && planRes.data.plan.length > 0) {
           planRes.data.plan.forEach(slot => {
-            // Fix: append Z to treat date as UTC — prevents IST timezone shift moving days forward
-            const dateObj = new Date(slot.date + "T00:00:00Z");
-            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+            const [yyyy, mm, dd] = slot.date.split('-').map(Number);
+            const dateObj = new Date(yyyy, mm - 1, dd); // local midnight, no UTC conversion
+            const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
             if (slot.main && slot.main.name !== "Skipped") {
               initialMap[`${dayName}-${slot.type}`] = {
                 main: slot.main,
