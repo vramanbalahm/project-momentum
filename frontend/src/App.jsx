@@ -425,7 +425,7 @@ export default function App() {
       <div style={{ width: "100%", maxWidth: 430, minHeight: "100vh", background: "#FFF9F2", display: "flex", flexDirection: "column" }}>
 
         {/* ── HEADER ── */}
-        <div style={{ background: "#1A3A2E", padding: "48px 20px 14px" }}>
+        <div style={{ background: "#1A3A2E", padding: "16px 20px 12px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
             <div>
               <div style={{ color: "#9FE1CB", fontSize: 12, marginBottom: 2 }}>{greeting}, Bala 👋</div>
@@ -455,18 +455,10 @@ export default function App() {
             </div>
           </div>
 
-          {/* Context chips */}
-          <div style={{ display: "flex", gap: 8 }}>
-            {[
-              { icon: "🛒", val: "Market", label: "Check signals" },
-              { icon: "🧊", val: "Fridge", label: "Update stock" },
-              { icon: "👨‍👩‍👧", val: "4 members", label: "This week" }
-            ].map((chip, i) => (
-              <div key={i} style={{ flex: 1, background: "rgba(255,255,255,0.08)", borderRadius: 10, padding: "8px 8px", border: "0.5px solid rgba(255,255,255,0.12)" }}>
-                <div style={{ fontSize: 14, marginBottom: 2 }}>{chip.icon}</div>
-                <div style={{ color: "#FDFCF8", fontSize: 11, fontWeight: 500 }}>{chip.val}</div>
-                <div style={{ color: "#9FE1CB", fontSize: 9, marginTop: 1 }}>{chip.label}</div>
-              </div>
+          {/* Context icons — compact icon-only row */}
+          <div style={{ display: "flex", gap: 16, marginTop: 6 }}>
+            {["🛒", "🧊", "👨‍👩‍👧"].map((icon, i) => (
+              <span key={i} style={{ fontSize: 18, cursor: "pointer", opacity: 0.85 }}>{icon}</span>
             ))}
           </div>
         </div>
@@ -598,7 +590,7 @@ export default function App() {
                       flex: 1, textAlign: "center",
                       padding: "7px 4px", borderRadius: 14,
                       cursor: "pointer",
-                      background: active ? "#1A3A2E" : "transparent",
+                      background: active ? "#1A3A2E" : hasEvent ? "#FFF3DC" : "transparent",
                       border: today && !active ? "1.5px solid #EF9F27" : "1.5px solid transparent",
                       transition: "all 0.15s"
                     }}

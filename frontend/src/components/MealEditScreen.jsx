@@ -363,43 +363,50 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
   // ── PANEL ROUTING ──
   if (panel === 'search') {
     return (
-      <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#FFF9F2", display: "flex", flexDirection: "column" }}>
+      <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start" }}>
+        <div style={{ width: "100%", maxWidth: 430, height: "100%", background: "#FFF9F2", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <SearchPanel
           context={searchContext.mode}
           onBack={() => setPanel('edit')}
           onSelect={handleSearchSelect}
         />
+        </div>
       </div>
     );
   }
 
   if (panel === 'reason') {
     return (
-      <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#FFF9F2", display: "flex", flexDirection: "column" }}>
+      <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start" }}>
+        <div style={{ width: "100%", maxWidth: 430, height: "100%", background: "#FFF9F2", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <ReasonPanel
           recipe={pendingRecipe}
           onBack={() => setPanel('search')}
           onConfirm={handleReasonConfirm}
         />
+        </div>
       </div>
     );
   }
 
   if (panel === 'detail') {
     return (
-      <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#FFF9F2", display: "flex", flexDirection: "column" }}>
+      <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start" }}>
+        <div style={{ width: "100%", maxWidth: 430, height: "100%", background: "#FFF9F2", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <DishDetailPanel
           recipe={detailRecipe}
           onBack={() => setPanel('edit')}
           onSelect={null}
         />
+        </div>
       </div>
     );
   }
 
   // ── EDIT PANEL (default) ──
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#FFF9F2", display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start" }}>
+      <div style={{ width: "100%", maxWidth: 430, height: "100%", background: "#FFF9F2", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* Header */}
       <div style={{ background: "#1A3A2E", padding: "48px 16px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
         <div>
@@ -492,6 +499,7 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
           style={{ width: "100%", background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 12, padding: 14, fontSize: 14, fontWeight: 500, cursor: "pointer", opacity: saving ? 0.6 : 1 }}>
           {saving ? "Saving..." : "Save changes"}
         </button>
+      </div>
       </div>
     </div>
   );
