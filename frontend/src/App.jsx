@@ -246,8 +246,11 @@ export default function App() {
             const dateObj = new Date(yyyy, mm - 1, dd);
             const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
             if (slot.main && slot.main.name !== "Skipped") {
+              // Support mains array (multi-main) — fallback to single main for backward compat
+              const mainsArr = slot.mains && slot.mains.length > 0 ? slot.mains : [slot.main];
               weekMap[`${dayName}-${slot.type}`] = {
                 main: slot.main,
+                mains: mainsArr,
                 sides: slot.sides || [],
                 event_id: slot.event_id
               };

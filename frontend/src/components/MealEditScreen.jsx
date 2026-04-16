@@ -300,7 +300,7 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
   const { day, type, meal, date } = selected;
 
   const [localMeal, setLocalMeal] = useState({
-    main: meal?.main || null,
+    mains: meal?.mains || (meal?.main ? [meal.main] : []),
     sides: meal?.sides || [],
     event_id: meal?.event_id || null
   });
@@ -312,17 +312,22 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
   const [skipped, setSkipped] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const openSearch = (mode, sideSeq = null) => {
-    setSearchContext({ mode, sideSeq });
+  const openSearch = (mode, sideSeq = null, mainIdx = null) => {
+    setSearchContext({ mode, sideSeq, mainIdx });
     setPanel('search');
   };
 
   const handleSearchSelect = (recipe) => {
-    // Add side doesn't need reason capture
     if (searchContext.mode === 'add-side') {
       setLocalMeal(prev => ({
         ...prev,
         sides: [...prev.sides, { ...recipe, dish_sequence: (prev.sides.length + 2) }]
+      }));
+      setPanel('edit');
+    } else if (searchContext.mode === 'add-main') {
+      setLocalMeal(prev => ({
+        ...prev,
+        mains: [...prev.mains, recipe].slice(0, 3)
       }));
       setPanel('edit');
     } else {
@@ -334,7 +339,10 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
   const handleReasonConfirm = (reason, note) => {
     const ctx = pendingRecipe._context;
     if (ctx.mode === 'replace-main') {
-      setLocalMeal(prev => ({ ...prev, main: pendingRecipe }));
+      setLocalMeal(prev => ({
+        ...prev,
+        mains: prev.mains.map((m, i) => i === ctx.mainIdx ? pendingRecipe : m)
+      }));
     } else if (ctx.mode === 'replace-side') {
       setLocalMeal(prev => ({
         ...prev,
@@ -343,6 +351,10 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
     }
     setPendingRecipe(null);
     setPanel('edit');
+  };
+
+  const handleDeleteMain = (idx) => {
+    setLocalMeal(prev => ({ ...prev, mains: prev.mains.filter((_, i) => i !== idx) }));
   };
 
   const handleDeleteSide = (seq) => {
@@ -354,9 +366,10 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
 
   const handleSave = () => {
     if (skipped) {
-      onSave({ main: null, sides: [], event_id: localMeal.event_id });
+      onSave({ mains: [], main: null, sides: [], event_id: localMeal.event_id });
     } else {
-      onSave(localMeal);
+      // Pass both mains array and main (first item) for backward compat
+      onSave({ ...localMeal, main: localMeal.mains[0] || null });
     }
   };
 
@@ -417,33 +430,44 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
       </div>
 
       <div style={{ flex: 1, overflowY: "auto" }}>
-        {/* Main dish */}
+        {/* Main dishes */}
         <div style={{ padding: "14px 16px", borderBottom: "0.5px solid #EDE8E0" }}>
-          <div style={{ fontSize: 9, color: "#B4B2A9", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Main dish</div>
-          {localMeal.main ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#F1EFE8", borderRadius: 10, padding: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <div style={{ fontSize: 9, color: "#B4B2A9", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>Main dishes</div>
+            {localMeal.mains.length < 3 && (
+              <button onClick={() => openSearch('add-main')} style={{ fontSize: 11, color: "#0F6E56", fontWeight: 500, background: "none", border: "none", cursor: "pointer", padding: 0 }}>+ Add main</button>
+            )}
+          </div>
+          {localMeal.mains.length === 0 && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F1EFE8", borderRadius: 10, padding: "12px 14px" }}>
+              <span style={{ fontSize: 12, color: "#B4B2A9" }}>No main dish set</span>
+              <button onClick={() => openSearch('add-main')} style={{ fontSize: 11, color: "#0F6E56", border: "0.5px solid #0F6E56", borderRadius: 6, padding: "4px 10px", background: "none", cursor: "pointer" }}>+ Add main</button>
+            </div>
+          )}
+          {localMeal.mains.map((dish, idx) => (
+            <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10, background: "#F1EFE8", borderRadius: 10, padding: 10, marginBottom: 6 }}>
               <div style={{ width: 52, height: 52, borderRadius: 8, background: "#EDE8E0", flexShrink: 0, overflow: "hidden" }}>
-                {(localMeal.main.thumb || localMeal.main.hero) && (
-                  <img src={localMeal.main.thumb || localMeal.main.hero} alt={localMeal.main.name}
+                {(dish.thumb || dish.hero) && (
+                  <img src={dish.thumb || dish.hero} alt={dish.name}
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     onError={e => { e.target.style.display = "none"; }} />
                 )}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: "#2C2C2A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{localMeal.main.name}</div>
-                <div style={{ marginTop: 3 }}><DietBadge dietType={localMeal.main.diet_type} isSattvic={localMeal.main.is_sattvic || localMeal.main.is_sattvic} /></div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: "#2C2C2A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{dish.name}</div>
+                <div style={{ marginTop: 3 }}><DietBadge dietType={dish.diet_type} isSattvic={dish.is_sattvic} /></div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end", flexShrink: 0 }}>
-                <button onClick={() => openSearch('replace-main')} style={{ fontSize: 10, color: "#0F6E56", border: "0.5px solid #0F6E56", borderRadius: 6, padding: "3px 8px", background: "none", cursor: "pointer" }}>Replace</button>
-                <button onClick={() => { setDetailRecipe(localMeal.main); setPanel('detail'); }} style={{ width: 20, height: 20, borderRadius: "50%", border: "0.5px solid #B4B2A9", background: "none", fontSize: 10, color: "#888780", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>?</button>
+                <button onClick={() => openSearch('replace-main', null, idx)} style={{ fontSize: 10, color: "#0F6E56", border: "0.5px solid #0F6E56", borderRadius: 6, padding: "3px 8px", background: "none", cursor: "pointer" }}>Replace</button>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button onClick={() => { setDetailRecipe(dish); setPanel('detail'); }} style={{ width: 18, height: 18, borderRadius: "50%", border: "0.5px solid #B4B2A9", background: "none", fontSize: 9, color: "#888780", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>?</button>
+                  {localMeal.mains.length > 1 && (
+                    <button onClick={() => handleDeleteMain(idx)} style={{ fontSize: 10, color: "#993C1D", border: "0.5px solid #993C1D", borderRadius: 6, padding: "2px 6px", background: "none", cursor: "pointer" }}>✕</button>
+                  )}
+                </div>
               </div>
             </div>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F1EFE8", borderRadius: 10, padding: "12px 14px" }}>
-              <span style={{ fontSize: 12, color: "#B4B2A9" }}>No main dish set</span>
-              <button onClick={() => openSearch('replace-main')} style={{ fontSize: 11, color: "#0F6E56", border: "0.5px solid #0F6E56", borderRadius: 6, padding: "4px 10px", background: "none", cursor: "pointer" }}>+ Add main</button>
-            </div>
-          )}
+          ))}
         </div>
 
         {/* Side dishes */}
