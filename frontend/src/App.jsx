@@ -417,6 +417,7 @@ export default function App() {
   const greeting = new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 17 ? "Good afternoon" : "Good evening";
 
   return (
+    <>
     <div style={{ minHeight: "100vh", background: "#F5F0E8", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div style={{ width: "100%", maxWidth: 430, minHeight: "100vh", background: "#FFF9F2", display: "flex", flexDirection: "column" }}>
 
@@ -840,5 +841,6 @@ export default function App() {
             }}
           />
         )}
+    </>
   );
 }
