@@ -3,7 +3,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 
 // FT-033: MealCard updated to show main dish + side dishes
 // Matches wireframe v3 — hero image, sides chips, audit pill
-export default function MealCard({ day, type, meal, auditResult, onClick, isEditable = true }) {
+export default function MealCard({ day, type, meal, auditResult, onClick, isEditable = true, isHighlighted = false }) {
   const slotId = `${day}-${type}`;
 
   const { attributes, listeners, setNodeRef: setDraggableRef, transform } = useDraggable({
@@ -42,9 +42,9 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
     <div
       ref={setDroppableRef}
       style={{
-        background: "#fff",
+        background: isHighlighted ? "#FFF3DC" : "#fff",
         borderRadius: 20,
-        border: "1px solid #EDE8E0",
+        border: isHighlighted ? "1px solid #FAC775" : "1px solid #EDE8E0",
         overflow: "hidden",
         marginBottom: 12
       }}

@@ -652,6 +652,7 @@ export default function App() {
                       meal={meal}
                       auditResult={auditResult}
                       isEditable={isCurrentWeek}
+                      isHighlighted={demoEvents.some(ev => ev.dayName === selectedDay)}
                       onClick={(data) => isCurrentWeek && setEditing(data)}
                     />
                   </div>
