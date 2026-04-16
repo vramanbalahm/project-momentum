@@ -133,6 +133,36 @@ async def session_constants(household_id: str, db: Session = Depends(get_db)):
 from routers.weekly_plan import router as weekly_plan_router
 app.include_router(weekly_plan_router)
 
+# --- 6b. FT-043: MEAL SWAP & STANDALONE AUDIT ---
+from services.swap_service import execute_swap, audit_slot
+
+@app.post("/meal/swap")
+def swap_meals(payload: dict, db: Session = Depends(get_db)):
+    """
+    Generic meal slot swap. Works for within-day and cross-day.
+    Day swap: caller loops over meal types, sends one request per type.
+    payload: { source: {day, type, date}, target: {day, type, date} }
+    """
+    return execute_swap(
+        db=db,
+        h_id=ACTIVE_H_ID,
+        source=payload["source"],
+        target=payload["target"]
+    )
+
+@app.post("/meal/audit-slot")
+def audit_meal_slot(payload: dict, db: Session = Depends(get_db)):
+    """
+    Standalone slot audit — callable anytime, anywhere.
+    payload: { date: YYYY-MM-DD, meal_slot: Breakfast|Lunch|Dinner }
+    """
+    return audit_slot(
+        db=db,
+        h_id=ACTIVE_H_ID,
+        event_date=payload["date"],
+        meal_slot=payload["meal_slot"]
+    )
+
 # --- 7. FT-040: RECIPE SEARCH ---
 @app.get("/recipes/search")
 def search_recipes(q: str = "", db: Session = Depends(get_db)):

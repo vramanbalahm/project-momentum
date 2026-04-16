@@ -7,6 +7,7 @@ import DayColumn from './components/DayColumn';
 import MealCard from './components/MealCard';
 import MealEditor from './components/MealEditor';
 import MealEditScreen from './components/MealEditScreen';
+import { swapSlots, swapDays, auditBlueprint, persistSwap } from './services/swapService';
 
 const API_BASE = "http://localhost:8000";
 const HH_ID = "HOUSEHOLD_001";
@@ -382,24 +383,38 @@ export default function App() {
     }
   };
 
-  const handleDragEnd = (event) => {
+  const handleDragEnd = async (event) => {
     const { active, over } = event;
     if (!over) return;
-    const targetSlot = over.id;
-    const draggedMeal = active.data.current?.meal;
     const sourceId = String(active.id);
-    setBlueprint(prev => {
-      const newBlueprint = { ...prev };
-      if (sourceId.startsWith('drag-')) {
-        const sourceSlot = sourceId.replace('drag-', '');
-        if (sourceSlot === targetSlot) return prev;
-        const mealAtTarget = newBlueprint[targetSlot];
-        newBlueprint[targetSlot] = draggedMeal;
-        newBlueprint[sourceSlot] = mealAtTarget || { main: null, sides: [] };
-      }
-      return newBlueprint;
-    });
-    setIsDirty(true); setIsAudited(false); setIsSaved(false);
+    if (!sourceId.startsWith('drag-')) return;
+    const sourceSlot = sourceId.replace('drag-', '');
+    const targetSlot = over.id;
+    if (sourceSlot === targetSlot) return;
+
+    // 1. Swap in memory via swapService
+    const newBlueprint = swapSlots(sourceSlot, targetSlot, blueprint);
+    setBlueprint(newBlueprint);
+    setIsDirty(true);
+    setIsAudited(false);
+    setIsSaved(false);
+
+    // 2. Persist swap to DB via swapService
+    const monday = getOffsetWeekMonday();
+    const weekStart = toLocalDateString(monday);
+    const result = await persistSwap(sourceSlot, targetSlot, getOffsetTargetDate, weekStart);
+
+    if (!result.success) {
+      console.error('Swap persist failed:', result);
+      return;
+    }
+
+    // 3. Run audit on updated blueprint
+    const auditResult = await auditBlueprint(newBlueprint, getTargetDate);
+    if (auditResult.success) {
+      setAuditResults(auditResult.results);
+      setIsAudited(true);
+    }
   };
 
   // Button state — no lock concept. Always invite the user to review.
