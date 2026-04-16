@@ -175,16 +175,19 @@ def persist_plan(db: Session, h_id: str, plan_data: list):
             )
 
         for entry in plan_data:
-            # FT-033: entry now has main dish + sides list
-            # Skip slots where main dish has no recipe_id
-            main = entry.get("main") if isinstance(entry, dict) else getattr(entry, "main", None)
+            # FT-041: entry supports mains array (multi-main) + sides list
+            mains = entry.get("mains", []) if isinstance(entry, dict) else getattr(entry, "mains", [])
+            main  = entry.get("main") if isinstance(entry, dict) else getattr(entry, "main", None)
             sides = entry.get("sides", []) if isinstance(entry, dict) else getattr(entry, "sides", [])
-            slot = entry.get("type") if isinstance(entry, dict) else entry.type
-            date = entry.get("date") if isinstance(entry, dict) else entry.date
+            slot  = entry.get("type") if isinstance(entry, dict) else entry.type
+            date  = entry.get("date") if isinstance(entry, dict) else entry.date
 
-            # FT-033: main is a DishItem Pydantic object — use attribute access, not dict
-            main_recipe_id = main.recipe_id if hasattr(main, "recipe_id") else main.get("recipe_id")
-            if not main or not main_recipe_id:
+            # Normalise: use mains array if present, else fall back to single main
+            if not mains and main:
+                main_recipe_id = main.recipe_id if hasattr(main, "recipe_id") else main.get("recipe_id")
+                mains = [{"recipe_id": main_recipe_id, "dish_type": "Main", "dish_sequence": 1}]
+
+            if not mains:
                 continue
 
             new_event_id = uuid4()
@@ -198,24 +201,29 @@ def persist_plan(db: Session, h_id: str, plan_data: list):
                 {"e_id": new_event_id, "h_id": clean_h_id, "slot": slot, "dt": date}
             )
 
-            # 3. Insert Main dish into Detail
-            db.execute(
-                text("""
-                    INSERT INTO meal_event_detail 
-                        (event_id, recipe_id, action_taken, dish_type, dish_sequence)
-                    VALUES (:e_id, CAST(:r_id AS uuid), 'Accepted', 'Main', 1)
-                """),
-                {"e_id": new_event_id, "r_id": main_recipe_id}
-            )
+            # 3. Insert all main dishes into Detail
+            for seq, m in enumerate(mains, start=1):
+                m_recipe_id = m.get("recipe_id") if isinstance(m, dict) else getattr(m, "recipe_id", None)
+                if not m_recipe_id:
+                    continue
+                db.execute(
+                    text("""
+                        INSERT INTO meal_event_detail
+                            (event_id, recipe_id, action_taken, dish_type, dish_sequence)
+                        VALUES (:e_id, CAST(:r_id AS uuid), 'Accepted', 'Main', :seq)
+                    """),
+                    {"e_id": new_event_id, "r_id": m_recipe_id, "seq": seq}
+                )
 
-            # 4. Insert Side dishes into Detail (FT-033)
-            for seq, side in enumerate(sides, start=2):
+            # 4. Insert Side dishes — sequence continues after mains
+            side_start = len(mains) + 1
+            for seq, side in enumerate(sides, start=side_start):
                 side_recipe_id = side.recipe_id if hasattr(side, "recipe_id") else side.get("recipe_id")
                 if not side_recipe_id:
                     continue
                 db.execute(
                     text("""
-                        INSERT INTO meal_event_detail 
+                        INSERT INTO meal_event_detail
                             (event_id, recipe_id, action_taken, dish_type, dish_sequence)
                         VALUES (:e_id, CAST(:r_id AS uuid), 'Accepted', 'Side', :seq)
                     """),

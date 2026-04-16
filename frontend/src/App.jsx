@@ -350,14 +350,21 @@ export default function App() {
       plan: Object.entries(blueprint).map(([key, val]) => {
         const [day, type] = key.split('-');
         const audit = auditResults[key] || {};
+        // Build mains array — support both old (val.main) and new (val.mains) shape
+        const mainsArr = val?.mains && val.mains.length > 0 ? val.mains : (val?.main ? [val.main] : []);
+        const sidesArr = val?.sides || [];
+        // dish_sequence: mains get 1,2,3... sides follow after
+        const mainItems = mainsArr.map((m, idx) => ({ recipe_id: m.recipe_id || "", dish_type: "Main", dish_sequence: idx + 1 }));
+        const sideItems = sidesArr.map((s, idx) => ({ recipe_id: s.recipe_id || "", dish_type: "Side", dish_sequence: mainsArr.length + idx + 1 }));
         return {
           date: getTargetDate(day), type,
-          main: val?.main ? { recipe_id: val.main.recipe_id || "", dish_type: "Main", dish_sequence: 1 } : null,
-          sides: (val?.sides || []).map((s, idx) => ({ recipe_id: s.recipe_id || "", dish_type: "Side", dish_sequence: idx + 2 })),
+          main: mainItems[0] || null,
+          mains: mainItems,
+          sides: sideItems,
           status: audit.status || "Success",
           message: audit.message || ""
         };
-      }).filter(s => s.main && s.main.recipe_id)
+      }).filter(s => s.mains && s.mains.length > 0 && s.mains[0].recipe_id)
     };
     try {
       setIsSaving(true);

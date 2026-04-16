@@ -318,6 +318,17 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
   };
 
   const handleSearchSelect = (recipe) => {
+    // Duplicate check — same recipe_id cannot appear twice in mains or sides
+    const allIds = [
+      ...localMeal.mains.map(m => m.recipe_id),
+      ...localMeal.sides.map(s => s.recipe_id)
+    ];
+    const isReplacing = searchContext.mode === 'replace-main' || searchContext.mode === 'replace-side';
+    if (!isReplacing && allIds.includes(recipe.recipe_id)) {
+      alert();
+      return;
+    }
+
     if (searchContext.mode === 'add-side') {
       setLocalMeal(prev => ({
         ...prev,
