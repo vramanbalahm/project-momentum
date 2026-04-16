@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, useDraggable, useDroppable } from '@dnd-kit/core';
 import axios from 'axios';
 
 // Component Imports
@@ -439,10 +439,10 @@ export default function App() {
 
         {/* ── HEADER ── */}
         <div style={{ background: "#1A3A2E", padding: "16px 20px 12px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div>
-              <div style={{ color: "#9FE1CB", fontSize: 12, marginBottom: 2 }}>{greeting}, Bala 👋</div>
-              <div style={{ color: "#FDFCF8", fontSize: 20, fontWeight: 500, letterSpacing: -0.3 }}>Your week awaits</div>
+              <div style={{ color: "#9FE1CB", fontSize: 11, marginBottom: 1 }}>{greeting}, Bala 👋</div>
+              <div style={{ color: "#FDFCF8", fontSize: 16, fontWeight: 500, letterSpacing: -0.3 }}>Your week awaits</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {/* Save button in header — hidden when viewing past weeks */}
@@ -587,7 +587,7 @@ export default function App() {
           )}
 
           {/* Day pills — only in day view */}
-          {viewMode === 'day' && <div style={{ padding: "4px 12px 8px", display: "flex" }}>
+          {viewMode === 'day' && <div style={{ padding: "3px 12px 5px", display: "flex" }}>
               {DAYS.map(day => {
                 const active = day === selectedDay;
                 const today = isCurrentWeek && isToday(day);
@@ -601,17 +601,17 @@ export default function App() {
                     onClick={() => setSelectedDay(day)}
                     style={{
                       flex: 1, textAlign: "center",
-                      padding: "7px 4px", borderRadius: 14,
+                      padding: "5px 3px", borderRadius: 10,
                       cursor: "pointer",
                       background: active ? "#1A3A2E" : hasEvent ? "#FFF3DC" : "transparent",
                       border: today && !active ? "1.5px solid #EF9F27" : "1.5px solid transparent",
                       transition: "all 0.15s"
                     }}
                   >
-                    <div style={{ fontSize: 9, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", color: active ? "#9FE1CB" : "#B4B2A9" }}>
+                    <div style={{ fontSize: 8, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", color: active ? "#9FE1CB" : "#B4B2A9" }}>
                       {day.substring(0, 3)}
                     </div>
-                    <div style={{ fontSize: 17, fontWeight: 500, margin: "2px 0", color: active ? "#fff" : "#2C2C2A" }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, margin: "1px 0", color: active ? "#fff" : "#2C2C2A" }}>
                       {dayNum}
                     </div>
                     <div style={{ height: 3, borderRadius: 2, background: active ? "rgba(255,255,255,0.2)" : "#EDE8E0", marginTop: 4 }} />
@@ -682,7 +682,7 @@ export default function App() {
                 <div style={{ textAlign: "center", padding: "48px 20px", color: "#B4B2A9" }}>
                   <div style={{ fontSize: 32, marginBottom: 12 }}>📭</div>
                   <div style={{ fontSize: 14, fontWeight: 500, color: "#2C2C2A", marginBottom: 6 }}>No plan for this week</div>
-                  <div style={{ fontSize: 12, marginBottom: 20 }}>No meals were saved for this period.</div>
+                  <div style={{ fontSize: 11, marginBottom: 10 }}>No meals were saved for this period.</div>
                   <button
                     onClick={() => { setWeekOffset(0); setSelectedDay(DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]); }}
                     style={{ background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 12, padding: "10px 20px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}
