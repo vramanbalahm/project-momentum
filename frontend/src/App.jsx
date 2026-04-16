@@ -823,7 +823,10 @@ export default function App() {
           </div>
         )}
 
-        {/* ── MEAL EDIT SCREEN ── */}
+      </div>
+    </div>
+
+        {/* ── MEAL EDIT SCREEN — outside app container so fixed overlay covers full viewport ── */}
         {editing && (
           <MealEditScreen
             selected={{ ...editing, date: getTargetDate(editing.day) }}
@@ -837,8 +840,5 @@ export default function App() {
             }}
           />
         )}
-
-      </div>
-    </div>
   );
 }
