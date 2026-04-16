@@ -20,10 +20,10 @@ class DishItem(BaseModel):
 # One SaveSlotItem per meal slot — contains main dish + list of sides
 class SaveSlotItem(BaseModel):
     date: str
-    type: str                           # Breakfast / Lunch / Dinner
-    main: Optional[DishItem] = None     # Main dish
-    sides: Optional[List[DishItem]] = []  # Side dishes
-    # Audit metadata
+    type: str                               # Breakfast / Lunch / Dinner
+    main: Optional[DishItem] = None         # First main dish (backward compat)
+    mains: Optional[List[DishItem]] = []    # All main dishes (multi-main support)
+    sides: Optional[List[DishItem]] = []    # Side dishes
     status: Optional[str] = "Success"
     message: Optional[str] = ""
 

@@ -135,7 +135,7 @@ function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
 }
 
 // ── SEARCH PANEL ───────────────────────────────────────────────────────────
-function SearchPanel({ context, onBack, onSelect }) {
+function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarning }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -190,10 +190,15 @@ function SearchPanel({ context, onBack, onSelect }) {
         <input
           ref={inputRef}
           value={query}
-          onChange={e => handleSearch(e.target.value)}
+          onChange={e => { handleSearch(e.target.value); onClearWarning && onClearWarning(); }}
           placeholder="Search dishes..."
           style={{ width: "100%", background: "#F1EFE8", border: "0.5px solid #EDE8E0", borderRadius: 10, padding: "9px 14px", fontSize: 13, color: "#2C2C2A", outline: "none", boxSizing: "border-box" }}
         />
+        {duplicateWarning && (
+          <div style={{ marginTop: 8, fontSize: 11, color: "#993C1D", background: "#FAECE7", borderRadius: 8, padding: "6px 10px" }}>
+            {duplicateWarning} is already in this meal slot.
+          </div>
+        )}
       </div>
 
       {/* Results */}
@@ -311,6 +316,7 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
   const [detailRecipe, setDetailRecipe] = useState(null);
   const [skipped, setSkipped] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState(null);
 
   const openSearch = (mode, sideSeq = null, mainIdx = null) => {
     setSearchContext({ mode, sideSeq, mainIdx });
@@ -325,9 +331,10 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
     ];
     const isReplacing = searchContext.mode === 'replace-main' || searchContext.mode === 'replace-side';
     if (!isReplacing && allIds.includes(recipe.recipe_id)) {
-      alert();
+      setDuplicateWarning(recipe.name || 'This dish');
       return;
     }
+    setDuplicateWarning(null);
 
     if (searchContext.mode === 'add-side') {
       setLocalMeal(prev => ({
@@ -391,8 +398,10 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
         <div style={{ width: "100%", maxWidth: 430, height: "100%", background: "#FFF9F2", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <SearchPanel
           context={searchContext.mode}
-          onBack={() => setPanel('edit')}
+          onBack={() => { setPanel('edit'); setDuplicateWarning(null); }}
           onSelect={handleSearchSelect}
+          duplicateWarning={duplicateWarning}
+          onClearWarning={() => setDuplicateWarning(null)}
         />
         </div>
       </div>
