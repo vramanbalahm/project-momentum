@@ -95,12 +95,14 @@ const WeekThumbCard = ({ meal, slotId, onClick }) => {
       onClick={onClick}
       style={{
         width: "100%", height: 64, borderRadius: 10,
-        overflow: "hidden", background: "#EDE8E0",
+        background: "#EDE8E0",
         position: "relative", cursor: "grab",
         border: "1px solid #E0DBD3",
+        zIndex: dragStyle ? 100 : 1,
         ...dragStyle
       }}
     >
+      <div style={{ position: "absolute", inset: 0, borderRadius: 10, overflow: "hidden" }}>
       {imgUrl ? (
         <img
           src={imgUrl}
@@ -140,6 +142,7 @@ const WeekThumbCard = ({ meal, slotId, onClick }) => {
         }}>
           {main?.name ? main.name.split(' ').slice(0, 2).join(' ') : "—"}
         </div>
+      </div>
       </div>
     </div>
     </div>
@@ -529,6 +532,12 @@ export default function App() {
             </div>
           )}
         </div>
+        {/* Swap hint — week view only */}
+        {viewMode === 'week' && isCurrentWeek && (
+          <div style={{ fontSize: 10, color: "#B4B2A9", fontStyle: "italic", padding: "3px 16px 0" }}>
+            Drag meals in week view to swap slots
+          </div>
+        )}
 
         {/* ── WEEK NAVIGATOR — shown in both day and week view ── */}
         <div style={{ background: "#FFF9F2", borderBottom: "1px solid #EDE8E0" }}>

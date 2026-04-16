@@ -45,13 +45,14 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
         background: isHighlighted ? "#FFF3DC" : "#fff",
         borderRadius: 20,
         border: isHighlighted ? "1px solid #FAC775" : "1px solid #EDE8E0",
-        overflow: "hidden",
-        marginBottom: 12
+        overflow: transform ? "visible" : "hidden",
+        marginBottom: 12,
+        position: "relative"
       }}
     >
       <div
         ref={setDraggableRef}
-        style={style}
+        style={{ ...style, position: "relative", zIndex: transform ? 100 : 1 }}
         {...listeners}
         {...attributes}
       >
