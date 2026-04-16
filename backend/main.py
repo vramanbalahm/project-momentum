@@ -136,25 +136,39 @@ app.include_router(weekly_plan_router)
 # --- 7. FT-040: RECIPE SEARCH ---
 @app.get("/recipes/search")
 def search_recipes(q: str = "", db: Session = Depends(get_db)):
-    """Search recipe_dna_master + join content vault for thumbnails."""
-    query = text("""
-        SELECT
-            r.recipe_id,
-            r.dish_name,
-            r.diet_type,
-            r.is_sattvic,
-            r.intensity_level,
-            v.carousel_thumb_url,
-            v.hero_image_url,
-            v.prep_steps,
-            v.ingredients_json
-        FROM recipe_dna_master r
-        LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
-        WHERE (:q = '' OR LOWER(r.dish_name) LIKE LOWER(:pattern))
-        ORDER BY r.dish_name
-        LIMIT 30
-    """)
-    rows = db.execute(query, {"q": q, "pattern": f"%{q}%"}).fetchall()
+    """
+    Fuzzy search on recipe_dna_master using pg_trgm trigram similarity.
+    Handles misspellings, partial words, and phonetically close inputs.
+    Empty query returns all recipes ordered by name.
+    """
+    if not q:
+        query = text("""
+            SELECT
+                r.recipe_id, r.dish_name, r.diet_type, r.is_sattvic,
+                r.intensity_level, v.carousel_thumb_url, v.hero_image_url,
+                v.prep_steps, v.ingredients_json
+            FROM recipe_dna_master r
+            LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
+            ORDER BY r.dish_name
+            LIMIT 30
+        """)
+        rows = db.execute(query).fetchall()
+    else:
+        query = text("""
+            SELECT
+                r.recipe_id, r.dish_name, r.diet_type, r.is_sattvic,
+                r.intensity_level, v.carousel_thumb_url, v.hero_image_url,
+                v.prep_steps, v.ingredients_json,
+                similarity(LOWER(r.dish_name), LOWER(:q)) AS sim_score
+            FROM recipe_dna_master r
+            LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
+            WHERE
+                similarity(LOWER(r.dish_name), LOWER(:q)) > 0.1
+                OR LOWER(r.dish_name) LIKE LOWER(:pattern)
+            ORDER BY sim_score DESC, r.dish_name
+            LIMIT 30
+        """)
+        rows = db.execute(query, {"q": q, "pattern": f"%{q}%"}).fetchall()
     return [
         {
             "recipe_id": str(row[0]),
