@@ -194,16 +194,11 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
 
         {/* Action buttons — hidden for past/future week views */}
         {isEditable && (
-          <div style={{
-            display: "flex",
-            gap: 8,
-            padding: "8px 14px 12px",
-            borderTop: "1px solid #F5F0E8"
-          }}>
+          <div style={{ padding: "8px 14px 12px", borderTop: "1px solid #F5F0E8" }}>
             <button
               onClick={() => mainDish && onClick({ day, type, meal })}
               style={{
-                flex: 1,
+                width: "100%",
                 background: "#1A3A2E",
                 color: "#FDFCF8",
                 border: "none",
@@ -215,20 +210,6 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
               }}
             >
               Edit dishes
-            </button>
-            <button
-              style={{
-                flex: 1,
-                background: "#FFF9F2",
-                color: "#444441",
-                border: "1px solid #EDE8E0",
-                borderRadius: 12,
-                padding: "9px 0",
-                fontSize: 12,
-                cursor: "pointer"
-              }}
-            >
-              Swap
             </button>
           </div>
         )}
