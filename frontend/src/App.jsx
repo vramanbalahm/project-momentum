@@ -207,7 +207,10 @@ export default function App() {
     setViewMode('day');
   };
 
-  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
+  );
 
   // Load plan whenever weekOffset changes
   // weekOffset === 0 reloads current week (fixes returning from past week showing stale data)
