@@ -71,22 +71,34 @@ const MEAL_CONFIG = {
   Dinner:    { icon: '🌙', color: '#EEEDFE', time: '7:30 – 9:00 pm' }
 };
 
-// FIX 3: Week overview thumbnail card — with +N sides indicator
-const WeekThumbCard = ({ meal, onClick }) => {
+// Week overview thumbnail card — DnD enabled for slot swapping
+const WeekThumbCard = ({ meal, slotId, onClick }) => {
   const main = meal?.main;
   const sides = meal?.sides || [];
   let imgUrl = main?.thumb || main?.hero;
   if (!imgUrl && main?.name) {
     imgUrl = `/assets/meals/${main.name.toLowerCase().replace(/\s+/g, '_')}.png`;
   }
+  const { attributes, listeners, setNodeRef: setDraggableRef, transform } = useDraggable({
+    id: `drag-${slotId}`,
+    data: { meal }
+  });
+  const { setNodeRef: setDroppableRef } = useDroppable({ id: slotId });
+  const dragStyle = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 } : undefined;
+
   return (
+    <div ref={setDroppableRef} style={{ width: "100%" }}>
     <div
+      ref={setDraggableRef}
+      {...listeners}
+      {...attributes}
       onClick={onClick}
       style={{
         width: "100%", height: 64, borderRadius: 10,
         overflow: "hidden", background: "#EDE8E0",
-        position: "relative", cursor: "pointer",
-        border: "1px solid #E0DBD3"
+        position: "relative", cursor: "grab",
+        border: "1px solid #E0DBD3",
+        ...dragStyle
       }}
     >
       {imgUrl ? (
@@ -129,6 +141,7 @@ const WeekThumbCard = ({ meal, onClick }) => {
           {main?.name ? main.name.split(' ').slice(0, 2).join(' ') : "—"}
         </div>
       </div>
+    </div>
     </div>
   );
 };
@@ -708,7 +721,8 @@ export default function App() {
                 })}
               </div>
 
-              {/* Meal rows */}
+              {/* Meal rows — wrapped in DndContext for week view slot swapping */}
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               {MEAL_TYPES.map(type => (
                 <div key={type} style={{ display: "grid", gridTemplateColumns: "60px repeat(7, 1fr)", gap: 4, marginBottom: 6, alignItems: "start" }}>
                   {/* Meal type label */}
@@ -723,12 +737,14 @@ export default function App() {
                   {DAYS.map(day => (
                     <WeekThumbCard
                       key={`${day}-${type}`}
+                      slotId={`${day}-${type}`}
                       meal={blueprint[`${day}-${type}`]}
                       onClick={() => { setSelectedDay(day); setViewMode('day'); }}
                     />
                   ))}
                 </div>
               ))}
+              </DndContext>
 
               </>
               )}

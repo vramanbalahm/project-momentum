@@ -60,6 +60,18 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
           style={{ height: 110, position: "relative", overflow: "hidden", cursor: "pointer" }}
           onClick={() => mainDish && onClick({ day, type, meal })}
         >
+          {/* Edit button — top left, only when editable */}
+          {isEditable && (
+            <div
+              onClick={e => { e.stopPropagation(); mainDish && onClick({ day, type, meal }); }}
+              style={{
+                position: "absolute", top: 8, left: 8, zIndex: 10,
+                background: "rgba(26,58,46,0.88)", color: "#9FE1CB",
+                fontSize: 10, fontWeight: 500, borderRadius: 8,
+                padding: "4px 10px", cursor: "pointer"
+              }}
+            >Edit</div>
+          )}
           <img
             src={imageUrl}
             alt={mainDish?.name || "Meal"}
@@ -192,27 +204,7 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
           </div>
         )}
 
-        {/* Action buttons — hidden for past/future week views */}
-        {isEditable && (
-          <div style={{ padding: "8px 14px 12px", borderTop: "1px solid #F5F0E8" }}>
-            <button
-              onClick={() => mainDish && onClick({ day, type, meal })}
-              style={{
-                width: "100%",
-                background: "#1A3A2E",
-                color: "#FDFCF8",
-                border: "none",
-                borderRadius: 12,
-                padding: "9px 0",
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: "pointer"
-              }}
-            >
-              Edit dishes
-            </button>
-          </div>
-        )}
+
       </div>
     </div>
   );
