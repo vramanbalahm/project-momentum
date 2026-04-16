@@ -479,51 +479,26 @@ export default function App() {
           </div>
         </div>
 
-        {/* ── EVENT BANNER — FIX 1: dates match current week ── */}
-        <div style={{ background: "#FFF3DC", borderBottom: "1.5px solid #FAC775", padding: "10px 16px" }}>
-          <div style={{ fontSize: 9, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.1em", color: "#854F0B", marginBottom: 8 }}>
-            Special this week
-          </div>
-          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
-            {demoEvents.map((ev, i) => (
-              <div key={i} style={{
-                flexShrink: 0, background: "#fff", borderRadius: 14,
-                padding: "8px 12px", border: "1px solid #FAC775",
-                display: "flex", alignItems: "center", gap: 8, minWidth: 165
-              }}>
-                <span style={{ fontSize: 22 }}>{ev.emoji}</span>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: "#2C2C2A" }}>{ev.title}</div>
-                  {/* FIX 1: Dynamic date from actual current week */}
-                  <div style={{ fontSize: 10, color: "#888780", marginTop: 1 }}>
-                    {getEventDateLabel(ev.dayName)}
-                  </div>
-                  <div style={{
-                    display: "inline-block", fontSize: 9, padding: "1px 7px",
-                    borderRadius: 20, fontWeight: 500, marginTop: 3,
-                    background: ev.pillBg, color: ev.pillColor
-                  }}>{ev.pill}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
 
-        {/* ── VIEW TOGGLE — FIX 3 ── */}
-        <div style={{ background: "#FFF9F2", padding: "8px 16px", display: "flex", gap: 8, borderBottom: "1px solid #EDE8E0", alignItems: "center" }}>
+
+        {/* ── VIEW TOGGLE ── */}
+        <div style={{ background: "#EDE8E0", padding: "8px 16px", display: "flex", gap: 8, borderBottom: "1px solid #D3D1C7", alignItems: "center" }}>
           {['day', 'week'].map(mode => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
               style={{
                 padding: "5px 14px", borderRadius: 20,
-                border: viewMode === mode ? "none" : "1px solid #EDE8E0",
-                background: viewMode === mode ? "#1A3A2E" : "transparent",
+                border: "none",
+                background: viewMode === mode ? "#1A3A2E" : "rgba(255,255,255,0.5)",
                 color: viewMode === mode ? "#9FE1CB" : "#888780",
                 fontSize: 11, fontWeight: 500, cursor: "pointer"
               }}
             >
               {mode === 'day' ? '📅 Day view' : '📆 Week view'}
+              {mode === 'week' && viewMode === 'week' && isCurrentWeek && (
+                <span style={{ fontSize: 9, color: "#5DCAA5", marginLeft: 4, fontStyle: "italic" }}>· drag to swap</span>
+              )}
             </button>
           ))}
           {isDirty && (
@@ -532,12 +507,6 @@ export default function App() {
             </div>
           )}
         </div>
-        {/* Swap hint — week view only */}
-        {viewMode === 'week' && isCurrentWeek && (
-          <div style={{ fontSize: 10, color: "#B4B2A9", fontStyle: "italic", padding: "3px 16px 0" }}>
-            Drag meals in week view to swap slots
-          </div>
-        )}
 
         {/* ── WEEK NAVIGATOR — shown in both day and week view ── */}
         <div style={{ background: "#FFF9F2", borderBottom: "1px solid #EDE8E0" }}>
@@ -624,9 +593,17 @@ export default function App() {
                       {dayNum}
                     </div>
                     <div style={{ height: 3, borderRadius: 2, background: active ? "rgba(255,255,255,0.2)" : "#EDE8E0", marginTop: 4 }} />
-                    {hasEvent && isCurrentWeek && (
-                      <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#EF9F27", margin: "3px auto 0" }} />
-                    )}
+                    {hasEvent && isCurrentWeek && (() => {
+                      const ev = demoEvents.find(e => e.dayName === day);
+                      return ev ? (
+                        <div style={{ marginTop: 3, lineHeight: 1 }}>
+                          <div style={{ fontSize: 10 }}>{ev.emoji}</div>
+                          <div style={{ fontSize: 7, color: active ? "#9FE1CB" : "#854F0B", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 36, margin: "0 auto" }}>
+                            {ev.title.split(" ")[0]}
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 );
               })}
@@ -644,7 +621,7 @@ export default function App() {
           ) : viewMode === 'day' ? (
 
             /* ── DAY VIEW ── */
-            <div style={{ padding: "12px 14px" }}>
+            <div style={{ padding: "12px 14px", overflow: "visible" }}>
               {/* Empty state — past/future week with no plan */}
               {!isCurrentWeek && Object.keys(blueprint).length === 0 && (
                 <div style={{ textAlign: "center", padding: "48px 20px", color: "#B4B2A9" }}>
@@ -685,7 +662,7 @@ export default function App() {
           ) : (
 
             /* ── WEEK VIEW — offset-aware, read-only for past weeks ── */
-            <div style={{ padding: "12px 14px" }}>
+            <div style={{ padding: "12px 14px", overflow: "visible" }}>
               {/* Empty state for week view */}
               {!isCurrentWeek && Object.keys(blueprint).length === 0 ? (
                 <div style={{ textAlign: "center", padding: "48px 20px", color: "#B4B2A9" }}>
@@ -733,7 +710,7 @@ export default function App() {
               {/* Meal rows — wrapped in DndContext for week view slot swapping */}
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               {MEAL_TYPES.map(type => (
-                <div key={type} style={{ display: "grid", gridTemplateColumns: "60px repeat(7, 1fr)", gap: 4, marginBottom: 6, alignItems: "start" }}>
+                <div key={type} style={{ display: "grid", gridTemplateColumns: "60px repeat(7, 1fr)", gap: 4, marginBottom: 6, alignItems: "start", overflow: "visible", position: "relative", zIndex: 1 }}>
                   {/* Meal type label */}
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8 }}>
                     <div style={{ fontSize: 14 }}>{MEAL_CONFIG[type].icon}</div>
