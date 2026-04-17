@@ -74,8 +74,12 @@ const MEAL_CONFIG = {
 
 // Week overview thumbnail card — DnD enabled for slot swapping
 const WeekThumbCard = ({ meal, slotId, onClick }) => {
-  const main = meal?.main;
+  // Read from mains array first (multi-main), fall back to single main
+  const mainsArr = meal?.mains && meal.mains.length > 0 ? meal.mains : (meal?.main ? [meal.main] : []);
+  const main = mainsArr[0] || null;
+  const extraMains = mainsArr.length > 1 ? mainsArr.length - 1 : 0;
   const sides = meal?.sides || [];
+  const extraCount = extraMains + sides.length; // total additional dishes beyond first main
   let imgUrl = main?.thumb || main?.hero;
   if (!imgUrl && main?.name) {
     imgUrl = `/assets/meals/${main.name.toLowerCase().replace(/\s+/g, '_')}.png`;
@@ -116,8 +120,8 @@ const WeekThumbCard = ({ meal, slotId, onClick }) => {
         />
       ) : null}
 
-      {/* +N sides badge — top right corner */}
-      {sides.length > 0 && (
+      {/* +N badge — extra mains + sides */}
+      {extraCount > 0 && (
         <div style={{
           position: "absolute", top: 4, right: 4,
           background: "rgba(26,58,46,0.85)",
@@ -126,7 +130,7 @@ const WeekThumbCard = ({ meal, slotId, onClick }) => {
           padding: "2px 5px", borderRadius: 8,
           lineHeight: 1.2
         }}>
-          +{sides.length}
+          +{extraCount}
         </div>
       )}
 
