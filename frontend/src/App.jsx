@@ -99,7 +99,7 @@ const WeekThumbCard = ({ meal, slotId, onClick }) => {
       {...attributes}
       onClick={onClick}
       style={{
-        width: "100%", height: 56, borderRadius: 8,
+        width: "100%", height: "100%", minHeight: 56, borderRadius: 8,
         background: "#EDE8E0",
         position: "relative", cursor: "grab",
         border: "1px solid #E0DBD3",
@@ -642,7 +642,7 @@ export default function App() {
         </div>
 
         {/* ── CONTENT AREA ── */}
-        <div style={{ flex: 1, overflowY: "auto" }}>
+        <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
 
           {isLoading ? (
             <div style={{ textAlign: "center", padding: "48px 0", color: "#B4B2A9", fontSize: 14 }}>
@@ -692,7 +692,7 @@ export default function App() {
           ) : (
 
             /* ── WEEK VIEW — offset-aware, read-only for past weeks ── */
-            <div style={{ padding: "6px 8px", overflow: "visible" }}>
+            <div style={{ padding: "6px 8px", overflow: "visible", flex: 1, display: "flex", flexDirection: "column" }}>
               {/* Empty state for week view */}
               {!isCurrentWeek && Object.keys(blueprint).length === 0 ? (
                 <div style={{ textAlign: "center", padding: "48px 20px", color: "#B4B2A9" }}>
@@ -740,7 +740,7 @@ export default function App() {
               {/* Meal rows — wrapped in DndContext for week view slot swapping */}
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               {MEAL_TYPES.map(type => (
-                <div key={type} style={{ display: "grid", gridTemplateColumns: "40px repeat(7, 1fr)", gap: 3, marginBottom: 4, alignItems: "start", overflow: "visible", position: "relative", zIndex: 1 }}>
+                <div key={type} style={{ display: "grid", gridTemplateColumns: "40px repeat(7, 1fr)", gap: 3, marginBottom: 4, alignItems: "center", overflow: "visible", position: "relative", zIndex: 1, flex: 1 }}>
                   {/* Meal type label */}
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8 }}>
                     <div style={{ fontSize: 12 }}>{MEAL_CONFIG[type].icon}</div>
