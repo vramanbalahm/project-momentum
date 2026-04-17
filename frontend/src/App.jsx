@@ -9,7 +9,7 @@ import MealEditor from './components/MealEditor';
 import MealEditScreen from './components/MealEditScreen';
 import { swapSlots, swapDays, auditBlueprint, persistSwap } from './services/swapService';
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const HH_ID = "HOUSEHOLD_001";
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner'];

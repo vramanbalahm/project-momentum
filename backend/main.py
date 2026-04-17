@@ -23,9 +23,12 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(title="Momentum Food Scheduler — MVP")
 
 # Allow frontend origin to talk to backend
+import os
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

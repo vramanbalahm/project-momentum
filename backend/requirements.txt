@@ -1,2 +1,7 @@
 fastapi
-uvicorn
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+python-dotenv
+pydantic
+starlette
