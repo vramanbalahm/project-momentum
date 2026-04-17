@@ -184,11 +184,15 @@ def persist_plan(db: Session, h_id: str, plan_data: list):
 
             # Normalise: use mains array if present, else fall back to single main
             if not mains and main:
-                main_recipe_id = main.recipe_id if hasattr(main, "recipe_id") else main.get("recipe_id")
-                mains = [{"recipe_id": main_recipe_id, "dish_type": "Main", "dish_sequence": 1}]
+                first_recipe_id = main.recipe_id if hasattr(main, "recipe_id") else main.get("recipe_id")
+                mains = [{"recipe_id": first_recipe_id, "dish_type": "Main", "dish_sequence": 1}]
 
             if not mains:
                 continue
+
+            # First main recipe_id — used for audit log
+            first_main = mains[0]
+            main_recipe_id = first_main.get("recipe_id") if isinstance(first_main, dict) else getattr(first_main, "recipe_id", None)
 
             new_event_id = uuid4()
 
