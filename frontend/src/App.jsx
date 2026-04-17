@@ -234,7 +234,7 @@ export default function App() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 400, tolerance: 10 } }),
     useSensor(KeyboardSensor)
   );
 
@@ -351,6 +351,11 @@ export default function App() {
       setAuditResults(resultMap);
       setIsAudited(true);
       setIsDirty(false);
+      // If in week view, switch to day view at Monday so user sees audit results
+      if (viewMode === 'week') {
+        setViewMode('day');
+        setSelectedDay('Monday');
+      }
     } catch { console.error("Audit failed"); }
   };
 
@@ -715,8 +720,7 @@ export default function App() {
               </div>
 
               {/* Column headers — offset-aware dates */}
-              <div style={{ display: "grid", gridTemplateColumns: "40px repeat(7, 1fr)", gap: 3, marginBottom: 4 }}>
-                <div />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, marginBottom: 2 }}>
                 {DAYS.map(day => {
                   const dateStr = getOffsetTargetDate(day);
                   const dayNum = parseInt(dateStr.split('-')[2], 10);
@@ -741,20 +745,18 @@ export default function App() {
                 })}
               </div>
 
-              {/* Meal rows — wrapped in DndContext for week view slot swapping */}
+              {/* Meal rows — label above each row, full width for cards */}
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <div style={{ display: "flex", flexDirection: "column", flex: 1, gap: 4 }}>
               {MEAL_TYPES.map(type => (
-                <div key={type} style={{ display: "grid", gridTemplateColumns: "40px repeat(7, 1fr)", gap: 3, alignItems: "stretch", overflow: "visible", position: "relative", zIndex: 1, flex: 1 }}>
-                  {/* Meal type label */}
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8 }}>
-                    <div style={{ fontSize: 12 }}>{MEAL_CONFIG[type].icon}</div>
-                    <div style={{ fontSize: 7, color: "#B4B2A9", fontWeight: 500, textTransform: "uppercase", marginTop: 1 }}>
-                      {type.substring(0, 5)}
-                    </div>
+                <div key={type} style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "visible" }}>
+                  {/* Meal type label — above the row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 3 }}>
+                    <span style={{ fontSize: 11 }}>{MEAL_CONFIG[type].icon}</span>
+                    <span style={{ fontSize: 8, color: "#B4B2A9", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em" }}>{type}</span>
                   </div>
-
-                  {/* Meal thumbnail per day */}
+                  {/* Cards row — full width */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, flex: 1, overflow: "visible", position: "relative", zIndex: 1 }}>
                   {DAYS.map(day => (
                     <WeekThumbCard
                       key={`${day}-${type}`}
@@ -763,6 +765,7 @@ export default function App() {
                       onClick={() => { setSelectedDay(day); setViewMode('day'); }}
                     />
                   ))}
+                  </div>
                 </div>
               ))}
               </div>
