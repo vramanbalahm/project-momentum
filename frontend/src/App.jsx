@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
 import axios from 'axios';
 
 // Component Imports
@@ -225,8 +225,10 @@ export default function App() {
     setViewMode('day');
   };
 
-  // Sensors kept for DndContext in day view (future use)
-  const sensors = useSensors(useSensor(PointerSensor));
+  // DnD sensors for day view card reordering
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
 
   // Load plan whenever weekOffset changes
   // weekOffset === 0 reloads current week (fixes returning from past week showing stale data)
@@ -711,7 +713,7 @@ export default function App() {
                   >Go to current week</button>
                 </div>
               )}
-              <div>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 {selectedDayMeals.map(({ type, meal, auditResult }) => (
                   <div key={type} style={{ marginBottom: 4 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 2px 4px" }}>
@@ -733,7 +735,7 @@ export default function App() {
                     />
                   </div>
                 ))}
-              </div>
+              </DndContext>
             </div>
 
           ) : (
