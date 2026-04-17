@@ -110,6 +110,7 @@ const WeekThumbCard = ({ meal, slotId, onClick }) => {
       <div style={{ position: "absolute", inset: 0, borderRadius: 10, overflow: "hidden" }}>
       {imgUrl ? (
         <img
+          key={imgUrl}
           src={imgUrl}
           alt={main?.name || "Meal"}
           style={{ width: "100%", height: "100%", objectFit: "cover" }}
