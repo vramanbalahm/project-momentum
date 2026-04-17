@@ -43,7 +43,7 @@ def fetch_active_plan(db: Session, h_id: str, week_start: str = None):
 
     rows = db.execute(query, params).fetchall()
 
-    # FT-033: Group dishes by date+slot into slots with main + sides
+    # FT-041: Group dishes by date+slot — mains array supports multi-main
     slots = {}
     for r in rows:
         key = f"{str(r.date)}_{r.slot}"
@@ -52,7 +52,8 @@ def fetch_active_plan(db: Session, h_id: str, week_start: str = None):
                 "date": str(r.date),
                 "type": r.slot,
                 "event_id": str(r.event_id),
-                "main": None,
+                "main": None,   # first main — backward compat for frontend
+                "mains": [],    # all mains — used by MealCard split hero
                 "sides": []
             }
         dish = {
@@ -67,7 +68,10 @@ def fetch_active_plan(db: Session, h_id: str, week_start: str = None):
             "diet_type": str(r.diet_type) if r.diet_type else "Veg"
         }
         if r.dish_type == "Main":
-            slots[key]["main"] = dish
+            slots[key]["mains"].append(dish)
+            # Keep main as first dish for backward compat
+            if slots[key]["main"] is None:
+                slots[key]["main"] = dish
         else:
             slots[key]["sides"].append(dish)
 
