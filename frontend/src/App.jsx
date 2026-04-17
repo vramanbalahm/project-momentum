@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, TouchSensor, useSensor, useSensors, useDraggable, useDroppable } from '@dnd-kit/core';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, useDraggable, useDroppable } from '@dnd-kit/core';
 import axios from 'axios';
 
 // Component Imports
@@ -237,9 +237,9 @@ export default function App() {
     setViewMode('day');
   };
 
+  // DnD sensors — desktop only (touch drag disabled, two-tap swap used on mobile)
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 400, tolerance: 10 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 50 } }),
     useSensor(KeyboardSensor)
   );
 
