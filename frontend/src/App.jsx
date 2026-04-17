@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import axios from 'axios';
 
 // Component Imports
@@ -225,11 +225,8 @@ export default function App() {
     setViewMode('day');
   };
 
-  // DnD sensors — desktop only (touch drag disabled, two-tap swap used on mobile)
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 50 } }),
-    useSensor(KeyboardSensor)
-  );
+  // Sensors kept for DndContext in day view (future use)
+  const sensors = useSensors(useSensor(PointerSensor));
 
   // Load plan whenever weekOffset changes
   // weekOffset === 0 reloads current week (fixes returning from past week showing stale data)
@@ -578,9 +575,7 @@ export default function App() {
               }}
             >
               {mode === 'day' ? '📅 Day view' : '📆 Week view'}
-              {mode === 'week' && viewMode === 'week' && isCurrentWeek && (
-                <span style={{ fontSize: 9, color: "#5DCAA5", marginLeft: 4, fontStyle: "italic" }}>· drag to swap</span>
-              )}
+
             </button>
           ))}
           {isDirty && (
@@ -716,7 +711,7 @@ export default function App() {
                   >Go to current week</button>
                 </div>
               )}
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <div>
                 {selectedDayMeals.map(({ type, meal, auditResult }) => (
                   <div key={type} style={{ marginBottom: 4 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 2px 4px" }}>
@@ -738,7 +733,7 @@ export default function App() {
                     />
                   </div>
                 ))}
-              </DndContext>
+              </div>
             </div>
 
           ) : (

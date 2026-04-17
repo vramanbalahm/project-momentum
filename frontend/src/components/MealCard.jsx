@@ -1,21 +1,8 @@
 import React from "react";
-import { useDraggable, useDroppable } from "@dnd-kit/core";
 
 // FT-041: MealCard supports multiple main dishes (split hero) + horizontal sides with names
+// DnD removed — swap handled via SwapCopyBar two-tap in week view
 export default function MealCard({ day, type, meal, auditResult, onClick, isEditable = true, isHighlighted = false }) {
-  const slotId = `${day}-${type}`;
-
-  const { attributes, listeners, setNodeRef: setDraggableRef, transform } = useDraggable({
-    id: `drag-${slotId}`,
-    data: { meal }
-  });
-
-  const { setNodeRef: setDroppableRef } = useDroppable({ id: slotId });
-
-  const style = transform ? {
-    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-    zIndex: 50
-  } : undefined;
 
   // Support both old shape (meal.main) and new shape (meal.mains array)
   const mainsRaw = meal?.mains || (meal?.main ? [meal.main] : []);
@@ -37,22 +24,16 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
 
   return (
     <div
-      ref={setDroppableRef}
       style={{
         background: isHighlighted ? "#FFF3DC" : "#fff",
         borderRadius: 20,
         border: isHighlighted ? "1px solid #FAC775" : "1px solid #EDE8E0",
-        overflow: transform ? "visible" : "hidden",
+        overflow: "hidden",
         marginBottom: 12,
         position: "relative"
       }}
     >
-      <div
-        ref={setDraggableRef}
-        style={{ ...style, position: "relative", zIndex: transform ? 100 : 1 }}
-        {...listeners}
-        {...attributes}
-      >
+      <div>
         {/* HERO — splits equally across all mains */}
         <div
           style={{ height: 110, display: "flex", position: "relative", overflow: "hidden", cursor: "pointer" }}
