@@ -145,6 +145,7 @@ const WeekThumbCard = ({ meal, slotId, onClick, isSelected = false, isSwapMode =
       </div>
       </div>
     </div>
+    </div>
   );
 };
 
