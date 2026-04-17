@@ -8,7 +8,6 @@ import MealCard from './components/MealCard';
 import MealEditor from './components/MealEditor';
 import MealEditScreen from './components/MealEditScreen';
 import SwapCopyBar from './components/SwapCopyBar';
-import { swapSlots, auditBlueprint, persistSwap } from './services/swapService';
 import { swapSlots, swapDays, auditBlueprint, persistSwap } from './services/swapService';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
