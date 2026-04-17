@@ -7,6 +7,8 @@ import DayColumn from './components/DayColumn';
 import MealCard from './components/MealCard';
 import MealEditor from './components/MealEditor';
 import MealEditScreen from './components/MealEditScreen';
+import SwapCopyBar from './components/SwapCopyBar';
+import { swapSlots, auditBlueprint, persistSwap } from './services/swapService';
 import { swapSlots, swapDays, auditBlueprint, persistSwap } from './services/swapService';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
@@ -73,7 +75,7 @@ const MEAL_CONFIG = {
 };
 
 // Week overview thumbnail card — DnD enabled for slot swapping
-const WeekThumbCard = ({ meal, slotId, onClick }) => {
+const WeekThumbCard = ({ meal, slotId, onClick, isSelected = false, isSwapMode = false }) => {
   // Read from mains array first (multi-main), fall back to single main
   const mainsArr = meal?.mains && meal.mains.length > 0 ? meal.mains : (meal?.main ? [meal.main] : []);
   const main = mainsArr[0] || null;
@@ -100,13 +102,14 @@ const WeekThumbCard = ({ meal, slotId, onClick }) => {
       onClick={onClick}
       style={{
         width: "100%", height: "100%", minHeight: 56, borderRadius: 8,
-        background: "#EDE8E0",
-        position: "relative", cursor: "grab",
-        border: "1px solid #E0DBD3",
-        zIndex: dragStyle ? 100 : 1,
+        background: isSelected ? "#EF9F27" : "#EDE8E0",
+        position: "relative", cursor: isSwapMode ? "pointer" : "grab",
+        border: isSelected ? "2px solid #BA7517" : isSwapMode ? "1.5px dashed #1A3A2E" : "1px solid #E0DBD3",
+        zIndex: isSelected ? 20 : dragStyle ? 100 : 1,
         touchAction: "none",
         userSelect: "none",
         WebkitUserSelect: "none",
+        opacity: isSwapMode && !isSelected ? 0.75 : 1,
         ...dragStyle
       }}
     >
@@ -173,6 +176,9 @@ export default function App() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [showCopyConfirm, setShowCopyConfirm] = useState(false);
   const [hasNextWeekData, setHasNextWeekData] = useState(false);
+  // Swap/Copy mode state — decoupled, can be feature-gated later
+  const [swapMode, setSwapMode] = useState(null); // null | 'swap' | 'copy'
+  const [swapSelected, setSwapSelected] = useState(null); // first selected slot key
   // Session constants — fetched once on load, cached for session
   const [oldestPlanWeekOffset, setOldestPlanWeekOffset] = useState(null); // null = no history at all
   const [memberCount, setMemberCount] = useState(0);
@@ -429,6 +435,56 @@ export default function App() {
       setAuditResults(auditResult.results);
       setIsAudited(true);
     }
+  };
+
+  // ── SLOT TAP HANDLER — used by swap/copy mode ──
+  const handleSlotTap = async (slotKey) => {
+    if (!swapMode) return; // not in swap/copy mode — ignore
+
+    if (!swapSelected) {
+      // First tap — select source
+      if (slotKey === swapSelected) {
+        setSwapSelected(null); // tap again to deselect
+      } else {
+        setSwapSelected(slotKey);
+      }
+      return;
+    }
+
+    if (slotKey === swapSelected) {
+      // Tap same card — deselect
+      setSwapSelected(null);
+      return;
+    }
+
+    // Second tap — execute swap or copy
+    const sourceKey = swapSelected;
+    const targetKey = slotKey;
+
+    if (swapMode === 'swap') {
+      const newBlueprint = swapSlots(sourceKey, targetKey, blueprint);
+      setBlueprint(newBlueprint);
+      setIsDirty(true);
+      setIsAudited(false);
+      setIsSaved(false);
+      // Persist swap to DB
+      const monday = getOffsetWeekMonday();
+      const weekStart = toLocalDateString(monday);
+      await persistSwap(sourceKey, targetKey, getOffsetTargetDate, weekStart);
+    } else if (swapMode === 'copy') {
+      // Copy source meal into target slot — source unchanged
+      const sourceMeal = blueprint[sourceKey];
+      if (sourceMeal) {
+        setBlueprint(prev => ({ ...prev, [targetKey]: { ...sourceMeal } }));
+        setIsDirty(true);
+        setIsAudited(false);
+        setIsSaved(false);
+      }
+    }
+
+    // Reset mode
+    setSwapMode(null);
+    setSwapSelected(null);
   };
 
   // Button state — no lock concept. Always invite the user to review.
@@ -715,9 +771,22 @@ export default function App() {
                 </div>
               ) : (
               <>
-              <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 12, fontStyle: "italic" }}>
-                {isCurrentWeek ? "Tap any meal to edit that day" : "Read-only view — use Copy to Current Week to edit"}
+              <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 6, fontStyle: "italic" }}>
+                {isCurrentWeek
+                  ? (swapMode ? "" : "Tap any meal to edit that day")
+                  : "Read-only view — use Copy to Current Week to edit"}
               </div>
+
+              {/* Swap / Copy action bar — current week only */}
+              {isCurrentWeek && (
+                <SwapCopyBar
+                  mode={swapMode}
+                  selectedKey={swapSelected}
+                  onSwap={() => { setSwapMode('swap'); setSwapSelected(null); }}
+                  onCopy={() => { setSwapMode('copy'); setSwapSelected(null); }}
+                  onCancel={() => { setSwapMode(null); setSwapSelected(null); }}
+                />
+              )}
 
               {/* Column headers — offset-aware dates */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, marginBottom: 2 }}>
@@ -757,14 +826,27 @@ export default function App() {
                   </div>
                   {/* Cards row — full width */}
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, flex: 1, overflow: "visible", position: "relative", zIndex: 1 }}>
-                  {DAYS.map(day => (
-                    <WeekThumbCard
-                      key={`${day}-${type}`}
-                      slotId={`${day}-${type}`}
-                      meal={blueprint[`${day}-${type}`]}
-                      onClick={() => { setSelectedDay(day); setViewMode('day'); }}
-                    />
-                  ))}
+                  {DAYS.map(day => {
+                    const slotKey = `${day}-${type}`;
+                    const isSelected = swapSelected === slotKey;
+                    return (
+                      <WeekThumbCard
+                        key={slotKey}
+                        slotId={slotKey}
+                        meal={blueprint[slotKey]}
+                        isSelected={isSelected}
+                        isSwapMode={!!swapMode}
+                        onClick={() => {
+                          if (swapMode) {
+                            handleSlotTap(slotKey);
+                          } else {
+                            setSelectedDay(day);
+                            setViewMode('day');
+                          }
+                        }}
+                      />
+                    );
+                  })}
                   </div>
                 </div>
               ))}
