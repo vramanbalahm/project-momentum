@@ -99,7 +99,7 @@ const WeekThumbCard = ({ meal, slotId, onClick }) => {
       {...attributes}
       onClick={onClick}
       style={{
-        width: "100%", height: 64, borderRadius: 10,
+        width: "100%", height: 56, borderRadius: 8,
         background: "#EDE8E0",
         position: "relative", cursor: "grab",
         border: "1px solid #E0DBD3",
@@ -651,7 +651,7 @@ export default function App() {
           ) : viewMode === 'day' ? (
 
             /* ── DAY VIEW ── */
-            <div style={{ padding: "12px 14px", overflow: "visible" }}>
+            <div style={{ padding: "6px 8px", overflow: "visible" }}>
               {/* Empty state — past/future week with no plan */}
               {!isCurrentWeek && Object.keys(blueprint).length === 0 && (
                 <div style={{ textAlign: "center", padding: "48px 20px", color: "#B4B2A9" }}>
@@ -692,7 +692,7 @@ export default function App() {
           ) : (
 
             /* ── WEEK VIEW — offset-aware, read-only for past weeks ── */
-            <div style={{ padding: "12px 14px", overflow: "visible" }}>
+            <div style={{ padding: "6px 8px", overflow: "visible" }}>
               {/* Empty state for week view */}
               {!isCurrentWeek && Object.keys(blueprint).length === 0 ? (
                 <div style={{ textAlign: "center", padding: "48px 20px", color: "#B4B2A9" }}>
@@ -711,7 +711,7 @@ export default function App() {
               </div>
 
               {/* Column headers — offset-aware dates */}
-              <div style={{ display: "grid", gridTemplateColumns: "60px repeat(7, 1fr)", gap: 4, marginBottom: 6 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "40px repeat(7, 1fr)", gap: 3, marginBottom: 4 }}>
                 <div />
                 {DAYS.map(day => {
                   const dateStr = getOffsetTargetDate(day);
@@ -740,11 +740,11 @@ export default function App() {
               {/* Meal rows — wrapped in DndContext for week view slot swapping */}
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               {MEAL_TYPES.map(type => (
-                <div key={type} style={{ display: "grid", gridTemplateColumns: "60px repeat(7, 1fr)", gap: 4, marginBottom: 6, alignItems: "start", overflow: "visible", position: "relative", zIndex: 1 }}>
+                <div key={type} style={{ display: "grid", gridTemplateColumns: "40px repeat(7, 1fr)", gap: 3, marginBottom: 4, alignItems: "start", overflow: "visible", position: "relative", zIndex: 1 }}>
                   {/* Meal type label */}
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8 }}>
-                    <div style={{ fontSize: 14 }}>{MEAL_CONFIG[type].icon}</div>
-                    <div style={{ fontSize: 8, color: "#B4B2A9", fontWeight: 500, textTransform: "uppercase", marginTop: 2 }}>
+                    <div style={{ fontSize: 12 }}>{MEAL_CONFIG[type].icon}</div>
+                    <div style={{ fontSize: 7, color: "#B4B2A9", fontWeight: 500, textTransform: "uppercase", marginTop: 1 }}>
                       {type.substring(0, 5)}
                     </div>
                   </div>
