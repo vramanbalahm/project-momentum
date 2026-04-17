@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, useDraggable, useDroppable } from '@dnd-kit/core';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import axios from 'axios';
 
 // Component Imports
@@ -73,43 +73,32 @@ const MEAL_CONFIG = {
   Dinner:    { icon: '🌙', color: '#EEEDFE', time: '7:30 – 9:00 pm' }
 };
 
-// Week overview thumbnail card — DnD enabled for slot swapping
+// Week overview thumbnail card — two-tap swap, no drag
 const WeekThumbCard = ({ meal, slotId, onClick, isSelected = false, isSwapMode = false }) => {
   // Read from mains array first (multi-main), fall back to single main
   const mainsArr = meal?.mains && meal.mains.length > 0 ? meal.mains : (meal?.main ? [meal.main] : []);
   const main = mainsArr[0] || null;
   const extraMains = mainsArr.length > 1 ? mainsArr.length - 1 : 0;
   const sides = meal?.sides || [];
-  const extraCount = extraMains + sides.length; // total additional dishes beyond first main
+  const extraCount = extraMains + sides.length;
   let imgUrl = main?.thumb || main?.hero;
   if (!imgUrl && main?.name) {
     imgUrl = `/assets/meals/${main.name.toLowerCase().replace(/\s+/g, '_')}.png`;
   }
-  const { attributes, listeners, setNodeRef: setDraggableRef, transform } = useDraggable({
-    id: `drag-${slotId}`,
-    data: { meal }
-  });
-  const { setNodeRef: setDroppableRef } = useDroppable({ id: slotId });
-  const dragStyle = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 } : undefined;
 
   return (
-    <div ref={setDroppableRef} style={{ width: "100%" }}>
+    <div style={{ width: "100%", height: "100%" }}>
     <div
-      ref={setDraggableRef}
-      {...listeners}
-      {...attributes}
       onClick={onClick}
       style={{
         width: "100%", height: "100%", minHeight: 56, borderRadius: 8,
         background: isSelected ? "#EF9F27" : "#EDE8E0",
-        position: "relative", cursor: isSwapMode ? "pointer" : "grab",
+        position: "relative", cursor: isSwapMode ? "pointer" : "default",
         border: isSelected ? "2px solid #BA7517" : isSwapMode ? "1.5px dashed #1A3A2E" : "1px solid #E0DBD3",
-        zIndex: isSelected ? 20 : dragStyle ? 100 : 1,
-        touchAction: "none",
+        zIndex: isSelected ? 20 : 1,
         userSelect: "none",
         WebkitUserSelect: "none",
         opacity: isSwapMode && !isSelected ? 0.75 : 1,
-        ...dragStyle
       }}
     >
       <div style={{ position: "absolute", inset: 0, borderRadius: 10, overflow: "hidden" }}>
@@ -155,7 +144,6 @@ const WeekThumbCard = ({ meal, slotId, onClick, isSelected = false, isSwapMode =
         </div>
       </div>
       </div>
-    </div>
     </div>
   );
 };
@@ -814,7 +802,6 @@ export default function App() {
               </div>
 
               {/* Meal rows — label above each row, full width for cards */}
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <div style={{ display: "flex", flexDirection: "column", flex: 1, gap: 4 }}>
               {MEAL_TYPES.map(type => (
                 <div key={type} style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "visible" }}>
@@ -850,7 +837,6 @@ export default function App() {
                 </div>
               ))}
               </div>
-              </DndContext>
 
               </>
               )}
