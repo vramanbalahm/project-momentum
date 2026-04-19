@@ -1,5 +1,8 @@
 import os
 import hashlib
+import warnings
+warnings.filterwarnings("ignore", ".*error reading bcrypt version.*")
+warnings.filterwarnings("ignore", ".*trapped.*")
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
@@ -19,10 +22,11 @@ REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(plain: str) -> str:
-    return pwd_context.hash(plain)
+    # bcrypt has a 72-byte hard limit
+    return pwd_context.hash(plain[:72])
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return pwd_context.verify(plain[:72], hashed)
 
 def create_access_token(sub: str, org_id: str, role: str) -> str:
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
