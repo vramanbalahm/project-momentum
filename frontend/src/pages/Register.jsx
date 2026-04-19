@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import OtpVerify from "./OtpVerify";
 
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const REGIONS = ["Tamil Nadu", "Kerala", "Karnataka", "Andhra Pradesh", "Telangana", "Maharashtra", "Other"];
 const DIET_PREFS = ["Veg", "Non-Veg", "Vegan"];
 
@@ -21,6 +23,7 @@ export default function Register({ onSwitchToLogin }) {
   });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [otpStep, setOtpStep] = useState(false); // true = show OTP screen
 
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
@@ -37,21 +40,63 @@ export default function Register({ onSwitchToLogin }) {
     }
     setLoading(true);
     try {
-      await register({
-        name: form.name,
-        email: form.email,
-        password: form.password,
-        house_name: form.house_name,
-        primary_region: form.primary_region,
-        current_city: form.current_city || form.primary_region,
-        dietary_preference: form.dietary_preference
+      // Send OTP first — if EMAIL_VERIFY_ENABLED=false, backend returns enabled:false and we skip OTP screen
+      const res = await fetch(`${API_BASE}/auth/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: form.email, name: form.name })
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to send verification email.");
+
+      if (data.enabled === false) {
+        // Email verification disabled — register directly
+        await register({
+          name: form.name, email: form.email, password: form.password,
+          house_name: form.house_name, primary_region: form.primary_region,
+          current_city: form.current_city || form.primary_region,
+          dietary_preference: form.dietary_preference
+        });
+      } else {
+        // Show OTP screen
+        setOtpStep(true);
+      }
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleOtpVerified = async () => {
+    // OTP verified — now create the account
+    setLoading(true);
+    try {
+      await register({
+        name: form.name, email: form.email, password: form.password,
+        house_name: form.house_name, primary_region: form.primary_region,
+        current_city: form.current_city || form.primary_region,
+        dietary_preference: form.dietary_preference
+      });
+    } catch (e) {
+      setOtpStep(false);
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Show OTP screen after form submit
+  if (otpStep) {
+    return (
+      <OtpVerify
+        email={form.email}
+        name={form.name}
+        onVerified={handleOtpVerified}
+        onBack={() => setOtpStep(false)}
+      />
+    );
+  }
 
   const inputStyle = { width: "100%", padding: "10px 14px", borderRadius: 10, border: "0.5px solid #EDE8E0", fontSize: 13, color: "#2C2C2A", background: "#F1EFE8", outline: "none", boxSizing: "border-box" };
 
@@ -127,7 +172,7 @@ export default function Register({ onSwitchToLogin }) {
             disabled={loading}
             style={{ width: "100%", background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 12, padding: "13px", fontSize: 14, fontWeight: 500, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, marginTop: 6 }}
           >
-            {loading ? "Creating..." : "Create household"}
+            {loading ? "Sending code..." : "Continue"}
           </button>
 
           <div style={{ textAlign: "center", marginTop: 14, fontSize: 13, color: "#888780" }}>

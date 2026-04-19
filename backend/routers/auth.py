@@ -5,8 +5,14 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel, EmailStr
 from uuid import uuid4
 import hashlib
+import os
 
 from database import SessionLocal
+from services.otp_service import generate_otp, verify_otp
+from services.email_service import send_otp_email
+
+# Feature flag — set EMAIL_VERIFY_ENABLED=false in .env to bypass OTP during testing
+EMAIL_VERIFY_ENABLED = os.getenv("EMAIL_VERIFY_ENABLED", "true").lower() == "true"
 from auth.security import (
     hash_password, verify_password,
     create_access_token, create_refresh_token,
@@ -303,3 +309,44 @@ async def change_password(
         WHERE user_id = CAST(:uid AS uuid)
     """), {"pwd": hash_password(req.new_password), "uid": current_user["user_id"]})
     db.commit()
+
+
+# ── OTP endpoints ─────────────────────────────────────────────────────────────
+
+class SendOtpRequest(BaseModel):
+    email: EmailStr
+    name: str = ""
+
+class VerifyOtpRequest(BaseModel):
+    email: EmailStr
+    otp: str
+
+@router.post("/send-otp", status_code=200)
+async def send_otp(req: SendOtpRequest):
+    """
+    Generate and email an OTP to the given address.
+    If EMAIL_VERIFY_ENABLED is false, returns success without sending.
+    """
+    if not EMAIL_VERIFY_ENABLED:
+        return {"message": "Email verification disabled — OTP skipped.", "enabled": False}
+
+    otp = generate_otp(req.email)
+    sent = send_otp_email(req.email, otp, req.name)
+    if not sent:
+        raise HTTPException(status_code=500, detail="Failed to send verification email. Check server email config.")
+    return {"message": "OTP sent successfully.", "enabled": True}
+
+
+@router.post("/verify-otp", status_code=200)
+async def verify_otp_endpoint(req: VerifyOtpRequest):
+    """
+    Verify the OTP submitted by the user.
+    If EMAIL_VERIFY_ENABLED is false, always returns verified=True.
+    """
+    if not EMAIL_VERIFY_ENABLED:
+        return {"verified": True, "message": "Email verification disabled — auto-verified."}
+
+    valid = verify_otp(req.email, req.otp)
+    if not valid:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP. Please try again.")
+    return {"verified": True, "message": "Email verified successfully."}
