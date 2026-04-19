@@ -6,4 +6,4 @@ python-dotenv
 pydantic[email]
 starlette
 python-jose[cryptography]
-passlib[bcrypt]
+bcrypt

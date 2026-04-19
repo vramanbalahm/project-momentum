@@ -1,15 +1,12 @@
 import os
 import hashlib
-import warnings
-warnings.filterwarnings("ignore", ".*error reading bcrypt version.*")
-warnings.filterwarnings("ignore", ".*trapped.*")
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from pathlib import Path
 from dotenv import load_dotenv
+import bcrypt
 
 # Load .env from root folder explicitly
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -19,14 +16,13 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 15))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
+# Using bcrypt directly — passlib is incompatible with bcrypt on Python 3.14
 def hash_password(plain: str) -> str:
-    # bcrypt has a 72-byte hard limit
-    return pwd_context.hash(plain[:72])
+    # bcrypt has a 72-byte hard limit — encode and truncate safely
+    return bcrypt.hashpw(plain.encode("utf-8")[:72], bcrypt.gensalt()).decode("utf-8")
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain[:72], hashed)
+    return bcrypt.checkpw(plain.encode("utf-8")[:72], hashed.encode("utf-8"))
 
 def create_access_token(sub: str, org_id: str, role: str) -> str:
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
