@@ -150,7 +150,7 @@ const WeekThumbCard = ({ meal, slotId, onClick, isSelected = false, isSwapMode =
   );
 };
 
-export default function App() {
+export default function App({ onBack }) {
   const { user, logout } = useAuth();
   const [authScreen, setAuthScreen] = useState('login'); // kept for reference — auth gate moved to main.jsx
   const [blueprint, setBlueprint] = useState({});
@@ -533,7 +533,8 @@ export default function App() {
         <div style={{ background: "#1A3A2E", padding: "16px 20px 12px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div>
-              <div style={{ color: "#9FE1CB", fontSize: 11, marginBottom: 1 }}>{greeting}, {user?.name?.split(' ')[0]} 👋</div>
+              {onBack && <span onClick={onBack} style={{ color: "#9FE1CB", fontSize: 12, cursor: "pointer", display: "block", marginBottom: 4 }}>← Dashboard</span>}
+          <div style={{ color: "#9FE1CB", fontSize: 11, marginBottom: 1 }}>{greeting}, {user?.name?.split(' ')[0]} 👋</div>
               <div style={{ color: "#FDFCF8", fontSize: 16, fontWeight: 500, letterSpacing: -0.3 }}>Your week awaits</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

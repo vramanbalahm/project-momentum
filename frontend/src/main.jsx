@@ -6,11 +6,15 @@ import { useAuth } from './context/AuthContext'
 import App from './App.jsx'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
+import Dashboard from './pages/Dashboard.jsx'
+import FamilyProfile from './pages/FamilyProfile.jsx'
+import ManageMembers from './pages/ManageMembers.jsx'
 
 // AuthGate — isolated from App's state so Login/Register inputs never lose focus
 function AuthGate() {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [authScreen, setAuthScreen] = useState('login');
+  const [screen, setScreen] = useState('dashboard'); // dashboard | weekly_plan | family_profile | manage_members
 
   if (authLoading) {
     return (
@@ -27,7 +31,12 @@ function AuthGate() {
     return <Login onSwitchToRegister={() => setAuthScreen('register')} />;
   }
 
-  return <App />;
+  // Authenticated — route to correct screen
+  if (screen === 'weekly_plan') return <App onBack={() => setScreen('dashboard')} />;
+  if (screen === 'family_profile') return <FamilyProfile onBack={() => setScreen('dashboard')} />;
+  if (screen === 'manage_members') return <ManageMembers onBack={() => setScreen('dashboard')} />;
+
+  return <Dashboard onNavigate={setScreen} />;
 }
 
 createRoot(document.getElementById('root')).render(

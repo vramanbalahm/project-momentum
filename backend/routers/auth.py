@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from datetime import datetime, timedelta
@@ -13,6 +13,27 @@ from services.email_service import send_otp_email
 
 # Feature flag — set EMAIL_VERIFY_ENABLED=false in .env to bypass OTP during testing
 EMAIL_VERIFY_ENABLED = os.getenv("EMAIL_VERIFY_ENABLED", "true").lower() == "true"
+
+# ── Rate limiting — in-memory, per IP ─────────────────────────────────────────
+from collections import defaultdict
+from datetime import datetime as dt
+import time
+
+_rate_store: dict = defaultdict(list)  # { ip: [timestamp, ...] }
+RATE_LIMIT_MAX = 5       # max attempts
+RATE_LIMIT_WINDOW = 900  # 15 minutes in seconds
+
+def check_rate_limit(ip: str):
+    now = time.time()
+    window_start = now - RATE_LIMIT_WINDOW
+    # Keep only attempts within the window
+    _rate_store[ip] = [t for t in _rate_store[ip] if t > window_start]
+    if len(_rate_store[ip]) >= RATE_LIMIT_MAX:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many attempts. Please wait 15 minutes before trying again."
+        )
+    _rate_store[ip].append(now)
 from auth.security import (
     hash_password, verify_password,
     create_access_token, create_refresh_token,
@@ -87,7 +108,8 @@ def issue_tokens(db: Session, user_id: str, house_id: str, role: str) -> dict:
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=TokenResponse)
-async def register(req: RegisterRequest, db: Session = Depends(get_db)):
+async def register(req: RegisterRequest, request: Request, db: Session = Depends(get_db)):
+    check_rate_limit(request.client.host)
     """
     Self-registration — creates a new household + household_admin user.
     Rules:
@@ -157,7 +179,8 @@ async def register(req: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(req: LoginRequest, db: Session = Depends(get_db)):
+async def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    check_rate_limit(request.client.host)
     """
     Login — checks user exists, password correct, user active, household active.
     """
@@ -350,3 +373,202 @@ async def verify_otp_endpoint(req: VerifyOtpRequest):
     if not valid:
         raise HTTPException(status_code=400, detail="Invalid or expired OTP. Please try again.")
     return {"verified": True, "message": "Email verified successfully."}
+
+
+# ── Profile update (admin only) ────────────────────────────────────────────────
+
+class ProfileUpdateRequest(BaseModel):
+    house_name: str = None
+    primary_region: str = None
+    current_city: str = None
+    dietary_preference: str = None
+    cuisine_sub_region_id: int = None
+    household_allergies: str = None  # comma-separated list
+
+@router.put("/profile", status_code=200)
+async def update_profile(
+    req: ProfileUpdateRequest,
+    current_user: dict = Depends(require_role("household_admin", "platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """Admin-only — update household profile fields with audit trail."""
+    house_id = current_user["house_id"]
+    user_id = current_user["user_id"]
+
+    # Fetch current values for audit
+    current = db.execute(text("""
+        SELECT house_name, dietary_preference, primary_region,
+               current_city, cuisine_sub_region_id, household_allergies
+        FROM household_master WHERE household_id = CAST(:hid AS uuid)
+    """), {"hid": house_id}).fetchone()
+
+    if not current:
+        raise HTTPException(status_code=404, detail="Household not found.")
+
+    updates = {}
+    audit_entries = []
+
+    def track(field, new_val, current_val):
+        if new_val is not None and str(new_val) != str(current_val or ""):
+            updates[field] = new_val
+            audit_entries.append({"field": field, "old": str(current_val or ""), "new": str(new_val)})
+
+    track("house_name",            req.house_name,            current.house_name)
+    track("primary_region",        req.primary_region,        current.primary_region)
+    track("current_city",          req.current_city,          current.current_city)
+    track("dietary_preference",    req.dietary_preference,    current.dietary_preference)
+    track("cuisine_sub_region_id", req.cuisine_sub_region_id, current.cuisine_sub_region_id)
+    track("household_allergies",   req.household_allergies,   current.household_allergies)
+
+    if not updates:
+        return {"message": "No changes detected."}
+
+    # Build dynamic UPDATE
+    set_clauses = ", ".join([f"{k} = :{k}" for k in updates])
+    params = {**updates, "hid": house_id}
+    db.execute(text(f"""
+        UPDATE household_master SET {set_clauses}
+        WHERE household_id = CAST(:hid AS uuid)
+    """), params)
+
+    # Write audit log
+    for entry in audit_entries:
+        db.execute(text("""
+            INSERT INTO profile_audit_log (house_id, changed_by, field_name, old_value, new_value)
+            VALUES (CAST(:hid AS uuid), CAST(:uid AS uuid), :field, :old, :new)
+        """), {"hid": house_id, "uid": user_id, "field": entry["field"], "old": entry["old"], "new": entry["new"]})
+
+    db.commit()
+    return {"message": f"{len(audit_entries)} field(s) updated successfully."}
+
+
+# ── Member management (admin only) ────────────────────────────────────────────
+
+class RoleUpdateRequest(BaseModel):
+    user_id: str
+    new_role: str  # 'household_admin' or 'household_member'
+
+@router.get("/members", status_code=200)
+async def list_members(
+    current_user: dict = Depends(require_role("household_admin", "platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """List all members in the household."""
+    rows = db.execute(text("""
+        SELECT user_id, name, email, role, is_active, created_at
+        FROM users
+        WHERE house_id = CAST(:hid AS uuid)
+        ORDER BY created_at
+    """), {"hid": current_user["house_id"]}).fetchall()
+    return [{"user_id": str(r.user_id), "name": r.name, "email": r.email,
+             "role": r.role, "is_active": r.is_active} for r in rows]
+
+
+@router.put("/members/role", status_code=200)
+async def update_member_role(
+    req: RoleUpdateRequest,
+    current_user: dict = Depends(require_role("household_admin", "platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Admin-only — promote or demote a household member.
+    On promotion to household_admin: generates temp password and emails the user.
+    """
+    allowed_roles = ["household_admin", "household_member"]
+    if req.new_role not in allowed_roles:
+        raise HTTPException(status_code=422, detail=f"Role must be one of: {allowed_roles}")
+
+    # Fetch target user — must be in same household
+    target = db.execute(text("""
+        SELECT user_id, name, email, role FROM users
+        WHERE user_id = CAST(:uid AS uuid) AND house_id = CAST(:hid AS uuid)
+    """), {"uid": req.user_id, "hid": current_user["house_id"]}).fetchone()
+
+    if not target:
+        raise HTTPException(status_code=404, detail="Member not found in your household.")
+
+    if str(target.user_id) == current_user["user_id"]:
+        raise HTTPException(status_code=400, detail="You cannot change your own role.")
+
+    is_promotion = (target.role == "household_member" and req.new_role == "household_admin")
+
+    if is_promotion:
+        # Generate temp password and update
+        import secrets as sec
+        temp_password = sec.token_urlsafe(10)
+        from auth.security import hash_password as hp
+        db.execute(text("""
+            UPDATE users SET role = :role, password_hash = :pwd
+            WHERE user_id = CAST(:uid AS uuid)
+        """), {"role": req.new_role, "pwd": hp(temp_password), "uid": req.user_id})
+        db.commit()
+        # Email the promoted user
+        send_otp_email.__module__  # ensure imported
+        from services.email_service import send_otp_email as send_email
+        # Reuse email service with custom message via a direct send
+        import smtplib, os
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        gmail_user = os.getenv("GMAIL_USER", "vramanbala@gmail.com")
+        gmail_pwd = os.getenv("GMAIL_APP_PASSWORD", "")
+        if gmail_pwd:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = "You have been promoted — Momentum"
+            msg["From"] = f"Momentum <{gmail_user}>"
+            msg["To"] = target.email
+            body = f"""
+            <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;">
+              <div style="background:#1A3A2E;padding:24px;border-radius:16px 16px 0 0;text-align:center;">
+                <div style="font-size:28px;">🌿</div>
+                <div style="color:#FDFCF8;font-size:18px;font-weight:500;margin-top:6px;">Momentum</div>
+              </div>
+              <div style="background:#FFF9F2;padding:28px 24px;border-radius:0 0 16px 16px;">
+                <p style="color:#2C2C2A;">Hi {target.name},</p>
+                <p style="color:#2C2C2A;">You have been promoted to <strong>Household Admin</strong> by your household administrator.</p>
+                <p style="color:#2C2C2A;">Your new temporary password is:</p>
+                <div style="background:#E1F5EE;border-radius:12px;padding:16px;text-align:center;margin:16px 0;">
+                  <div style="font-size:22px;font-weight:700;letter-spacing:4px;color:#1A3A2E;">{temp_password}</div>
+                </div>
+                <p style="color:#888780;font-size:12px;">Please log in and change your password immediately.</p>
+              </div>
+            </div>"""
+            msg.attach(MIMEText(body, "html"))
+            try:
+                with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+                    server.login(gmail_user, gmail_pwd)
+                    server.sendmail(gmail_user, target.email, msg.as_string())
+            except Exception as e:
+                print(f"[role_email] Failed: {e}")
+        return {"message": f"{target.name} promoted to admin. Temporary password sent to {target.email}."}
+    else:
+        # Demotion — just update role, no password change
+        db.execute(text("""
+            UPDATE users SET role = :role WHERE user_id = CAST(:uid AS uuid)
+        """), {"role": req.new_role, "uid": req.user_id})
+        db.commit()
+        return {"message": f"{target.name} role updated to {req.new_role}."}
+
+
+@router.put("/members/deactivate", status_code=200)
+async def deactivate_member(
+    req: dict,
+    current_user: dict = Depends(require_role("household_admin", "platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """Admin-only — activate or deactivate a member."""
+    target = db.execute(text("""
+        SELECT user_id, name FROM users
+        WHERE user_id = CAST(:uid AS uuid) AND house_id = CAST(:hid AS uuid)
+    """), {"uid": req.get("user_id"), "hid": current_user["house_id"]}).fetchone()
+
+    if not target:
+        raise HTTPException(status_code=404, detail="Member not found.")
+    if str(target.user_id) == current_user["user_id"]:
+        raise HTTPException(status_code=400, detail="You cannot deactivate yourself.")
+
+    db.execute(text("""
+        UPDATE users SET is_active = :active WHERE user_id = CAST(:uid AS uuid)
+    """), {"active": req.get("is_active", False), "uid": req.get("user_id")})
+    db.commit()
+    status_str = "activated" if req.get("is_active") else "deactivated"
+    return {"message": f"{target.name} has been {status_str}."}
