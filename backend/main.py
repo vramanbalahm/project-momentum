@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
 import uuid
+from dotenv import load_dotenv
+load_dotenv()  # Load backend/.env on startup
 
 # FT-033: Updated imports — plan_service now lives in services/
 from services.plan_service import (
