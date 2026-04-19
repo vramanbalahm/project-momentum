@@ -9,9 +9,12 @@ import MealEditor from './components/MealEditor';
 import MealEditScreen from './components/MealEditScreen';
 import SwapCopyBar from './components/SwapCopyBar';
 import { swapSlots, swapDays, auditBlueprint, persistSwap } from './services/swapService';
+import { useAuth } from './context/AuthContext';
+import Login from './pages/Login';
+import Register from './pages/Register';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
-const HH_ID = "HOUSEHOLD_001";
+// HH_ID now comes from authenticated user — see App() below
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner'];
 
@@ -150,6 +153,8 @@ const WeekThumbCard = ({ meal, slotId, onClick, isSelected = false, isSwapMode =
 };
 
 export default function App() {
+  const { isAuthenticated, loading: authLoading, user, logout } = useAuth();
+  const [authScreen, setAuthScreen] = useState('login'); // 'login' | 'register'
   const [blueprint, setBlueprint] = useState({});
   const [suggestions, setSuggestions] = useState([]);
   const [auditResults, setAuditResults] = useState({});
@@ -503,6 +508,24 @@ export default function App() {
 
   const cta = getCtaButton();
 
+  // HH_ID from authenticated user
+  const HH_ID = user?.house_id || 'HOUSEHOLD_001';
+
+  // ── AUTH GATE — after all hooks ──
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#1A3A2E", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: "#9FE1CB", fontSize: 14 }}>Loading...</div>
+      </div>
+    );
+  }
+  if (!isAuthenticated) {
+    if (authScreen === 'register') {
+      return <Register onSwitchToLogin={() => setAuthScreen('login')} />;
+    }
+    return <Login onSwitchToRegister={() => setAuthScreen('register')} />;
+  }
+
   // FIX 1: Demo events matched to actual current week dates
   const demoEvents = [
     { dayName: "Wednesday", emoji: "🎂", title: "Amma's Birthday", pill: "Feast day", pillBg: "#FAECE7", pillColor: "#712B13" },
@@ -526,7 +549,7 @@ export default function App() {
         <div style={{ background: "#1A3A2E", padding: "16px 20px 12px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div>
-              <div style={{ color: "#9FE1CB", fontSize: 11, marginBottom: 1 }}>{greeting}, Bala 👋</div>
+              <div style={{ color: "#9FE1CB", fontSize: 11, marginBottom: 1 }}>{greeting}, {user?.name?.split(' ')[0]} 👋</div>
               <div style={{ color: "#FDFCF8", fontSize: 16, fontWeight: 500, letterSpacing: -0.3 }}>Your week awaits</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -544,12 +567,18 @@ export default function App() {
                   {cta.label}
                 </button>
               )}
-              <div style={{
-                width: 34, height: 34, borderRadius: "50%",
-                background: "#2C4A3E", border: "2px solid #5DCAA5",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "#9FE1CB", fontSize: 13, fontWeight: 500, flexShrink: 0
-              }}>V</div>
+              <div
+                onClick={logout}
+                title="Tap to sign out"
+                style={{
+                  width: 34, height: 34, borderRadius: "50%",
+                  background: "#2C4A3E", border: "2px solid #5DCAA5",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#9FE1CB", fontSize: 13, fontWeight: 500, flexShrink: 0,
+                  cursor: "pointer"
+                }}>
+                {user?.name?.charAt(0).toUpperCase() || 'U'}
+              </div>
             </div>
           </div>
 

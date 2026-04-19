@@ -132,6 +132,10 @@ async def session_constants(household_id: str, db: Session = Depends(get_db)):
     h_id = ACTIVE_H_ID if household_id == "HOUSEHOLD_001" else household_id
     return get_session_constants(db, h_id)
 
+# --- 5b. AUTH ROUTER ---
+from routers.auth import router as auth_router
+app.include_router(auth_router)
+
 # --- 6. WEEKLY PLAN ROUTER (FT-030) ---
 from routers.weekly_plan import router as weekly_plan_router
 app.include_router(weekly_plan_router)
