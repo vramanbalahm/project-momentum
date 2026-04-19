@@ -138,6 +138,10 @@ async def session_constants(household_id: str, db: Session = Depends(get_db)):
 from routers.auth import router as auth_router
 app.include_router(auth_router)
 
+# --- Lookup router — cuisine_regions and cities for registration dropdowns ---
+from routers.lookup import router as lookup_router
+app.include_router(lookup_router)
+
 # --- 6. WEEKLY PLAN ROUTER (FT-030) ---
 from routers.weekly_plan import router as weekly_plan_router
 app.include_router(weekly_plan_router)
