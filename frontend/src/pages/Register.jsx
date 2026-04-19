@@ -4,6 +4,14 @@ import { useAuth } from "../context/AuthContext";
 const REGIONS = ["Tamil Nadu", "Kerala", "Karnataka", "Andhra Pradesh", "Telangana", "Maharashtra", "Other"];
 const DIET_PREFS = ["Veg", "Non-Veg", "Vegan"];
 
+// Moved outside Register to prevent re-mount on every keystroke (focus-loss fix)
+const Field = ({ label, children }) => (
+  <div style={{ marginBottom: 14 }}>
+    <div style={{ fontSize: 11, color: "#888780", fontWeight: 500, marginBottom: 5 }}>{label}</div>
+    {children}
+  </div>
+);
+
 export default function Register({ onSwitchToLogin }) {
   const { register } = useAuth();
   const [form, setForm] = useState({
@@ -44,13 +52,6 @@ export default function Register({ onSwitchToLogin }) {
       setLoading(false);
     }
   };
-
-  const Field = ({ label, children }) => (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 11, color: "#888780", fontWeight: 500, marginBottom: 5 }}>{label}</div>
-      {children}
-    </div>
-  );
 
   const inputStyle = { width: "100%", padding: "10px 14px", borderRadius: 10, border: "0.5px solid #EDE8E0", fontSize: 13, color: "#2C2C2A", background: "#F1EFE8", outline: "none", boxSizing: "border-box" };
 
