@@ -20,9 +20,6 @@ export default function Dashboard({ onNavigate }) {
 
   const isAdmin = user?.role === "household_admin" || user?.role === "platform_admin";
 
-  const initials = (user?.name || "U")
-    .split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-
   const tiles = [
     {
       id: "weekly_plan",
@@ -72,18 +69,90 @@ export default function Dashboard({ onNavigate }) {
             <div style={{ color: "#5DCAA5", fontSize: 11, marginTop: 2 }}>{user?.house_name}</div>
           </div>
 
-          {/* Avatar / initials button */}
-          <div
-            onClick={() => setMenuOpen(!menuOpen)}
-            style={{
-              width: 40, height: 40, borderRadius: "50%",
-              background: COLORS.mint, color: COLORS.green,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 14, fontWeight: 700, cursor: "pointer",
-              position: "relative", userSelect: "none"
-            }}
-          >
-            {initials}
+          {/* ── Top right — logout + settings icons ── */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+
+            {/* Settings icon — opens dropdown */}
+            <div style={{ position: "relative" }}>
+              <div
+                onClick={() => setMenuOpen(!menuOpen)}
+                title="Settings"
+                style={{
+                  width: 38, height: 38, borderRadius: 10,
+                  background: "rgba(159,225,203,0.12)",
+                  border: "0.5px solid rgba(159,225,203,0.25)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 18, cursor: "pointer", userSelect: "none"
+                }}
+              >
+                ⚙️
+              </div>
+
+              {/* Settings dropdown */}
+              {menuOpen && (
+                <>
+                  <div
+                    onClick={() => setMenuOpen(false)}
+                    style={{ position: "fixed", inset: 0, zIndex: 40 }}
+                  />
+                  <div style={{
+                    position: "absolute", top: 44, right: 0, zIndex: 50,
+                    background: COLORS.card, borderRadius: 14,
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
+                    border: `0.5px solid ${COLORS.border}`,
+                    overflow: "hidden", minWidth: 210
+                  }}>
+                    {/* User info header */}
+                    <div style={{ padding: "12px 16px", borderBottom: `0.5px solid ${COLORS.border}`, background: "#F7F4EE" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>{user?.name}</div>
+                      <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{user?.email}</div>
+                      <div style={{ fontSize: 10, color: isAdmin ? "#1A3A2E" : COLORS.muted, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                        {isAdmin ? "Household Admin" : "Member"}
+                      </div>
+                    </div>
+
+                    {/* Change Password — available to all */}
+                    <SettingsItem
+                      icon="🔑"
+                      label="Change Password"
+                      available={true}
+                      onClick={() => { setMenuOpen(false); setShowChangePassword(true); }}
+                    />
+
+                    {/* Family Profile — admin only */}
+                    <SettingsItem
+                      icon="🏠"
+                      label="Family Profile"
+                      available={isAdmin}
+                      onClick={() => { setMenuOpen(false); onNavigate("family_profile"); }}
+                    />
+
+                    {/* Manage Members — admin only */}
+                    <SettingsItem
+                      icon="👥"
+                      label="Manage Members"
+                      available={isAdmin}
+                      onClick={() => { setMenuOpen(false); onNavigate("manage_members"); }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Logout icon — direct tap, no dropdown */}
+            <div
+              onClick={logout}
+              title="Logout"
+              style={{
+                width: 38, height: 38, borderRadius: 10,
+                background: "rgba(255,100,80,0.12)",
+                border: "0.5px solid rgba(255,100,80,0.25)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 18, cursor: "pointer", userSelect: "none"
+              }}
+            >
+              🚪
+            </div>
           </div>
         </div>
 
@@ -100,30 +169,6 @@ export default function Dashboard({ onNavigate }) {
           </span>
         </div>
       </div>
-
-      {/* ── User menu dropdown ── */}
-      {menuOpen && (
-        <>
-          <div
-            onClick={() => setMenuOpen(false)}
-            style={{ position: "fixed", inset: 0, zIndex: 40 }}
-          />
-          <div style={{
-            position: "absolute", top: 56, right: 20, zIndex: 50,
-            background: COLORS.card, borderRadius: 14,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
-            border: `0.5px solid ${COLORS.border}`,
-            overflow: "hidden", minWidth: 200
-          }}>
-            <div style={{ padding: "12px 16px", borderBottom: `0.5px solid ${COLORS.border}` }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: COLORS.text }}>{user?.name}</div>
-              <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{user?.email}</div>
-            </div>
-            <MenuItem icon="🔑" label="Change Password" onClick={() => { setMenuOpen(false); setShowChangePassword(true); }} />
-            <MenuItem icon="🚪" label="Logout" onClick={logout} danger />
-          </div>
-        </>
-      )}
 
       {/* ── Tiles grid ── */}
       <div style={{ padding: "24px 20px" }}>
@@ -179,19 +224,23 @@ export default function Dashboard({ onNavigate }) {
   );
 }
 
-function MenuItem({ icon, label, onClick, danger }) {
+function SettingsItem({ icon, label, available, onClick }) {
   return (
     <div
-      onClick={onClick}
+      onClick={available ? onClick : undefined}
       style={{
         padding: "12px 16px", display: "flex", alignItems: "center", gap: 10,
-        cursor: "pointer", fontSize: 13,
-        color: danger ? "#C0392B" : COLORS.text,
-        borderBottom: `0.5px solid ${COLORS.border}`
+        cursor: available ? "pointer" : "default",
+        fontSize: 13,
+        color: available ? COLORS.text : COLORS.muted,
+        borderBottom: `0.5px solid ${COLORS.border}`,
+        opacity: available ? 1 : 0.5,
+        background: "transparent"
       }}
     >
-      <span>{icon}</span>
-      <span>{label}</span>
+      <span style={{ fontSize: 16 }}>{icon}</span>
+      <span style={{ flex: 1 }}>{label}</span>
+      {!available && <span style={{ fontSize: 10, color: "#C4A882", fontWeight: 500 }}>🔒 Admin</span>}
     </div>
   );
 }
