@@ -35,7 +35,7 @@ def check_rate_limit(ip: str):
         )
     _rate_store[ip].append(now)
 from auth.security import (
-    hash_password, verify_password,
+    hash_password, verify_password, validate_password,
     create_access_token, create_refresh_token,
     decode_access_token, REFRESH_TOKEN_EXPIRE_DAYS
 )
@@ -129,11 +129,9 @@ async def register(req: RegisterRequest, request: Request, db: Session = Depends
             detail="This email is already registered. Please log in instead."
         )
 
-    if len(req.password) < 8:
-        raise HTTPException(
-            status_code=422,
-            detail="Password must be at least 8 characters."
-        )
+    pwd_errors = validate_password(req.password)
+    if pwd_errors:
+        raise HTTPException(status_code=422, detail=" ".join(pwd_errors))
 
     # Create household
     house_id = str(uuid4())
@@ -285,11 +283,9 @@ async def create_member(
             detail="This email is already registered in the system."
         )
 
-    if len(req.password) < 8:
-        raise HTTPException(
-            status_code=422,
-            detail="Password must be at least 8 characters."
-        )
+    pwd_errors = validate_password(req.password)
+    if pwd_errors:
+        raise HTTPException(status_code=422, detail=" ".join(pwd_errors))
 
     user_id = str(uuid4())
     db.execute(text("""
@@ -324,8 +320,9 @@ async def change_password(
     if not verify_password(req.current_password, row.password_hash):
         raise HTTPException(status_code=401, detail="Current password is incorrect.")
 
-    if len(req.new_password) < 8:
-        raise HTTPException(status_code=422, detail="Password must be at least 8 characters.")
+    pwd_errors = validate_password(req.new_password)
+    if pwd_errors:
+        raise HTTPException(status_code=422, detail=" ".join(pwd_errors))
 
     db.execute(text("""
         UPDATE users SET password_hash = :pwd

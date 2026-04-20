@@ -24,6 +24,31 @@ def hash_password(plain: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode("utf-8")[:72], hashed.encode("utf-8"))
 
+def validate_password(password: str) -> list:
+    """
+    Returns a list of error messages for any rules the password violates.
+    Empty list means the password is valid.
+    Rules (matches frontend PasswordStrength component):
+      - At least 8 characters
+      - At least 1 uppercase letter
+      - At least 1 number
+      - At least 1 special character (@$!%*?&)
+      - No spaces
+    """
+    import re
+    errors = []
+    if len(password) < 8:
+        errors.append("Password must be at least 8 characters.")
+    if not re.search(r"[A-Z]", password):
+        errors.append("Password must contain at least 1 uppercase letter.")
+    if not re.search(r"[0-9]", password):
+        errors.append("Password must contain at least 1 number.")
+    if not re.search(r"[@$!%*?&]", password):
+        errors.append("Password must contain at least 1 special character (@$!%*?&).")
+    if " " in password:
+        errors.append("Password must not contain spaces.")
+    return errors
+
 def create_access_token(sub: str, org_id: str, role: str) -> str:
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
