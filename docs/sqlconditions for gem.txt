@@ -1,0 +1,10 @@
+
+
+1. no overwritting of existing code and functionality. 
+2. no deleting of existing code only #
+3. do not change the names of variables, functions and any calls including the loops.. 
+4. refer the columns and tables name from the baseline on he 16th. 
+5. only update/fix/append the fix or new functionality without changing the structure. 
+6. when ever you are sharing the entire file, ensure that the functions are ordered in the same way as the baseline and not to change the order. 
+
+keep these instructions as very critical for the entire project. 
