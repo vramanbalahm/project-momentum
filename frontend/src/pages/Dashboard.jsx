@@ -59,7 +59,7 @@ export default function Dashboard({ onNavigate }) {
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F7F4EE", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#F7F4EE", fontFamily: "system-ui, sans-serif", maxWidth: 480, margin: "0 auto" }}>
 
       {/* ── Top bar ── */}
       <div style={{ background: COLORS.bg, padding: "16px 20px 20px", position: "relative" }}>

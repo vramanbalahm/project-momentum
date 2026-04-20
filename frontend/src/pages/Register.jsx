@@ -98,8 +98,14 @@ export default function Register({ onSwitchToLogin }) {
     if (form.password !== form.confirmPassword) {
       setError("Passwords do not match."); return;
     }
-    if (form.password.length < 8) {
-      setError("Password must be at least 8 characters."); return;
+    const pwdErrors = [];
+    if (form.password.length < 8) pwdErrors.push("at least 8 characters");
+    if (!/[A-Z]/.test(form.password)) pwdErrors.push("1 uppercase letter");
+    if (!/[0-9]/.test(form.password)) pwdErrors.push("1 number");
+    if (!/[@$!%*?&]/.test(form.password)) pwdErrors.push("1 special character (@$!%*?&)");
+    if (/\s/.test(form.password)) pwdErrors.push("no spaces");
+    if (pwdErrors.length > 0) {
+      setError("Password must have: " + pwdErrors.join(", ") + "."); return;
     }
     setLoading(true);
     try {

@@ -31,6 +31,9 @@ function AuthGate() {
     return <Login onSwitchToRegister={() => setAuthScreen('register')} />;
   }
 
+  // Authenticated — always reset authScreen to login so logout never lands on register
+  if (authScreen !== 'login') setAuthScreen('login');
+
   // Authenticated — route to correct screen
   if (screen === 'weekly_plan') return <App onBack={() => setScreen('dashboard')} />;
   if (screen === 'family_profile') return <FamilyProfile onBack={() => setScreen('dashboard')} />;

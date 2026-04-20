@@ -65,6 +65,8 @@ class RegisterRequest(BaseModel):
     primary_region: str = "Tamil Nadu"
     current_city: str = "Bengaluru"
     dietary_preference: str = "Veg"
+    household_allergies: str = None
+    cuisine_sub_region_id: int = None
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -143,16 +145,20 @@ async def register(req: RegisterRequest, request: Request, db: Session = Depends
     db.execute(text("""
         INSERT INTO household_master
             (household_id, house_name, dietary_preference, primary_region,
-             native_region, current_city, is_active, onboarding_done)
+             native_region, current_city, is_active, onboarding_done,
+             household_allergies, cuisine_sub_region_id)
         VALUES
             (CAST(:hid AS uuid), :hname, CAST(:diet AS diet_pref),
-             :region, :region, :city, true, false)
+             :region, :region, :city, true, false,
+             :allergies, :sub_region_id)
     """), {
-        "hid": house_id,
-        "hname": req.house_name,
-        "diet": req.dietary_preference,
-        "region": req.primary_region,
-        "city": req.current_city
+        "hid":          house_id,
+        "hname":        req.house_name,
+        "diet":         req.dietary_preference,
+        "region":       req.primary_region,
+        "city":         req.current_city,
+        "allergies":    req.household_allergies,
+        "sub_region_id": req.cuisine_sub_region_id
     })
 
     # Create household_admin user
