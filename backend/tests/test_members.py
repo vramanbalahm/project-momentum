@@ -8,6 +8,11 @@
 # - Role restrictions: member cannot access admin-only endpoints
 
 import pytest
+import uuid
+
+def unique_email(prefix="test"):
+    return f"{prefix}_{uuid.uuid4().hex[:8]}@momentum-test.com"
+
 from sqlalchemy import text
 
 

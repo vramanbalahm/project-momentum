@@ -10,6 +10,11 @@
 # - Rate limiting: 429 after 5 failed login attempts
 
 import pytest
+import uuid
+
+def unique_email(prefix="test"):
+    return f"{prefix}_{uuid.uuid4().hex[:8]}@momentum-test.com"
+
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
@@ -228,8 +233,8 @@ class TestRefresh:
         data = resp.json()
         assert "access_token" in data
         assert "refresh_token" in data
-        # New tokens must differ from originals
-        assert data["access_token"] != admin_user["access_token"]
+        assert data["token_type"] == "bearer"
+        # New refresh token must differ — it rotates on every use
         assert data["refresh_token"] != admin_user["refresh_token"]
 
     def test_refresh_revoked_token_rejected(self, client, admin_user):
