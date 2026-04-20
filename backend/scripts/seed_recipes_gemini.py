@@ -51,6 +51,7 @@ PROMPT_TEMPLATE = """
 You are a culinary expert specialising in South Indian cuisine.
 
 Generate exactly {count} authentic {meal} recipes from {region} — covering all sub-regions
+(this is the source_region: {region})
 (e.g. Chettinad, Kongu Nadu, Tirunelveli, Thanjavur, Brahmin, coastal areas etc.).
 
 Return ONLY a JSON array. No explanation, no markdown, no code fences.
@@ -98,11 +99,13 @@ def dish_exists(cur, dish_name):
     cur.execute("SELECT 1 FROM recipe_dna_master WHERE LOWER(dish_name) = LOWER(%s)", (dish_name,))
     return cur.fetchone() is not None
 
-def insert_recipes(recipes, dry_run=False):
+def insert_recipes(recipes, args, dry_run=False):
     if dry_run:
         print(json.dumps(recipes, indent=2, ensure_ascii=False))
         print(f"\n✓ Dry run — {len(recipes)} recipes generated, not inserted.")
         return
+
+    # args used inside loop for source_region and ai_model
 
     conn = get_connection()
     cur  = conn.cursor()
@@ -142,16 +145,30 @@ def insert_recipes(recipes, dry_run=False):
                 intensity = "Medium"
 
             is_regional_specific = r.get("is_regional_specific", False)
+            regional_name  = r.get("regional_name", dish_name)
+            sub_region     = r.get("sub_region", "")
+            meal_slots     = r.get("meal_slots", [])
+            prep_time_mins = r.get("prep_time_mins")
+            cook_time_mins = r.get("cook_time_mins")
+            serves         = r.get("serves")
+            tags           = r.get("tags", [])
 
-            # Insert into recipe_dna_master
+            # Insert into recipe_dna_master — store everything Gemini returns
             cur.execute("""
                 INSERT INTO recipe_dna_master
-                    (recipe_id, dish_name, diet_type, is_sattvic, intensity_level,
-                     is_scalable, is_vegan, is_regional_specific)
+                    (recipe_id, dish_name, regional_name, sub_region, diet_type,
+                     is_sattvic, intensity_level, is_scalable, is_vegan,
+                     is_regional_specific, meal_slots, prep_time_mins, cook_time_mins,
+                     serves, tags, source_region, created_by_ai, ai_model)
                 VALUES
-                    (%s, %s, %s::diet_pref, %s, %s, %s, %s, %s)
-            """, (recipe_id, dish_name, diet_type, is_sattvic, intensity,
-                  is_scalable, is_vegan, is_regional_specific))
+                    (%s, %s, %s, %s, %s::diet_pref,
+                     %s, %s, %s, %s,
+                     %s, %s, %s, %s,
+                     %s, %s, %s, %s, %s)
+            """, (recipe_id, dish_name, regional_name, sub_region, diet_type,
+                  is_sattvic, intensity, is_scalable, is_vegan,
+                  is_regional_specific, meal_slots, prep_time_mins, cook_time_mins,
+                  serves, tags, args.region, True, GEMINI_MODEL))
 
             # Build prep_steps string
             steps = r.get("prep_steps", [])
@@ -242,7 +259,7 @@ def main():
 
     print(f"✓ Parsed {len(recipes)} recipes\n")
     print("💾 Inserting into database...")
-    insert_recipes(recipes, dry_run=args.dry_run)
+    insert_recipes(recipes, args, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
