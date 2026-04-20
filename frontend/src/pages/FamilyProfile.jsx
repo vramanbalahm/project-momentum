@@ -256,8 +256,8 @@ export default function FamilyProfile({ onBack }) {
 
       </div>
 
-      {/* Save button — fixed bottom */}
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#FFF9F2", padding: "16px 20px 32px", borderTop: "0.5px solid #EDE8E0" }}>
+      {/* Save button — fixed bottom, constrained to container maxWidth */}
+      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "#FFF9F2", padding: "16px 20px 32px", borderTop: "0.5px solid #EDE8E0", boxSizing: "border-box" }}>
         <button onClick={handleSave} disabled={saving} style={{ width: "100%", background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 14, padding: "14px", fontSize: 15, fontWeight: 500, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
           {saving ? "Saving..." : "Save changes"}
         </button>
