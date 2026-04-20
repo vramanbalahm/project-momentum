@@ -43,7 +43,13 @@ def db():
 import uuid
 
 def unique_email(prefix="test"):
+    """Plain function — usable directly in test files without import."""
     return f"{prefix}_{uuid.uuid4().hex[:8]}@momentum-test.com"
+
+@pytest.fixture
+def make_email():
+    """Fixture version — yields the unique_email function for use in tests."""
+    return unique_email
 
 
 # ── Admin user fixture ────────────────────────────────────────────────────────

@@ -23,7 +23,12 @@ _rate_store: dict = defaultdict(list)  # { ip: [timestamp, ...] }
 RATE_LIMIT_MAX = 5       # max attempts
 RATE_LIMIT_WINDOW = 900  # 15 minutes in seconds
 
+# Set RATE_LIMIT_ENABLED=false in .env to disable rate limiting during automated tests
+RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
+
 def check_rate_limit(ip: str):
+    if not RATE_LIMIT_ENABLED:
+        return  # bypassed — testing mode
     now = time.time()
     window_start = now - RATE_LIMIT_WINDOW
     # Keep only attempts within the window
