@@ -1,58 +1,54 @@
 // tests/register.spec.js — Register screen Playwright tests
 //
 // Test cases:
-//   9.  Register page loads with all expected fields
-//  10.  "Sign in" link switches back to Login screen
-//  11.  Submitting with all fields empty shows error
-//  12.  Passwords that don't match shows error
-//  13.  Password under 8 characters shows error
-//  14.  Duplicate email address shows error
-//  15.  Valid registration with EMAIL_VERIFY_ENABLED=false lands on Dashboard
-//  16.  Veg is selected by default for dietary preference
-//  17.  Clicking Non-Veg toggles selection
-//  18.  Clicking Vegan toggles selection
-//  19.  Home region dropdown contains expected states
+//  9.  Page loads with all sections visible
+// 10.  Clicking Sign in switches back to Login
+// 11.  Empty required fields shows error
+// 12.  Passwords don't match shows error
+// 13.  Password too short shows error
+// 14.  Password no uppercase shows error
+// 15.  Password no number shows error
+// 16.  Password no special character shows error
+// 17.  Duplicate email shows error
+// 18.  Valid registration lands on Dashboard
+// 19.  Veg is selected by default
+// 20.  Clicking Non-Veg toggles selection
+// 21.  Clicking Vegan toggles selection
+// 22.  Clicking Eggitarian toggles selection
+// 23.  Selecting cuisine state loads regions
+// 24.  Selecting cuisine region loads sub-regions
+// 25.  Selecting city state loads cities
 //
 // Prerequisites:
-//   - Frontend running on http://localhost:5173
-//   - Backend running on http://localhost:8000
-//   - EMAIL_VERIFY_ENABLED=false in backend .env
-//   - RATE_LIMIT_ENABLED=false in backend .env
+//  - Frontend running: npm run dev (http://localhost:5173)
+//  - Backend running: uvicorn main:app --reload (http://localhost:8000)
+//  - EMAIL_VERIFY_ENABLED=false and RATE_LIMIT_ENABLED=false in backend .env
+//  - EXISTING_EMAIL below must be a real account already in your DB
 //
-// ── Cleanup after running these tests ────────────────────────────────────────
-// Tests 14 and 15 create real users in the DB.
-// After running, clean up in pgAdmin with:
+// ── Cleanup after running test 17 and 18 ─────────────────────────────────────
+// Run this in pgAdmin after the test suite to remove test registrations:
 //
-//   DELETE FROM refresh_tokens rt
-//   USING users u
-//   WHERE rt.user_id = u.user_id
-//     AND u.email LIKE '%@playwright-test.com';
-//
-//   DELETE FROM household_master hm
-//   USING users u
-//   WHERE hm.household_id = u.house_id
-//     AND u.email LIKE '%@playwright-test.com';
-//
-//   DELETE FROM users WHERE email LIKE '%@playwright-test.com';
-//
+//   DO $$ DECLARE v_house_id UUID;
+//   BEGIN
+//     SELECT house_id INTO v_house_id FROM users WHERE email LIKE '%@playwright-test.com';
+//     DELETE FROM refresh_tokens    WHERE house_id = v_house_id;
+//     DELETE FROM profile_audit_log WHERE house_id = v_house_id;
+//     DELETE FROM users             WHERE house_id = v_house_id;
+//     DELETE FROM household_master  WHERE household_id = v_house_id;
+//   END $$;
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { test, expect } from '@playwright/test';
 
-// ── Test email domain — easy to identify and clean up ─────────────────────────
-const TEST_DOMAIN = '@playwright-test.com';
+const EXISTING_EMAIL = 'testadmin@momentum-test.com'; // must exist in your DB
+const TEST_DOMAIN    = '@playwright-test.com';
 
-// ── A known existing email for duplicate test (test 14) ───────────────────────
-// This must be a real account already in your DB.
-// Update this to match a real email in your system.
-const EXISTING_EMAIL = 'testadmin@momentum-test.com';
-
-// ── Helper — unique email per test run ────────────────────────────────────────
-function uniqueEmail(prefix = 'reg') {
-  return `${prefix}_${Date.now()}${TEST_DOMAIN}`;
+function uniqueEmail() {
+  return `reg_${Date.now()}${TEST_DOMAIN}`;
 }
 
-// ── Helper — navigate to Register screen ─────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 async function goToRegister(page) {
   await page.goto('/');
   await page.waitForSelector('text=Sign in', { timeout: 10000 });
@@ -60,23 +56,23 @@ async function goToRegister(page) {
   await page.waitForSelector('text=New household signup', { timeout: 10000 });
 }
 
-// ── Helper — fill the full registration form ──────────────────────────────────
-async function fillRegisterForm(page, {
-  name = 'Test User',
-  email = uniqueEmail(),
-  password = 'ValidPass1!',
+async function fillForm(page, {
+  name            = 'Test User',
+  email           = uniqueEmail(),
+  password        = 'ValidPass1!',
   confirmPassword = 'ValidPass1!',
-  houseName = 'Test Household',
+  houseName       = 'Test Household',
 } = {}) {
-  const inputs = page.locator('input[type="text"]');
-  const emailInput = page.locator('input[type="email"]');
-  const passwordInputs = page.locator('input[type="password"]');
-
-  await inputs.nth(0).fill(name);          // Your name
-  await emailInput.fill(email);            // Email
-  await passwordInputs.nth(0).fill(password);       // Password
-  await passwordInputs.nth(1).fill(confirmPassword); // Confirm password
-  await inputs.nth(1).fill(houseName);    // Household name
+  // name — first text input
+  await page.locator('input[type="text"]').nth(0).fill(name);
+  // email
+  await page.locator('input[type="email"]').fill(email);
+  // password
+  await page.locator('input[type="password"]').nth(0).fill(password);
+  // confirm password
+  await page.locator('input[type="password"]').nth(1).fill(confirmPassword);
+  // household name — second text input
+  await page.locator('input[type="text"]').nth(1).fill(houseName);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -87,125 +83,164 @@ test.describe('Register Screen', () => {
     await goToRegister(page);
   });
 
-  // ── Test 9: Page loads with all fields ────────────────────────────────────
-
-  test('register page loads with all expected elements', async ({ page }) => {
+  // Test 9
+  test('page loads with all sections visible', async ({ page }) => {
     await expect(page.locator('text=🌿')).toBeVisible();
     await expect(page.locator('text=New household signup')).toBeVisible();
-    // Required fields
+    // Personal detail fields
     await expect(page.locator('text=Your name *')).toBeVisible();
     await expect(page.locator('text=Email *')).toBeVisible();
     await expect(page.locator('text=Password *')).toBeVisible();
     await expect(page.locator('text=Confirm password *')).toBeVisible();
-    await expect(page.locator('text=Household name *')).toBeVisible();
     // Household details
-    await expect(page.locator('text=Home region')).toBeVisible();
-    await expect(page.locator('text=Current city')).toBeVisible();
+    await expect(page.locator('text=Household name *')).toBeVisible();
     await expect(page.locator('text=Dietary preference')).toBeVisible();
+    await expect(page.locator('text=Household allergies')).toBeVisible();
+    // Cuisine region section
+    await expect(page.locator('text=Home cuisine region')).toBeVisible();
+    // Current location section
+    await expect(page.locator('text=Current location')).toBeVisible();
     // Continue button
     await expect(page.locator('button', { hasText: 'Continue' })).toBeVisible();
     // Sign in link
-    await expect(page.locator('text=Sign in')).toBeVisible();
+    await expect(page.locator('text=Already have an account?')).toBeVisible();
   });
 
-  // ── Test 10: Switch to Login ───────────────────────────────────────────────
-
+  // Test 10
   test('clicking Sign in link switches back to Login screen', async ({ page }) => {
-    await page.locator('text=Already have an account?').locator('..').locator('text=Sign in').click();
-    await expect(page.locator('text=Sign in').first()).toBeVisible();
+    await page.locator('text=Sign in').last().click();
+    await expect(page.locator('text=Your weekly meal planner')).toBeVisible();
     await expect(page.locator('input[type="email"]')).toBeVisible();
   });
 
-  // ── Test 11: Empty form shows error ───────────────────────────────────────
-
-  test('submitting with all required fields empty shows error', async ({ page }) => {
+  // Test 11
+  test('submitting with empty required fields shows error', async ({ page }) => {
     await page.locator('button', { hasText: 'Continue' }).click();
     await expect(page.locator('text=Please fill in all required fields')).toBeVisible();
   });
 
-  // ── Test 12: Passwords don't match ────────────────────────────────────────
-
+  // Test 12
   test('passwords that do not match shows error', async ({ page }) => {
-    await fillRegisterForm(page, {
-      password: 'ValidPass1!',
-      confirmPassword: 'DifferentPass1!'
-    });
+    await fillForm(page, { password: 'ValidPass1!', confirmPassword: 'DifferentPass1!' });
     await page.locator('button', { hasText: 'Continue' }).click();
     await expect(page.locator('text=Passwords do not match')).toBeVisible();
   });
 
-  // ── Test 13: Password too short ───────────────────────────────────────────
-
+  // Test 13
   test('password under 8 characters shows error', async ({ page }) => {
-    await fillRegisterForm(page, {
-      password: 'Ab1!',
-      confirmPassword: 'Ab1!'
-    });
+    await fillForm(page, { password: 'Ab1!', confirmPassword: 'Ab1!' });
     await page.locator('button', { hasText: 'Continue' }).click();
     await expect(page.locator('text=at least 8 characters')).toBeVisible();
   });
 
-  // ── Test 14: Duplicate email ──────────────────────────────────────────────
-
-  test('duplicate email address shows error', async ({ page }) => {
-    await fillRegisterForm(page, { email: EXISTING_EMAIL });
+  // Test 14
+  test('password with no uppercase letter shows error', async ({ page }) => {
+    await fillForm(page, { password: 'validpass1!', confirmPassword: 'validpass1!' });
     await page.locator('button', { hasText: 'Continue' }).click();
-    // Backend returns 409 — frontend shows the error message
+    await expect(page.locator('text=uppercase')).toBeVisible();
+  });
+
+  // Test 15
+  test('password with no number shows error', async ({ page }) => {
+    await fillForm(page, { password: 'ValidPass!', confirmPassword: 'ValidPass!' });
+    await page.locator('button', { hasText: 'Continue' }).click();
+    await expect(page.locator('text=number')).toBeVisible();
+  });
+
+  // Test 16
+  test('password with no special character shows error', async ({ page }) => {
+    await fillForm(page, { password: 'ValidPass1', confirmPassword: 'ValidPass1' });
+    await page.locator('button', { hasText: 'Continue' }).click();
+    await expect(page.locator('text=special character')).toBeVisible();
+  });
+
+  // Test 17
+  test('duplicate email shows already registered error', async ({ page }) => {
+    await fillForm(page, { email: EXISTING_EMAIL });
+    await page.locator('button', { hasText: 'Continue' }).click();
     await expect(page.locator('text=already registered')).toBeVisible({ timeout: 10000 });
   });
 
-  // ── Test 15: Valid registration lands on Dashboard ────────────────────────
-  // NOTE: This creates a real user in the DB.
-  // Clean up after with the SQL in the file header comments.
-
-  test('valid registration with email verify disabled lands on Dashboard', async ({ page }) => {
-    const email = uniqueEmail('newuser');
-    await fillRegisterForm(page, { email, name: 'Playwright User', houseName: 'PW Test House' });
+  // Test 18 — creates a real user, clean up with SQL in header comment
+  test('valid registration lands on Dashboard', async ({ page }) => {
+    await fillForm(page, {
+      email:    uniqueEmail(),
+      name:     'Playwright User',
+      houseName: 'PW Test House'
+    });
     await page.locator('button', { hasText: 'Continue' }).click();
-    // Should land on Dashboard — greeting visible
     await expect(page.locator('text=Good')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('text=Weekly Plan')).toBeVisible();
+    await expect(page.locator('text=⚙️')).toBeVisible();
   });
 
-  // ── Test 16: Veg is default dietary preference ────────────────────────────
-
-  test('Veg is selected by default for dietary preference', async ({ page }) => {
-    // The Veg button should have the active dark background colour
-    const vegButton = page.locator('button', { hasText: 'Veg' });
-    await expect(vegButton).toBeVisible();
-    // Active button has dark green background — check background style
-    const bg = await vegButton.evaluate(el => el.style.background);
-    expect(bg).toBe('rgb(26, 58, 46)'); // #1A3A2E
+  // Test 19
+  test('Veg is selected by default', async ({ page }) => {
+    const vegBtn = page.locator('button', { hasText: 'Veg' });
+    await expect(vegBtn).toBeVisible();
+    const bg = await vegBtn.evaluate(el => el.style.background);
+    expect(bg).toBe('rgb(26, 58, 46)'); // #1A3A2E — active state
   });
 
-  // ── Test 17: Clicking Non-Veg toggles selection ───────────────────────────
-
-  test('clicking Non-Veg toggles dietary preference selection', async ({ page }) => {
-    const nonVegButton = page.locator('button', { hasText: 'Non-Veg' });
-    await nonVegButton.click();
-    const bg = await nonVegButton.evaluate(el => el.style.background);
-    expect(bg).toBe('rgb(26, 58, 46)'); // #1A3A2E — active
+  // Test 20
+  test('clicking Non-Veg toggles selection', async ({ page }) => {
+    await page.locator('button', { hasText: 'Non-Veg' }).click();
+    const bg = await page.locator('button', { hasText: 'Non-Veg' }).evaluate(el => el.style.background);
+    expect(bg).toBe('rgb(26, 58, 46)');
+    // Veg should now be inactive
+    const vegBg = await page.locator('button', { hasText: 'Veg' }).evaluate(el => el.style.background);
+    expect(vegBg).not.toBe('rgb(26, 58, 46)');
   });
 
-  // ── Test 18: Clicking Vegan toggles selection ─────────────────────────────
-
-  test('clicking Vegan toggles dietary preference selection', async ({ page }) => {
-    const veganButton = page.locator('button', { hasText: 'Vegan' });
-    await veganButton.click();
-    const bg = await veganButton.evaluate(el => el.style.background);
-    expect(bg).toBe('rgb(26, 58, 46)'); // #1A3A2E — active
+  // Test 21
+  test('clicking Vegan toggles selection', async ({ page }) => {
+    await page.locator('button', { hasText: 'Vegan' }).click();
+    const bg = await page.locator('button', { hasText: 'Vegan' }).evaluate(el => el.style.background);
+    expect(bg).toBe('rgb(26, 58, 46)');
   });
 
-  // ── Test 19: Home region dropdown contains expected states ────────────────
+  // Test 22
+  test('clicking Eggitarian toggles selection', async ({ page }) => {
+    await page.locator('button', { hasText: 'Eggitarian' }).click();
+    const bg = await page.locator('button', { hasText: 'Eggitarian' }).evaluate(el => el.style.background);
+    expect(bg).toBe('rgb(26, 58, 46)');
+  });
 
-  test('home region dropdown contains expected states', async ({ page }) => {
-    const select = page.locator('select');
-    await expect(select).toBeVisible();
-    const options = await select.locator('option').allTextContents();
-    const expected = ['Tamil Nadu', 'Kerala', 'Karnataka', 'Andhra Pradesh', 'Telangana', 'Maharashtra'];
-    for (const state of expected) {
-      expect(options).toContain(state);
-    }
+  // Test 23
+  test('selecting cuisine state loads regions dropdown', async ({ page }) => {
+    const selects = page.locator('select');
+    // First select is cuisine state
+    await selects.nth(0).selectOption('Tamil Nadu');
+    // Region select should appear
+    await expect(page.locator('text=Region')).toBeVisible({ timeout: 5000 });
+    const regionSelect = selects.nth(1);
+    await expect(regionSelect).toBeVisible();
+    const options = await regionSelect.locator('option').allTextContents();
+    expect(options.some(o => o.includes('Tamil Nadu'))).toBeTruthy();
+  });
+
+  // Test 24
+  test('selecting cuisine region loads sub-regions dropdown', async ({ page }) => {
+    const selects = page.locator('select');
+    await selects.nth(0).selectOption('Tamil Nadu');
+    await page.waitForTimeout(500);
+    await selects.nth(1).selectOption('Central Tamil Nadu');
+    await expect(page.locator('text=Sub-region')).toBeVisible({ timeout: 5000 });
+    const subOptions = await selects.nth(2).locator('option').allTextContents();
+    expect(subOptions.some(o => o.includes('Chettinad'))).toBeTruthy();
+  });
+
+  // Test 25
+  test('selecting city state loads cities dropdown', async ({ page }) => {
+    // City state is the last select on the page — scroll down first
+    await page.locator('text=Current location').scrollIntoViewIfNeeded();
+    const selects = page.locator('select');
+    const count = await selects.count();
+    // Last select before city loads is the city state select
+    await selects.nth(count - 1).selectOption('Karnataka');
+    await expect(page.locator('text=City / Town')).toBeVisible({ timeout: 5000 });
+    const cityOptions = await page.locator('select').last().locator('option').allTextContents();
+    expect(cityOptions.some(o => o.includes('Bengaluru'))).toBeTruthy();
   });
 
 });
