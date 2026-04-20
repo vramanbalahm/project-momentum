@@ -50,15 +50,35 @@ export default function FamilyProfile({ onBack }) {
         setCityStates(cs);
         setCuisineStates(cis);
 
-        // Load current household profile
+        // Load current household profile — pre-fill all fields from /auth/me
         const me = await apiFetch("/auth/me");
         setForm(prev => ({
           ...prev,
-          house_name: me.house_name || "",
-          dietary_preference: me.dietary_preference || "Veg",
-          current_city: me.current_city || "",
-          household_allergies: me.household_allergies || ""
+          house_name:            me.house_name || "",
+          dietary_preference:    me.dietary_preference || "Veg",
+          household_allergies:   me.household_allergies || "",
+          cuisine_state:         me.cuisine_state || "",
+          cuisine_region:        me.cuisine_region || "",
+          cuisine_sub_region_id: me.cuisine_sub_region_id ? String(me.cuisine_sub_region_id) : "",
+          city_state:            me.city_state || "",
+          current_city:          me.current_city || "",
         }));
+
+        // Pre-load regions if cuisine_state is set
+        if (me.cuisine_state) {
+          const r = await fetch(`${API_BASE}/lookup/cuisine-regions/${encodeURIComponent(me.cuisine_state)}`).then(x => x.json());
+          setRegions(r);
+        }
+        // Pre-load sub-regions if cuisine_region is set
+        if (me.cuisine_state && me.cuisine_region) {
+          const sr = await fetch(`${API_BASE}/lookup/cuisine-sub-regions/${encodeURIComponent(me.cuisine_state)}/${encodeURIComponent(me.cuisine_region)}`).then(x => x.json());
+          setSubRegions(sr);
+        }
+        // Pre-load cities if city_state is set
+        if (me.city_state) {
+          const c = await fetch(`${API_BASE}/lookup/cities/${encodeURIComponent(me.city_state)}`).then(x => x.json());
+          setCities(c);
+        }
       } catch (e) {
         setError("Failed to load profile.");
       } finally {

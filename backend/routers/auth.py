@@ -257,19 +257,48 @@ async def me(current_user: dict = Depends(get_current_user),
              db: Session = Depends(get_db)):
     house = db.execute(text("""
         SELECT house_name, dietary_preference, primary_region,
-               current_city, subscription_tier, onboarding_done
+               current_city, subscription_tier, onboarding_done,
+               household_allergies, cuisine_sub_region_id
         FROM household_master
         WHERE household_id = CAST(:hid AS uuid)
     """), {"hid": current_user["house_id"]}).fetchone()
 
+    # Resolve cuisine state and region from cuisine_sub_region_id
+    cuisine_state = None
+    cuisine_region = None
+    if house and house.cuisine_sub_region_id:
+        cr = db.execute(text("""
+            SELECT state, region FROM cuisine_regions
+            WHERE id = :id
+        """), {"id": house.cuisine_sub_region_id}).fetchone()
+        if cr:
+            cuisine_state  = cr.state
+            cuisine_region = cr.region
+
+    # Resolve city state from current_city
+    city_state = None
+    if house and house.current_city:
+        cs = db.execute(text("""
+            SELECT state FROM cities
+            WHERE display_name = :city AND is_active = true
+            LIMIT 1
+        """), {"city": house.current_city}).fetchone()
+        if cs:
+            city_state = cs.state
+
     return {
         **current_user,
-        "house_name":        house.house_name if house else None,
-        "dietary_preference": str(house.dietary_preference) if house else None,
-        "primary_region":    house.primary_region if house else None,
-        "current_city":      house.current_city if house else None,
-        "subscription_tier": house.subscription_tier if house else "free",
-        "onboarding_done":   house.onboarding_done if house else False
+        "house_name":            house.house_name if house else None,
+        "dietary_preference":    str(house.dietary_preference) if house else None,
+        "primary_region":        house.primary_region if house else None,
+        "current_city":          house.current_city if house else None,
+        "subscription_tier":     house.subscription_tier if house else "free",
+        "onboarding_done":       house.onboarding_done if house else False,
+        "household_allergies":   house.household_allergies if house else None,
+        "cuisine_sub_region_id": house.cuisine_sub_region_id if house else None,
+        "cuisine_state":         cuisine_state,
+        "cuisine_region":        cuisine_region,
+        "city_state":            city_state,
     }
 
 
