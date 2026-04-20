@@ -423,11 +423,16 @@ async def update_profile(
     if not updates:
         return {"message": "No changes detected."}
 
-    # Build dynamic UPDATE
-    set_clauses = ", ".join([f"{k} = :{k}" for k in updates])
+    # Build dynamic UPDATE — dietary_preference must be cast to the diet_pref enum type
+    set_clauses = []
+    for k in updates:
+        if k == "dietary_preference":
+            set_clauses.append(f"{k} = CAST(:{k} AS diet_pref)")
+        else:
+            set_clauses.append(f"{k} = :{k}")
     params = {**updates, "hid": house_id}
     db.execute(text(f"""
-        UPDATE household_master SET {set_clauses}
+        UPDATE household_master SET {', '.join(set_clauses)}
         WHERE household_id = CAST(:hid AS uuid)
     """), params)
 
@@ -549,26 +554,32 @@ async def update_member_role(
         return {"message": f"{target.name} role updated to {req.new_role}."}
 
 
+class DeactivateRequest(BaseModel):
+    user_id: str
+    is_active: bool  # true = activate, false = deactivate
+
 @router.put("/members/deactivate", status_code=200)
 async def deactivate_member(
-    req: dict,
+    req: DeactivateRequest,
     current_user: dict = Depends(require_role("household_admin", "platform_admin")),
     db: Session = Depends(get_db)
 ):
-    """Admin-only — activate or deactivate a member."""
+    """Admin-only — activate or deactivate a member. Admin cannot deactivate themselves."""
+    if not req.is_active and req.user_id == current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="You cannot deactivate yourself.")
+
     target = db.execute(text("""
         SELECT user_id, name FROM users
         WHERE user_id = CAST(:uid AS uuid) AND house_id = CAST(:hid AS uuid)
-    """), {"uid": req.get("user_id"), "hid": current_user["house_id"]}).fetchone()
+    """), {"uid": req.user_id, "hid": current_user["house_id"]}).fetchone()
 
     if not target:
-        raise HTTPException(status_code=404, detail="Member not found.")
-    if str(target.user_id) == current_user["user_id"]:
-        raise HTTPException(status_code=400, detail="You cannot deactivate yourself.")
+        raise HTTPException(status_code=404, detail="Member not found in your household.")
 
     db.execute(text("""
         UPDATE users SET is_active = :active WHERE user_id = CAST(:uid AS uuid)
-    """), {"active": req.get("is_active", False), "uid": req.get("user_id")})
+    """), {"active": req.is_active, "uid": req.user_id})
     db.commit()
-    status_str = "activated" if req.get("is_active") else "deactivated"
-    return {"message": f"{target.name} has been {status_str}."}
+
+    status_str = "activated" if req.is_active else "deactivated"
+    return {"user_id": req.user_id, "is_active": req.is_active, "message": f"{target.name} has been {status_str}."}
