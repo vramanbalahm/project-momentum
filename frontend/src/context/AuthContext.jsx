@@ -14,7 +14,7 @@ async function apiFetch(path, options = {}) {
   });
   if (res.status === 401) {
     window.dispatchEvent(new Event("auth:logout"));
-    throw new Error("Unauthorized");
+    throw new Error("Your session has expired. Please log in again.");
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));

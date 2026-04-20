@@ -62,7 +62,7 @@ export default function Dashboard({ onNavigate }) {
     <div style={{ minHeight: "100vh", background: "#F7F4EE", fontFamily: "system-ui, sans-serif", maxWidth: 480, margin: "0 auto" }}>
 
       {/* ── Top bar ── */}
-      <div style={{ background: COLORS.bg, padding: "16px 20px 20px", position: "relative" }}>
+      <div style={{ background: COLORS.bg, padding: "16px 20px 20px", position: "relative", zIndex: 10 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ color: COLORS.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>MOMENTUM</div>
@@ -109,11 +109,11 @@ export default function Dashboard({ onNavigate }) {
             style={{ position: "fixed", inset: 0, zIndex: 40 }}
           />
           <div style={{
-            position: "fixed", top: 64, right: 16, zIndex: 50,
+            position: "absolute", top: 56, right: 20, zIndex: 50,
             background: COLORS.card, borderRadius: 14,
             boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
             border: `0.5px solid ${COLORS.border}`,
-            overflow: "hidden", minWidth: 180
+            overflow: "hidden", minWidth: 200
           }}>
             <div style={{ padding: "12px 16px", borderBottom: `0.5px solid ${COLORS.border}` }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: COLORS.text }}>{user?.name}</div>

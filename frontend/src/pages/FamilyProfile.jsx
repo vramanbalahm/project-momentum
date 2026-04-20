@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
@@ -38,6 +38,10 @@ export default function FamilyProfile({ onBack }) {
   const [success, setSuccess] = useState(null);
 
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
+
+  // Tracks whether the initial pre-fill is complete
+  // Prevents cascade useEffects from resetting values during init
+  const initialised = useRef(false);
 
   // Load lookup states on mount
   useEffect(() => {
@@ -83,35 +87,42 @@ export default function FamilyProfile({ onBack }) {
         setError("Failed to load profile.");
       } finally {
         setLoading(false);
+        initialised.current = true;  // pre-fill complete — cascade effects can now reset on user change
       }
     };
     init();
   }, []);
 
-  // Load regions when cuisine state changes
+  // Load regions when cuisine state changes — skip reset during initial pre-fill
   useEffect(() => {
     if (!form.cuisine_state) { setRegions([]); setSubRegions([]); return; }
     fetch(`${API_BASE}/lookup/cuisine-regions/${encodeURIComponent(form.cuisine_state)}`)
       .then(r => r.json()).then(setRegions);
-    set("cuisine_region", "");
-    set("cuisine_sub_region_id", "");
-    setSubRegions([]);
+    if (initialised.current) {
+      set("cuisine_region", "");
+      set("cuisine_sub_region_id", "");
+      setSubRegions([]);
+    }
   }, [form.cuisine_state]);
 
-  // Load sub-regions when region changes
+  // Load sub-regions when region changes — skip reset during initial pre-fill
   useEffect(() => {
     if (!form.cuisine_state || !form.cuisine_region) { setSubRegions([]); return; }
     fetch(`${API_BASE}/lookup/cuisine-sub-regions/${encodeURIComponent(form.cuisine_state)}/${encodeURIComponent(form.cuisine_region)}`)
       .then(r => r.json()).then(setSubRegions);
-    set("cuisine_sub_region_id", "");
+    if (initialised.current) {
+      set("cuisine_sub_region_id", "");
+    }
   }, [form.cuisine_region]);
 
-  // Load cities when city state changes
+  // Load cities when city state changes — skip reset during initial pre-fill
   useEffect(() => {
     if (!form.city_state) { setCities([]); return; }
     fetch(`${API_BASE}/lookup/cities/${encodeURIComponent(form.city_state)}`)
       .then(r => r.json()).then(setCities);
-    set("current_city", "");
+    if (initialised.current) {
+      set("current_city", "");
+    }
   }, [form.city_state]);
 
   const handleSave = async () => {
@@ -142,7 +153,7 @@ export default function FamilyProfile({ onBack }) {
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F7F4EE", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#F7F4EE", fontFamily: "system-ui, sans-serif", maxWidth: 480, margin: "0 auto" }}>
 
       {/* Header */}
       <div style={{ background: "#1A3A2E", padding: "16px 20px 20px" }}>

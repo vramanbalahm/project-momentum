@@ -90,7 +90,7 @@ export default function ManageMembers({ onBack }) {
   const inputStyle = { width: "100%", padding: "10px 14px", borderRadius: 10, border: "0.5px solid #EDE8E0", fontSize: 13, color: "#2C2C2A", background: "#F1EFE8", outline: "none", boxSizing: "border-box", marginBottom: 10 };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F7F4EE", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#F7F4EE", fontFamily: "system-ui, sans-serif", maxWidth: 480, margin: "0 auto" }}>
 
       {/* Header */}
       <div style={{ background: "#1A3A2E", padding: "16px 20px 20px" }}>
