@@ -1,12 +1,12 @@
 # test_auth.py — Authentication endpoint tests
 #
 # Covers:
-# - Register: success, duplicate email, short password
+# - Register: success, duplicate email, all 5 password rules
 # - Login: success, wrong password, inactive user, inactive household
 # - Logout: revokes refresh token
 # - Refresh: valid token rotates, revoked token rejected
 # - Me: returns correct user and household data
-# - Change password: success, wrong current password, too short
+# - Change password: success, wrong current password, all 5 password rules
 # - Rate limiting: 429 after 5 failed login attempts
 
 import pytest
@@ -65,18 +65,57 @@ class TestRegister:
         assert resp.status_code == 409
         assert "already registered" in resp.json()["detail"].lower()
 
-    def test_register_short_password(self, client):
-        """Password under 8 chars returns 422."""
-        resp = client.post("/auth/register", json={
-            "email": unique_email("short"),
-            "password": "abc",
-            "name": "Short",
-            "house_name": "Short House",
+    def _register_with_password(self, client, password):
+        """Helper — attempt registration with a given password."""
+        return client.post("/auth/register", json={
+            "email": unique_email("pwdtest"),
+            "password": password,
+            "name": "Pwd Test",
+            "house_name": "Pwd House",
             "primary_region": "Tamil Nadu",
             "current_city": "Chennai",
             "dietary_preference": "Veg"
         })
-        assert resp.status_code == 422
+
+    def test_register_password_too_short(self, client):
+        """Password under 8 characters is rejected — returns 422."""
+        assert self._register_with_password(client, "Abc1!").status_code == 422
+
+    def test_register_password_no_uppercase(self, client):
+        """Password with no uppercase letter is rejected — returns 422."""
+        assert self._register_with_password(client, "validpass1!").status_code == 422
+
+    def test_register_password_no_number(self, client):
+        """Password with no number is rejected — returns 422."""
+        assert self._register_with_password(client, "ValidPass!").status_code == 422
+
+    def test_register_password_no_special_char(self, client):
+        """Password with no special character is rejected — returns 422."""
+        assert self._register_with_password(client, "ValidPass1").status_code == 422
+
+    def test_register_password_contains_space(self, client):
+        """Password containing a space is rejected — returns 422."""
+        assert self._register_with_password(client, "Valid Pass1!").status_code == 422
+
+    def test_register_password_all_rules_pass(self, client, db):
+        """Password meeting all 5 rules is accepted — returns 200."""
+        email = unique_email("allrules")
+        resp = client.post("/auth/register", json={
+            "email": email,
+            "password": "ValidPass1!",
+            "name": "All Rules",
+            "house_name": "All Rules House",
+            "primary_region": "Tamil Nadu",
+            "current_city": "Chennai",
+            "dietary_preference": "Veg"
+        })
+        assert resp.status_code == 200
+        # Teardown
+        from sqlalchemy import text as t
+        db.execute(t("DELETE FROM refresh_tokens rt USING users u WHERE rt.user_id = u.user_id AND u.email = :e"), {"e": email})
+        db.execute(t("DELETE FROM household_master hm USING users u WHERE hm.household_id = u.house_id AND u.email = :e"), {"e": email})
+        db.execute(t("DELETE FROM users WHERE email = :e"), {"e": email})
+        db.commit()
 
 
 # ── Login ─────────────────────────────────────────────────────────────────────
@@ -269,16 +308,35 @@ class TestChangePassword:
         )
         assert resp.status_code == 401
 
-    def test_change_password_too_short(self, client, admin_user):
-        """New password under 8 chars returns 422."""
-        resp = client.post("/auth/change-password",
+    def _change_with_password(self, client, admin_user, new_password):
+        """Helper — attempt change-password with a given new password."""
+        return client.post("/auth/change-password",
             json={
                 "current_password": admin_user["password"],
-                "new_password": "abc"
+                "new_password": new_password
             },
             headers={"Authorization": f"Bearer {admin_user['access_token']}"}
         )
-        assert resp.status_code == 422
+
+    def test_change_password_too_short(self, client, admin_user):
+        """New password under 8 characters is rejected — returns 422."""
+        assert self._change_with_password(client, admin_user, "Abc1!").status_code == 422
+
+    def test_change_password_no_uppercase(self, client, admin_user):
+        """New password with no uppercase letter is rejected — returns 422."""
+        assert self._change_with_password(client, admin_user, "newpass1!").status_code == 422
+
+    def test_change_password_no_number(self, client, admin_user):
+        """New password with no number is rejected — returns 422."""
+        assert self._change_with_password(client, admin_user, "NewPass!").status_code == 422
+
+    def test_change_password_no_special_char(self, client, admin_user):
+        """New password with no special character is rejected — returns 422."""
+        assert self._change_with_password(client, admin_user, "NewPass1").status_code == 422
+
+    def test_change_password_contains_space(self, client, admin_user):
+        """New password containing a space is rejected — returns 422."""
+        assert self._change_with_password(client, admin_user, "New Pass1!").status_code == 422
 
     def test_change_password_unauthenticated(self, client):
         """No token returns 401."""

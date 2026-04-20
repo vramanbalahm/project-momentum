@@ -41,13 +41,32 @@ class TestCreateMember:
         )
         assert resp.status_code == 409
 
-    def test_create_member_short_password(self, client, admin_user):
-        """Password under 8 chars returns 422."""
-        resp = client.post("/auth/members/create",
-            json={"email": unique_email("short"), "password": "abc", "name": "Short"},
+    def _create_with_password(self, client, admin_user, password):
+        """Helper — attempt member creation with a given password."""
+        return client.post("/auth/members/create",
+            json={"email": unique_email("pwdtest"), "password": password, "name": "Pwd Test"},
             headers={"Authorization": f"Bearer {admin_user['access_token']}"}
         )
-        assert resp.status_code == 422
+
+    def test_create_member_password_too_short(self, client, admin_user):
+        """Password under 8 characters is rejected — returns 422."""
+        assert self._create_with_password(client, admin_user, "Abc1!").status_code == 422
+
+    def test_create_member_password_no_uppercase(self, client, admin_user):
+        """Password with no uppercase letter is rejected — returns 422."""
+        assert self._create_with_password(client, admin_user, "validpass1!").status_code == 422
+
+    def test_create_member_password_no_number(self, client, admin_user):
+        """Password with no number is rejected — returns 422."""
+        assert self._create_with_password(client, admin_user, "ValidPass!").status_code == 422
+
+    def test_create_member_password_no_special_char(self, client, admin_user):
+        """Password with no special character is rejected — returns 422."""
+        assert self._create_with_password(client, admin_user, "ValidPass1").status_code == 422
+
+    def test_create_member_password_contains_space(self, client, admin_user):
+        """Password containing a space is rejected — returns 422."""
+        assert self._create_with_password(client, admin_user, "Valid Pass1!").status_code == 422
 
     def test_member_cannot_create_member(self, client, member_user):
         """household_member cannot create members — returns 403."""
