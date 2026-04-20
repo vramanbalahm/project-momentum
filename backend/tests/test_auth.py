@@ -352,8 +352,22 @@ class TestChangePassword:
 
 
 # ── Rate Limiting ─────────────────────────────────────────────────────────────
+# These tests temporarily re-enable the rate limiter and clear the store,
+# then restore the original state after the test.
+
+import routers.auth as auth_module
 
 class TestRateLimiting:
+
+    def setup_method(self):
+        """Enable rate limiter and clear the store before each rate limit test."""
+        auth_module.RATE_LIMIT_ENABLED = True
+        auth_module._rate_store.clear()
+
+    def teardown_method(self):
+        """Restore rate limiter to disabled after each rate limit test."""
+        auth_module.RATE_LIMIT_ENABLED = False
+        auth_module._rate_store.clear()
 
     def test_login_rate_limit(self, client):
         """6th failed login attempt from same IP returns 429."""
@@ -398,7 +412,7 @@ class TestRateLimiting:
                 db.execute(text("DELETE FROM users WHERE email = :email"), {"email": email})
                 db.commit()
 
-        # 6th attempt
+        # 6th attempt must be rate limited
         resp = client.post("/auth/register", json={
             "email": unique_email("ratelimitreg6"),
             "password": "ValidPass1!",
