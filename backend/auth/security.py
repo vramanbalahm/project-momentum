@@ -1,7 +1,7 @@
 import os
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 from pathlib import Path
@@ -50,7 +50,7 @@ def validate_password(password: str) -> list:
     return errors
 
 def create_access_token(sub: str, org_id: str, role: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": sub,
         "org_id": org_id,

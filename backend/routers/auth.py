@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, EmailStr
 from uuid import uuid4
 import hashlib
@@ -95,7 +95,7 @@ def issue_tokens(db: Session, user_id: str, house_id: str, role: str) -> dict:
         role=role
     )
     plaintext, token_hash = create_refresh_token()
-    expires = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    expires = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
     db.execute(text("""
         INSERT INTO refresh_tokens (user_id, house_id, token_hash, expires_at)
@@ -105,7 +105,7 @@ def issue_tokens(db: Session, user_id: str, house_id: str, role: str) -> dict:
     db.execute(text("""
         UPDATE users SET last_login_at = :now
         WHERE user_id = CAST(:uid AS uuid)
-    """), {"now": datetime.utcnow(), "uid": user_id})
+    """), {"now": datetime.now(timezone.utc), "uid": user_id})
 
     db.commit()
     return {"access_token": access_token, "refresh_token": plaintext, "token_type": "bearer"}
@@ -221,7 +221,7 @@ async def refresh(req: RefreshRequest, db: Session = Depends(get_db)):
         WHERE rt.token_hash = :hash
           AND rt.revoked = false
           AND rt.expires_at > :now
-    """), {"hash": token_hash, "now": datetime.utcnow()}).fetchone()
+    """), {"hash": token_hash, "now": datetime.now(timezone.utc)}).fetchone()
 
     if not rt:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token.")
