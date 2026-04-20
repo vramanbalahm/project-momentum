@@ -1,5 +1,9 @@
 // playwright.config.js — Momentum frontend test configuration
 import { defineConfig } from '@playwright/test';
+import { config } from 'dotenv';
+
+// Load test credentials from .env.test — never committed to repo
+config({ path: '.env.test' });
 
 export default defineConfig({
   testDir: './tests',

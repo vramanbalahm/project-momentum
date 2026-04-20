@@ -19,8 +19,12 @@
 
 import { test, expect } from '@playwright/test';
 
-const VALID_EMAIL    = 'testadmin@momentum-test.com'; // update to a real account
-const VALID_PASSWORD = 'TestAdmin1!';                 // update to match
+// Credentials loaded from environment — set these in frontend/.env.test
+// Create frontend/.env.test with:
+//   TEST_EMAIL=your@email.com
+//   TEST_PASSWORD=YourPassword1!
+const VALID_EMAIL    = process.env.TEST_EMAIL    || 'testadmin@momentum-test.com';
+const VALID_PASSWORD = process.env.TEST_PASSWORD || 'TestAdmin1!';
 
 async function goToLogin(page) {
   await page.goto('/');

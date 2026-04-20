@@ -25,3 +25,5 @@ Thumbs.db
 
 # Large model files
 *.pt
+
+frontend/.env.test

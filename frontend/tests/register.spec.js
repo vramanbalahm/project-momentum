@@ -40,7 +40,8 @@
 
 import { test, expect } from '@playwright/test';
 
-const EXISTING_EMAIL = 'testadmin@momentum-test.com'; // must exist in your DB
+// Set in frontend/.env.test — same account used for login tests
+const EXISTING_EMAIL = process.env.TEST_EMAIL || 'testadmin@momentum-test.com';
 const TEST_DOMAIN    = '@playwright-test.com';
 
 function uniqueEmail() {
