@@ -65,6 +65,7 @@ Each recipe must follow this exact structure:
   "is_vegan": true | false,
   "intensity_level": "Light | Medium | Heavy",
   "is_scalable": true | false,
+  "is_regional_specific": true | false — true if this dish is distinctly associated with a specific sub-region and not commonly eaten across all of {region}. false if it is a staple eaten widely across the state regardless of sub-region. Example: Idli Sambar = false, Chettinad Kuzhambu = true, Tirunelveli Seepu Seedai = true,
   "meal_slots": ["Breakfast"] or ["Lunch"] or ["Dinner"] or ["Breakfast","Lunch"] etc,
   "prep_time_mins": integer,
   "cook_time_mins": integer,
@@ -140,13 +141,17 @@ def insert_recipes(recipes, dry_run=False):
             if intensity not in valid_intensity:
                 intensity = "Medium"
 
+            is_regional_specific = r.get("is_regional_specific", False)
+
             # Insert into recipe_dna_master
             cur.execute("""
                 INSERT INTO recipe_dna_master
-                    (recipe_id, dish_name, diet_type, is_sattvic, intensity_level, is_scalable, is_vegan)
+                    (recipe_id, dish_name, diet_type, is_sattvic, intensity_level,
+                     is_scalable, is_vegan, is_regional_specific)
                 VALUES
-                    (%s, %s, %s::diet_pref, %s, %s, %s, %s)
-            """, (recipe_id, dish_name, diet_type, is_sattvic, intensity, is_scalable, is_vegan))
+                    (%s, %s, %s::diet_pref, %s, %s, %s, %s, %s)
+            """, (recipe_id, dish_name, diet_type, is_sattvic, intensity,
+                  is_scalable, is_vegan, is_regional_specific))
 
             # Build prep_steps string
             steps = r.get("prep_steps", [])
