@@ -3,7 +3,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from "rea
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const AuthContext = createContext(null);
 
-async function apiFetch(path, options = {}) {
+async function apiFetch(path, options = {}, { skipLogoutOn401 = false } = {}) {
   const token = localStorage.getItem("access_token");
   const res = await fetch(`${API_BASE}${path}`, {
     headers: {
@@ -13,8 +13,13 @@ async function apiFetch(path, options = {}) {
     ...options
   });
   if (res.status === 401) {
-    window.dispatchEvent(new Event("auth:logout"));
-    throw new Error("Your session has expired. Please log in again.");
+    if (!skipLogoutOn401) {
+      window.dispatchEvent(new Event("auth:logout"));
+      throw new Error("Your session has expired. Please log in again.");
+    }
+    // For login/register — surface the backend error message directly
+    const err = await res.json().catch(() => ({ detail: "Invalid email or password." }));
+    throw new Error(err.detail || "Invalid email or password.");
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));
@@ -64,7 +69,7 @@ export function AuthProvider({ children }) {
     clearTokens(); setUser(null);
     const data = await apiFetch("/auth/login", {
       method: "POST", body: JSON.stringify({ email, password })
-    });
+    }, { skipLogoutOn401: true });
     storeTokens(data.access_token, data.refresh_token);
     const me = await apiFetch("/auth/me");
     setUser(me);
@@ -74,7 +79,7 @@ export function AuthProvider({ children }) {
   const register = useCallback(async (payload) => {
     const data = await apiFetch("/auth/register", {
       method: "POST", body: JSON.stringify(payload)
-    });
+    }, { skipLogoutOn401: true });
     storeTokens(data.access_token, data.refresh_token);
     const me = await apiFetch("/auth/me");
     setUser(me);
