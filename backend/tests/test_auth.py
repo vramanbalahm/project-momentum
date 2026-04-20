@@ -12,7 +12,6 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
-from conftest import unique_email
 
 
 # ── Register ──────────────────────────────────────────────────────────────────

@@ -9,7 +9,6 @@
 
 import pytest
 from sqlalchemy import text
-from conftest import unique_email
 
 
 class TestCreateMember:
