@@ -90,7 +90,7 @@ test.describe('Register Screen', () => {
     // Personal detail fields
     await expect(page.locator('text=Your name *')).toBeVisible();
     await expect(page.locator('text=Email *')).toBeVisible();
-    await expect(page.locator('text=Password *')).toBeVisible();
+    await expect(page.locator('text=Password *').first()).toBeVisible();
     await expect(page.locator('text=Confirm password *')).toBeVisible();
     // Household details
     await expect(page.locator('text=Household name *')).toBeVisible();
@@ -158,7 +158,7 @@ test.describe('Register Screen', () => {
   test('duplicate email shows already registered error', async ({ page }) => {
     await fillForm(page, { email: EXISTING_EMAIL });
     await page.locator('button', { hasText: 'Continue' }).click();
-    await expect(page.locator('text=already registered')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text=already registered').first()).toBeVisible({ timeout: 10000 });
   });
 
   // Test 18 — creates a real user, clean up with SQL in header comment
@@ -169,14 +169,14 @@ test.describe('Register Screen', () => {
       houseName: 'PW Test House'
     });
     await page.locator('button', { hasText: 'Continue' }).click();
-    await expect(page.locator('text=Good')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('text=MOMENTUM')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('text=Weekly Plan')).toBeVisible();
     await expect(page.locator('text=⚙️')).toBeVisible();
   });
 
   // Test 19
   test('Veg is selected by default', async ({ page }) => {
-    const vegBtn = page.locator('button', { hasText: 'Veg' });
+    const vegBtn = page.getByRole('button', { name: 'Veg', exact: true });
     await expect(vegBtn).toBeVisible();
     const bg = await vegBtn.evaluate(el => el.style.background);
     expect(bg).toBe('rgb(26, 58, 46)'); // #1A3A2E — active state
@@ -184,25 +184,25 @@ test.describe('Register Screen', () => {
 
   // Test 20
   test('clicking Non-Veg toggles selection', async ({ page }) => {
-    await page.locator('button', { hasText: 'Non-Veg' }).click();
-    const bg = await page.locator('button', { hasText: 'Non-Veg' }).evaluate(el => el.style.background);
+    await page.getByRole('button', { name: 'Non-Veg', exact: true }).click();
+    const bg = await page.getByRole('button', { name: 'Non-Veg', exact: true }).evaluate(el => el.style.background);
     expect(bg).toBe('rgb(26, 58, 46)');
     // Veg should now be inactive
-    const vegBg = await page.locator('button', { hasText: 'Veg' }).evaluate(el => el.style.background);
+    const vegBg = await page.getByRole('button', { name: 'Veg', exact: true }).evaluate(el => el.style.background);
     expect(vegBg).not.toBe('rgb(26, 58, 46)');
   });
 
   // Test 21
   test('clicking Vegan toggles selection', async ({ page }) => {
-    await page.locator('button', { hasText: 'Vegan' }).click();
-    const bg = await page.locator('button', { hasText: 'Vegan' }).evaluate(el => el.style.background);
+    await page.getByRole('button', { name: 'Vegan', exact: true }).click();
+    const bg = await page.getByRole('button', { name: 'Vegan', exact: true }).evaluate(el => el.style.background);
     expect(bg).toBe('rgb(26, 58, 46)');
   });
 
   // Test 22
   test('clicking Eggitarian toggles selection', async ({ page }) => {
-    await page.locator('button', { hasText: 'Eggitarian' }).click();
-    const bg = await page.locator('button', { hasText: 'Eggitarian' }).evaluate(el => el.style.background);
+    await page.getByRole('button', { name: 'Eggitarian', exact: true }).click();
+    const bg = await page.getByRole('button', { name: 'Eggitarian', exact: true }).evaluate(el => el.style.background);
     expect(bg).toBe('rgb(26, 58, 46)');
   });
 
@@ -212,7 +212,7 @@ test.describe('Register Screen', () => {
     // First select is cuisine state
     await selects.nth(0).selectOption('Tamil Nadu');
     // Region select should appear
-    await expect(page.locator('text=Region')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Region', { exact: true })).toBeVisible({ timeout: 5000 });
     const regionSelect = selects.nth(1);
     await expect(regionSelect).toBeVisible();
     const options = await regionSelect.locator('option').allTextContents();
@@ -225,7 +225,7 @@ test.describe('Register Screen', () => {
     await selects.nth(0).selectOption('Tamil Nadu');
     await page.waitForTimeout(500);
     await selects.nth(1).selectOption('Central Tamil Nadu');
-    await expect(page.locator('text=Sub-region')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Sub-region / Cuisine style', { exact: true })).toBeVisible({ timeout: 5000 });
     const subOptions = await selects.nth(2).locator('option').allTextContents();
     expect(subOptions.some(o => o.includes('Chettinad'))).toBeTruthy();
   });

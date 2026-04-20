@@ -89,7 +89,7 @@ test.describe('Login Screen', () => {
     await page.locator('input[type="email"]').fill(VALID_EMAIL);
     await page.locator('input[type="password"]').fill('WrongPass999!');
     await page.locator('button', { hasText: 'Sign in' }).click();
-    await expect(page.locator('text=Invalid email or password')).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('text=Invalid email or password.')).toBeVisible({ timeout: 8000 });
   });
 
   // Test 8
@@ -97,7 +97,7 @@ test.describe('Login Screen', () => {
     await page.locator('input[type="email"]').fill('nobody@nowhere-at-all.com');
     await page.locator('input[type="password"]').fill('SomePass1!');
     await page.locator('button', { hasText: 'Sign in' }).click();
-    await expect(page.locator('text=Invalid email or password')).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('text=Invalid email or password.')).toBeVisible({ timeout: 8000 });
   });
 
 });
