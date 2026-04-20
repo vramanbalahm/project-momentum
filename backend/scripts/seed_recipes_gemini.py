@@ -1,0 +1,244 @@
+"""
+seed_recipes_gemini.py — Populate recipe_dna_master and recipe_content_vault
+using Google Gemini AI.
+
+Usage:
+    cd C:\\Users\\SATISH.000\\project-momentum\\backend
+    python scripts/seed_recipes_gemini.py --meal breakfast --region "Tamil Nadu" --count 50
+    python scripts/seed_recipes_gemini.py --meal lunch    --region "Tamil Nadu" --count 50
+    python scripts/seed_recipes_gemini.py --meal dinner   --region "Tamil Nadu" --count 50
+    python scripts/seed_recipes_gemini.py --meal snack    --region "Tamil Nadu" --count 30
+
+Options:
+    --meal      breakfast | lunch | dinner | snack | all
+    --region    e.g. "Tamil Nadu", "Kerala", "Karnataka"
+    --count     number of recipes to generate (default 50)
+    --dry-run   print JSON only, do not insert into DB
+
+Requirements:
+    pip install google-generativeai psycopg2-binary python-dotenv
+"""
+
+import argparse
+import json
+import os
+import sys
+import uuid
+from pathlib import Path
+
+# ── Load .env ─────────────────────────────────────────────────────────────────
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+import google.generativeai as genai
+import psycopg2
+from psycopg2.extras import execute_batch
+
+# ── Config ────────────────────────────────────────────────────────────────────
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCwsXt4Pkga-RmiJGORB56yQBDXvryXEh0")
+GEMINI_MODEL   = os.getenv("GEMINI_MODEL",   "gemini-2.5-flash-lite")
+DATABASE_URL   = os.getenv("DATABASE_URL",   "postgresql://postgres:admin123@localhost:5432/food_momentum_db")
+
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# ── Gemini setup ──────────────────────────────────────────────────────────────
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel(GEMINI_MODEL)
+
+# ── Prompt ────────────────────────────────────────────────────────────────────
+PROMPT_TEMPLATE = """
+You are a culinary expert specialising in South Indian cuisine.
+
+Generate exactly {count} authentic {meal} recipes from {region} — covering all sub-regions
+(e.g. Chettinad, Kongu Nadu, Tirunelveli, Thanjavur, Brahmin, coastal areas etc.).
+
+Return ONLY a JSON array. No explanation, no markdown, no code fences.
+
+Each recipe must follow this exact structure:
+{{
+  "dish_name": "string — English name of the dish",
+  "regional_name": "string — name in Tamil or local language if applicable, else same as dish_name",
+  "sub_region": "string — which sub-region this dish belongs to, e.g. Chettinad, Tirunelveli, Kongu Nadu",
+  "diet_type": "Veg | Non-Veg | Vegan | Eggitarian",
+  "is_sattvic": true | false,
+  "is_vegan": true | false,
+  "intensity_level": "Light | Medium | Heavy",
+  "is_scalable": true | false,
+  "meal_slots": ["Breakfast"] or ["Lunch"] or ["Dinner"] or ["Breakfast","Lunch"] etc,
+  "prep_time_mins": integer,
+  "cook_time_mins": integer,
+  "serves": integer,
+  "ingredients": [
+    {{"name": "string", "quantity": "string", "unit": "string"}}
+  ],
+  "prep_steps": [
+    "Step 1: ...",
+    "Step 2: ...",
+    "Step 3: ..."
+  ],
+  "tags": ["string"]
+}}
+
+Rules:
+- dish_name must be unique — no duplicates
+- Ingredients must be specific and realistic — actual quantities
+- prep_steps must be clear and actionable — minimum 4 steps
+- Cover a variety of diet types reflecting the region
+- Include both common and lesser-known authentic dishes
+- Do not include fusion or non-regional dishes
+"""
+
+# ── DB helpers ────────────────────────────────────────────────────────────────
+def get_connection():
+    return psycopg2.connect(DATABASE_URL)
+
+def dish_exists(cur, dish_name):
+    cur.execute("SELECT 1 FROM recipe_dna_master WHERE LOWER(dish_name) = LOWER(%s)", (dish_name,))
+    return cur.fetchone() is not None
+
+def insert_recipes(recipes, dry_run=False):
+    if dry_run:
+        print(json.dumps(recipes, indent=2, ensure_ascii=False))
+        print(f"\n✓ Dry run — {len(recipes)} recipes generated, not inserted.")
+        return
+
+    conn = get_connection()
+    cur  = conn.cursor()
+
+    inserted   = 0
+    skipped    = 0
+    errors     = 0
+
+    for r in recipes:
+        try:
+            dish_name = r.get("dish_name", "").strip()
+            if not dish_name:
+                print(f"  ⚠ Skipped — empty dish_name")
+                skipped += 1
+                continue
+
+            if dish_exists(cur, dish_name):
+                print(f"  ⟳ Skipped — already exists: {dish_name}")
+                skipped += 1
+                continue
+
+            recipe_id  = str(uuid.uuid4())
+            diet_type  = r.get("diet_type", "Veg")
+            is_sattvic = r.get("is_sattvic", False)
+            is_vegan   = r.get("is_vegan", False)
+            intensity  = r.get("intensity_level", "Medium")
+            is_scalable = r.get("is_scalable", True)
+
+            # Validate diet_type against DB enum
+            valid_diets = {"Veg", "Non-Veg", "Vegan", "Eggitarian"}
+            if diet_type not in valid_diets:
+                diet_type = "Veg"
+
+            # Validate intensity
+            valid_intensity = {"Light", "Medium", "Heavy"}
+            if intensity not in valid_intensity:
+                intensity = "Medium"
+
+            # Insert into recipe_dna_master
+            cur.execute("""
+                INSERT INTO recipe_dna_master
+                    (recipe_id, dish_name, diet_type, is_sattvic, intensity_level, is_scalable, is_vegan)
+                VALUES
+                    (%s, %s, %s::diet_pref, %s, %s, %s, %s)
+            """, (recipe_id, dish_name, diet_type, is_sattvic, intensity, is_scalable, is_vegan))
+
+            # Build prep_steps string
+            steps = r.get("prep_steps", [])
+            prep_steps_text = "\n".join(steps) if isinstance(steps, list) else str(steps)
+
+            # Build ingredients JSON
+            ingredients = r.get("ingredients", [])
+            ingredients_json = json.dumps(ingredients, ensure_ascii=False)
+
+            # Insert into recipe_content_vault
+            cur.execute("""
+                INSERT INTO recipe_content_vault
+                    (recipe_id, prep_steps, ingredients_json)
+                VALUES
+                    (%s, %s, %s)
+            """, (recipe_id, prep_steps_text, ingredients_json))
+
+            conn.commit()
+            print(f"  ✓ Inserted: {dish_name} ({diet_type}, {intensity})")
+            inserted += 1
+
+        except Exception as e:
+            conn.rollback()
+            print(f"  ✗ Error inserting '{r.get('dish_name', '?')}': {e}")
+            errors += 1
+
+    cur.close()
+    conn.close()
+
+    print(f"\n{'='*50}")
+    print(f"  Inserted : {inserted}")
+    print(f"  Skipped  : {skipped}")
+    print(f"  Errors   : {errors}")
+    print(f"{'='*50}")
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+def main():
+    parser = argparse.ArgumentParser(description="Seed recipes using Gemini AI")
+    parser.add_argument("--meal",    default="breakfast", help="breakfast | lunch | dinner | snack")
+    parser.add_argument("--region",  default="Tamil Nadu", help="Region name e.g. 'Tamil Nadu'")
+    parser.add_argument("--count",   type=int, default=50, help="Number of recipes to generate")
+    parser.add_argument("--dry-run", action="store_true", help="Print JSON only, do not insert")
+    args = parser.parse_args()
+
+    print(f"\n🌿 Momentum Recipe Seeder")
+    print(f"   Meal    : {args.meal}")
+    print(f"   Region  : {args.region}")
+    print(f"   Count   : {args.count}")
+    print(f"   Dry run : {args.dry_run}")
+    print(f"   Model   : {GEMINI_MODEL}\n")
+
+    prompt = PROMPT_TEMPLATE.format(
+        count  = args.count,
+        meal   = args.meal,
+        region = args.region
+    )
+
+    print("⏳ Calling Gemini...")
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature      = 0.7,
+                max_output_tokens= 8192,
+            )
+        )
+        raw = response.text.strip()
+    except Exception as e:
+        print(f"✗ Gemini API error: {e}")
+        sys.exit(1)
+
+    # Strip any markdown fences if Gemini adds them despite instructions
+    if raw.startswith("```"):
+        lines = raw.split("\n")
+        raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+
+    print("✓ Response received — parsing JSON...")
+    try:
+        recipes = json.loads(raw)
+        if not isinstance(recipes, list):
+            raise ValueError("Expected a JSON array at the top level")
+    except json.JSONDecodeError as e:
+        print(f"✗ JSON parse error: {e}")
+        print("Raw response snippet:")
+        print(raw[:500])
+        sys.exit(1)
+
+    print(f"✓ Parsed {len(recipes)} recipes\n")
+    print("💾 Inserting into database...")
+    insert_recipes(recipes, dry_run=args.dry_run)
+
+
+if __name__ == "__main__":
+    main()
