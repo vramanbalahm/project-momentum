@@ -93,6 +93,10 @@ Each recipe must follow this exact structure:
 
 Rules:
 - dish_name must be unique — no duplicates
+- Ingredient name must be the clean base ingredient only — no preparation notes.
+  WRONG: "Onion, finely chopped" / "Banana blossom (Vazhaipoo), cleaned"
+  RIGHT: "Onion" / "Banana blossom"
+  Preparation method belongs in prep_steps, not in ingredient name.
 - Ingredients must be specific and realistic — actual quantities
 - prep_steps must be clear and actionable — minimum 4 steps
 - Cover a variety of diet types reflecting the region
@@ -103,6 +107,27 @@ Rules:
 # ── DB helpers ────────────────────────────────────────────────────────────────
 def get_connection():
     return psycopg2.connect(DATABASE_URL)
+
+def clean_ingredient_name(name):
+    """
+    Strip preparation notes from ingredient names before storing in ingredient_catalog.
+    Examples:
+      "Onion, finely chopped"           → "Onion"
+      "Banana blossom (Vazhaipoo), ..."  → "Banana blossom"
+      "Chana dal (Kadalai Paruppu), ..." → "Chana dal"
+      "Oil for deep frying"             → "Oil"
+      "Mutton or Chicken keema"         → keep as-is (it is a valid combined ingredient)
+    """
+    import re
+    # Remove anything after a comma
+    name = name.split(",")[0].strip()
+    # Remove parenthetical local names — e.g. (Vazhaipoo), (Kadalai Paruppu)
+    name = re.sub(r"\s*\([^)]*\)", "", name).strip()
+    # Remove trailing prep notes after common keywords
+    for keyword in [" for ", " soaked", " roasted", " ground", " grated", " beaten"]:
+        if keyword in name.lower():
+            name = name[:name.lower().index(keyword)].strip()
+    return name
 
 def dish_exists(cur, dish_name):
     """Check exact + fuzzy match — prevents near-duplicate dishes."""
@@ -122,7 +147,7 @@ def get_or_create_ingredient(cur, ingredient):
     Get existing ingredient from catalog by name (fuzzy match),
     or create a new one. Returns ingredient_catalog.id.
     """
-    name_en = ingredient.get("name", "").strip()
+    name_en = clean_ingredient_name(ingredient.get("name", "").strip())
     if not name_en:
         return None
 
