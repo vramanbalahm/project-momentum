@@ -50,18 +50,13 @@ def get_db():
 # --- 1. CORE SUGGESTIONS & PREFERENCES ---
 
 @app.get("/generate-suggestions/{household_id}")
-async def generate_suggestions(
-    household_id: str,
-    meal_slot: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    """
-    Returns recipe suggestions filtered by dietary preference and meal slot.
-    meal_slot: Breakfast | Lunch | Dinner (optional — if omitted returns all slots)
-    """
+async def generate_suggestions(household_id: str, db: Session = Depends(get_db)):
+    # If the frontend sends "HOUSEHOLD_001", we swap it for the real ACTIVE_H_ID
     clean_h_id = ACTIVE_H_ID if household_id == "HOUSEHOLD_001" else household_id
+    """Standardized to use price_logs while keeping yesterday's mapping."""
     pref = get_dietary_pref(db, clean_h_id)
-    return get_suggestions(db, pref, clean_h_id, meal_slot=meal_slot)
+    # Passed h_id to ensure inventory bonus (+50) and price penalty (-80) work
+    return get_suggestions(db, pref, clean_h_id)
 
 # --- 2. AUDIT & INVENTORY ---
 

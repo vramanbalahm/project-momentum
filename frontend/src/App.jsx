@@ -154,7 +154,7 @@ export default function App({ onBack }) {
   const { user, logout } = useAuth();
   const [authScreen, setAuthScreen] = useState('login'); // kept for reference — auth gate moved to main.jsx
   const [blueprint, setBlueprint] = useState({});
-  const [suggestions, setSuggestions] = useState({ Breakfast: [], Lunch: [], Dinner: [] });
+  const [suggestions, setSuggestions] = useState([]);
   const [auditResults, setAuditResults] = useState({});
   const [editing, setEditing] = useState(null);
   const [isAudited, setIsAudited] = useState(false);
@@ -273,20 +273,18 @@ export default function App({ onBack }) {
 
         if (weekOffset === 0) {
           // Current week: fill gaps with suggestions
-          // Track suggestion index per meal slot for variety
-          const suggIdx = { Breakfast: 0, Lunch: 0, Dinner: 0 };
+          let suggestionIdx = 0;
           DAYS.forEach(day => {
             MEAL_TYPES.forEach(type => {
               const key = `${day}-${type}`;
               if (!weekMap[key]) {
-                const pool = suggestions[type] || [];
-                if (pool.length > 0) {
-                  const sugg = pool[suggIdx[type] % pool.length];
-                  suggIdx[type]++;
+                const sugg = suggestions[suggestionIdx % (suggestions.length || 1)];
+                if (sugg) {
                   weekMap[key] = {
                     main: { name: sugg.name, recipe_id: sugg.recipe_id, hero: sugg.hero, thumb: sugg.thumb, is_sattvic: sugg.is_sattvic, diet_type: sugg.diet_type },
                     sides: []
                   };
+                  suggestionIdx++;
                 }
               }
             });
@@ -312,18 +310,12 @@ export default function App({ onBack }) {
   useEffect(() => {
     const init = async () => {
       try {
-        const [bfRes, lnRes, dnRes, sessionRes] = await Promise.all([
-          axios.get(`${API_BASE}/generate-suggestions/${HH_ID}?meal_slot=Breakfast`),
-          axios.get(`${API_BASE}/generate-suggestions/${HH_ID}?meal_slot=Lunch`),
-          axios.get(`${API_BASE}/generate-suggestions/${HH_ID}?meal_slot=Dinner`),
+        const [suggRes, sessionRes] = await Promise.all([
+          axios.get(`${API_BASE}/generate-suggestions/${HH_ID}`),
           axios.get(`${API_BASE}/session-constants/${HH_ID}`)
         ]);
 
-        setSuggestions({
-          Breakfast: bfRes.data || [],
-          Lunch:     lnRes.data || [],
-          Dinner:    dnRes.data || [],
-        });
+        setSuggestions(suggRes.data);
 
         // Cache session constants — used throughout session without re-fetching
         const sc = sessionRes.data;

@@ -78,82 +78,52 @@ def fetch_active_plan(db: Session, h_id: str, week_start: str = None):
     return {"plan": list(slots.values())}
 
 
-# --- 2. SUGGESTIONS & SCORING ---
-def get_suggestions(db: Session, pref: str, h_id: str, meal_slot: str = None):
-    """
-    Returns recipe suggestions filtered by:
-    - dietary_preference (Veg → only Veg/Vegan, Non-Veg/Eggitarian → all)
-    - meal_slot (if provided — matches against meal_slots[] array on recipe)
-    - Scores by intensity: Light=120, Medium=100, Heavy=80 base
-    - Randomises within score band for variety
-    - Returns 30 suggestions so frontend has enough to fill a week
-    """
+# --- 2. SUGGESTIONS & SCORING (Fixed: UUID Capture) ---
+def get_suggestions(db: Session, pref: str, h_id: str):
     current_pref = str(pref).strip() if pref else "Veg"
+    test_uuid = "733b3f63-0fb4-4170-877c-eb2a70f29ccb"
+    clean_h_id = test_uuid if h_id == "HOUSEHOLD_001" else h_id
 
-    # Diet filter — Veg households only see Veg/Vegan
-    if current_pref in ("Veg",):
-        diet_filter = "AND r.diet_type IN ('Veg', 'Vegan')"
-    elif current_pref in ("Vegan",):
-        diet_filter = "AND r.diet_type = 'Vegan'"
-    elif current_pref in ("Eggitarian",):
-        diet_filter = "AND r.diet_type IN ('Veg', 'Vegan', 'Eggitarian')"
-    else:
-        diet_filter = ""  # Non-Veg households see everything
-
-    # Meal slot filter — only if provided
-    slot_filter = ""
-    slot_param = {}
-    if meal_slot and meal_slot in ("Breakfast", "Lunch", "Dinner"):
-        slot_filter = "AND :meal_slot = ANY(r.meal_slots)"
-        slot_param = {"meal_slot": meal_slot}
+    filter_sql = "AND r.diet_type IN ('Veg', 'Vegan')" if current_pref == "Veg" else ""
 
     query = text(f"""
-        SELECT
-            r.recipe_id,
-            r.dish_name,
-            r.diet_type,
-            r.is_sattvic,
-            r.intensity_level,
-            r.sub_region,
-            r.is_regional_specific,
-            r.meal_slots,
-            v.hero_image_url,
+        SELECT 
+            r.dish_name, 
+            r.recipe_code, 
+            v.hero_image_url, 
             v.carousel_thumb_url,
-            v.prep_steps,
-            -- Score: base by intensity + small random for variety
-            (CASE r.intensity_level
-                WHEN 'Light'  THEN 120
-                WHEN 'Medium' THEN 100
-                WHEN 'Heavy'  THEN 80
-                ELSE 100
-             END + FLOOR(RANDOM() * 20)) AS match_score
+            (100 + 
+                CASE WHEN inv.stock_status = 'In-Stock' THEN 50 ELSE 0 END - 
+                CASE WHEN lp.recorded_price >= s.peak_threshold AND s.peak_threshold > 0 THEN 80 ELSE 0 END
+            ) as match_score,
+            r.recipe_id,
+            r.is_sattvic,
+            r.diet_type
         FROM recipe_dna_master r
         LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
-        WHERE r.dish_name IS NOT NULL
-          {diet_filter}
-          {slot_filter}
+        LEFT JOIN staple_master_registry s ON r.primary_staple_id = s.staple_id
+        LEFT JOIN household_inventory inv ON s.staple_id = inv.staple_id 
+            AND inv.house_id = CAST(:h_id AS uuid)
+        LEFT JOIN LATERAL (
+            SELECT recorded_price FROM price_logs 
+            WHERE staple_id = s.staple_id 
+            ORDER BY recorded_at DESC LIMIT 1
+        ) lp ON TRUE
+        WHERE 1=1 {filter_sql}
         ORDER BY match_score DESC
-        LIMIT 30
+        LIMIT 20
     """)
 
-    params = slot_param
-    rows = db.execute(query, params).fetchall()
-
+    rows = db.execute(query, {"h_id": clean_h_id}).fetchall()
     return [{
-        "recipe_id":          str(r.recipe_id),
-        "name":               r.dish_name,
-        "diet_type":          str(r.diet_type) if r.diet_type else "Veg",
-        "is_sattvic":         r.is_sattvic,
-        "intensity_level":    r.intensity_level,
-        "sub_region":         r.sub_region,
-        "is_regional_specific": r.is_regional_specific,
-        "meal_slots":         r.meal_slots,
-        "hero":               r.hero_image_url,
-        "thumb":              r.carousel_thumb_url,
-        "steps":              r.prep_steps,
-        "score":              int(r.match_score),
-        # Keep legacy fields for backward compat with existing frontend
-        "code":               None,
+        "name": r[0],
+        "code": r[1],
+        "hero": r[2],
+        "thumb": r[3],
+        "score": r[4],
+        "recipe_id": str(r[5]),
+        "is_sattvic": r[6],
+        "diet_type": str(r[7]) if r[7] else "Veg"
     } for r in rows]
 
 
