@@ -329,45 +329,57 @@ def main():
     print(f"   Dry run : {args.dry_run}")
     print(f"   Model   : {GEMINI_MODEL}\n")
 
-    prompt = PROMPT_TEMPLATE.format(
-        count  = args.count,
-        meal   = args.meal,
-        region = args.region
-    )
+    # Split into batches of 20 to avoid token limit truncation
+    # Each recipe with full ingredients is ~500 tokens — 20 recipes ≈ 10k tokens safely
+    BATCH_SIZE  = 20
+    total       = args.count
+    all_recipes = []
 
-    print("⏳ Calling Gemini...")
-    try:
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature      = 0.7,
-                max_output_tokens= 8192,
-            )
+    batches = [BATCH_SIZE] * (total // BATCH_SIZE)
+    if total % BATCH_SIZE:
+        batches.append(total % BATCH_SIZE)
+
+    for batch_num, count in enumerate(batches, 1):
+        print(f"⏳ Calling Gemini — batch {batch_num}/{len(batches)} ({count} recipes)...")
+        batch_prompt = PROMPT_TEMPLATE.format(
+            count=count, meal=args.meal, region=args.region
         )
-        raw = response.text.strip()
-    except Exception as e:
-        print(f"✗ Gemini API error: {e}")
+        try:
+            response = model.generate_content(
+                batch_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature       = 0.7,
+                    max_output_tokens = 16000,
+                )
+            )
+            raw = response.text.strip()
+        except Exception as e:
+            print(f"✗ Gemini API error on batch {batch_num}: {e}")
+            continue
+
+        # Strip markdown fences if Gemini adds them despite instructions
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+
+        try:
+            recipes = json.loads(raw)
+            if not isinstance(recipes, list):
+                raise ValueError("Expected a JSON array")
+            print(f"  ✓ Parsed {len(recipes)} recipes in batch {batch_num}")
+            all_recipes.extend(recipes)
+        except json.JSONDecodeError as e:
+            print(f"  ✗ JSON parse error on batch {batch_num}: {e}")
+            print("  Raw snippet:", raw[:300])
+            continue
+
+    if not all_recipes:
+        print("✗ No recipes parsed — exiting.")
         sys.exit(1)
 
-    # Strip any markdown fences if Gemini adds them despite instructions
-    if raw.startswith("```"):
-        lines = raw.split("\n")
-        raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-
-    print("✓ Response received — parsing JSON...")
-    try:
-        recipes = json.loads(raw)
-        if not isinstance(recipes, list):
-            raise ValueError("Expected a JSON array at the top level")
-    except json.JSONDecodeError as e:
-        print(f"✗ JSON parse error: {e}")
-        print("Raw response snippet:")
-        print(raw[:500])
-        sys.exit(1)
-
-    print(f"✓ Parsed {len(recipes)} recipes\n")
-    print("💾 Inserting into database...")
-    insert_recipes(recipes, args, dry_run=args.dry_run)
+    print(f"\n✓ Total parsed: {len(all_recipes)} recipes")
+    print("\n💾 Inserting into database...")
+    insert_recipes(all_recipes, args, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
