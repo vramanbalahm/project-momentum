@@ -30,7 +30,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import psycopg2
 from psycopg2.extras import execute_batch
 
@@ -43,8 +44,7 @@ if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # ── Gemini setup ──────────────────────────────────────────────────────────────
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel(GEMINI_MODEL)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
 PROMPT_TEMPLATE = """
@@ -337,7 +337,7 @@ def main():
 
     # Split into batches of 20 to avoid token limit truncation
     # Each recipe with full ingredients is ~500 tokens — 20 recipes ≈ 10k tokens safely
-    BATCH_SIZE  = 10
+    BATCH_SIZE  = 8
     total       = args.count
     all_recipes = []
 
@@ -351,9 +351,10 @@ def main():
             count=count, meal=args.meal, region=args.region
         )
         try:
-            response = model.generate_content(
-                batch_prompt,
-                generation_config=genai.types.GenerationConfig(
+            response = client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=batch_prompt,
+                config=types.GenerateContentConfig(
                     temperature       = 0.7,
                     max_output_tokens = 16000,
                 )
