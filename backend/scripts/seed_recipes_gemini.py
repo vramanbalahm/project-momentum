@@ -135,12 +135,18 @@ def dish_exists(cur, dish_name):
     cur.execute("SELECT 1 FROM recipe_dna_master WHERE LOWER(dish_name) = LOWER(%s)", (dish_name,))
     if cur.fetchone():
         return True
-    # Fuzzy match — similarity > 0.7
+    # Fuzzy match — similarity > 0.6 catches spelling variations like
+    # Tirunelveli vs Thirunelveli, Seepu Seedai vs Thirunelveli Seepu Seedai
     cur.execute("""
-        SELECT 1 FROM recipe_dna_master
-        WHERE similarity(LOWER(dish_name), LOWER(%s)) > 0.7
+        SELECT dish_name FROM recipe_dna_master
+        WHERE similarity(LOWER(dish_name), LOWER(%s)) > 0.6
+        LIMIT 1
     """, (dish_name,))
-    return cur.fetchone() is not None
+    row = cur.fetchone()
+    if row:
+        print(f"    (fuzzy match: '{dish_name}' ~ '{row[0]}')")
+        return True
+    return False
 
 def get_or_create_ingredient(cur, ingredient):
     """
