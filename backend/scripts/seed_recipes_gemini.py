@@ -331,7 +331,7 @@ def main():
 
     # Split into batches of 20 to avoid token limit truncation
     # Each recipe with full ingredients is ~500 tokens — 20 recipes ≈ 10k tokens safely
-    BATCH_SIZE  = 20
+    BATCH_SIZE  = 10
     total       = args.count
     all_recipes = []
 
