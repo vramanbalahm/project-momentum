@@ -72,7 +72,16 @@ Each recipe must follow this exact structure:
   "cook_time_mins": integer,
   "serves": integer,
   "ingredients": [
-    {{"name": "string", "quantity": "string", "unit": "string"}}
+    {{
+      "name": "string — ingredient name in English",
+      "name_ta": "string — ingredient name in Tamil if known, else empty string",
+      "quantity": "string — e.g. 2, 1/2, a pinch, to taste",
+      "unit": "string — e.g. cups, tbsp, grams, teaspoon, or empty for countable items",
+      "category": "Vegetable | Lentil | Spice | Oil | Dairy | Grain | Meat | Seafood | Fruit | Nut | Other",
+      "is_optional": true | false,
+      "is_sattvic": true | false,
+      "is_vegan": true | false
+    }}
   ],
   "prep_steps": [
     "Step 1: ...",
@@ -96,8 +105,65 @@ def get_connection():
     return psycopg2.connect(DATABASE_URL)
 
 def dish_exists(cur, dish_name):
+    """Check exact + fuzzy match — prevents near-duplicate dishes."""
+    # Exact match
     cur.execute("SELECT 1 FROM recipe_dna_master WHERE LOWER(dish_name) = LOWER(%s)", (dish_name,))
+    if cur.fetchone():
+        return True
+    # Fuzzy match — similarity > 0.7
+    cur.execute("""
+        SELECT 1 FROM recipe_dna_master
+        WHERE similarity(LOWER(dish_name), LOWER(%s)) > 0.7
+    """, (dish_name,))
     return cur.fetchone() is not None
+
+def get_or_create_ingredient(cur, ingredient):
+    """
+    Get existing ingredient from catalog by name (fuzzy match),
+    or create a new one. Returns ingredient_catalog.id.
+    """
+    name_en = ingredient.get("name", "").strip()
+    if not name_en:
+        return None
+
+    # Try exact match first
+    cur.execute("""
+        SELECT id FROM ingredient_catalog WHERE LOWER(name_en) = LOWER(%s)
+    """, (name_en,))
+    row = cur.fetchone()
+    if row:
+        return row[0]
+
+    # Try fuzzy match — similarity > 0.8 to avoid false positives
+    cur.execute("""
+        SELECT id, name_en FROM ingredient_catalog
+        WHERE similarity(LOWER(name_en), LOWER(%s)) > 0.8
+        ORDER BY similarity(LOWER(name_en), LOWER(%s)) DESC
+        LIMIT 1
+    """, (name_en, name_en))
+    row = cur.fetchone()
+    if row:
+        return row[0]
+
+    # Not found — create new
+    name_ta  = ingredient.get("name_ta", "") or None
+    category = ingredient.get("category", "Other")
+    is_sattvic = ingredient.get("is_sattvic", True)
+    is_vegan   = ingredient.get("is_vegan", True)
+
+    valid_categories = {
+        "Vegetable", "Lentil", "Spice", "Oil", "Dairy",
+        "Grain", "Meat", "Seafood", "Fruit", "Nut", "Other"
+    }
+    if category not in valid_categories:
+        category = "Other"
+
+    cur.execute("""
+        INSERT INTO ingredient_catalog (name_en, name_ta, category, is_sattvic, is_vegan, created_by_ai)
+        VALUES (%s, %s, %s, %s, %s, true)
+        RETURNING id
+    """, (name_en, name_ta, category, is_sattvic, is_vegan))
+    return cur.fetchone()[0]
 
 def insert_recipes(recipes, args, dry_run=False):
     if dry_run:
@@ -178,7 +244,7 @@ def insert_recipes(recipes, args, dry_run=False):
             ingredients = r.get("ingredients", [])
             ingredients_json = json.dumps(ingredients, ensure_ascii=False)
 
-            # Insert into recipe_content_vault
+            # Insert into recipe_content_vault — keep JSON blob for display
             cur.execute("""
                 INSERT INTO recipe_content_vault
                     (recipe_id, prep_steps, ingredients_json)
@@ -186,8 +252,25 @@ def insert_recipes(recipes, args, dry_run=False):
                     (%s, %s, %s)
             """, (recipe_id, prep_steps_text, ingredients_json))
 
+            # Insert into ingredient_catalog + recipe_ingredients
+            ing_inserted = 0
+            for idx, ing in enumerate(ingredients):
+                ing_id = get_or_create_ingredient(cur, ing)
+                if ing_id is None:
+                    continue
+                quantity   = ing.get("quantity", "")
+                unit       = ing.get("unit", "")
+                is_optional = ing.get("is_optional", False)
+                cur.execute("""
+                    INSERT INTO recipe_ingredients
+                        (recipe_id, ingredient_id, quantity, unit, is_optional, sort_order)
+                    VALUES
+                        (%s, %s, %s, %s, %s, %s)
+                """, (recipe_id, ing_id, quantity, unit, is_optional, idx + 1))
+                ing_inserted += 1
+
             conn.commit()
-            print(f"  ✓ Inserted: {dish_name} ({diet_type}, {intensity})")
+            print(f"  ✓ Inserted: {dish_name} ({diet_type}, {intensity}) — {ing_inserted} ingredients")
             inserted += 1
 
         except Exception as e:
