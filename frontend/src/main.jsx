@@ -9,6 +9,7 @@ import Register from './pages/Register.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import FamilyProfile from './pages/FamilyProfile.jsx'
 import ManageMembers from './pages/ManageMembers.jsx'
+import OnboardingWizard from './pages/OnboardingWizard.jsx'
 
 // AuthGate — isolated from App's state so Login/Register inputs never lose focus
 function AuthGate() {
@@ -33,6 +34,9 @@ function AuthGate() {
 
   // Authenticated — always reset authScreen to login so logout never lands on register
   if (authScreen !== 'login') setAuthScreen('login');
+
+  // Authenticated — show onboarding wizard if not yet completed
+  if (!user?.onboarding_done) return <OnboardingWizard onComplete={() => window.location.reload()} />;
 
   // Authenticated — route to correct screen
   if (screen === 'weekly_plan') return <App onBack={() => setScreen('dashboard')} />;
