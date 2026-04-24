@@ -13,7 +13,7 @@ import OnboardingWizard from './pages/OnboardingWizard.jsx'
 
 // AuthGate — isolated from App's state so Login/Register inputs never lose focus
 function AuthGate() {
-  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { isAuthenticated, loading: authLoading, user } = useAuth();
   const [authScreen, setAuthScreen] = useState('login');
   const [screen, setScreen] = useState('dashboard'); // dashboard | weekly_plan | family_profile | manage_members
 
