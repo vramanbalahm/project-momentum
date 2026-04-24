@@ -21,6 +21,11 @@ const C = {
 };
 
 const DIET_PREFS = ["Veg", "Non-Veg", "Vegan", "Eggitarian"];
+const EVENT_ICONS = [
+  "🎂", "🎉", "🎊", "💍", "🙏", "⭐", "🌸", "🕉️",
+  "👶", "🎓", "🏠", "❤️", "🌙", "🔔", "🪔", "🌺"
+];
+
 const STEP_LABELS = ["Welcome", "Members", "Satvik", "Calendar", "Events", "Done"];
 
 // ── Small reusable components ─────────────────────────────────────────────────
@@ -80,6 +85,7 @@ export default function OnboardingWizard({ onComplete }) {
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState(null);
   const [help, setHelp]         = useState({});
+  const [completedSteps, setCompletedSteps] = useState([]);
 
   // Step 2 — Members state
   const [members, setMembers]   = useState([]);
@@ -97,8 +103,10 @@ export default function OnboardingWizard({ onComplete }) {
 
   // Step 5 — Events state
   const [events, setEvents]     = useState([]);
-  const [newEvent, setNewEvent] = useState({ event_name: "", event_date: "", event_type: "Personal", is_sattvic_required: false, recurring_annual: true });
+  const [newEvent, setNewEvent] = useState({ event_name: "", event_date: "", event_type: "Personal", is_sattvic_required: false, recurring_annual: true, icon: "🎂" });
   const [addingEvent, setAddingEvent] = useState(false);
+  const [ingSearch, setIngSearch] = useState("");
+  const [ingResults, setIngResults] = useState([]);
 
   const toggleHelp = (key) => setHelp(h => ({ ...h, [key]: !h[key] }));
 
@@ -134,6 +142,19 @@ export default function OnboardingWizard({ onComplete }) {
   }, []);
 
   // ── Save handlers ──────────────────────────────────────────────────────────
+  const searchIngredients = async (q) => {
+    setIngSearch(q);
+    if (q.length < 2) { setIngResults([]); return; }
+    try {
+      const res = await apiFetch(`/lookup/ingredients/search?q=${encodeURIComponent(q)}&limit=8`);
+      setIngResults(res.results || res || []);
+    } catch {
+      // fallback — search locally from satvikIngredients
+      const all = Object.values(satvikIngredients).flat();
+      setIngResults(all.filter(i => i.name_en.toLowerCase().includes(q.toLowerCase())).slice(0, 8));
+    }
+  };
+
   const saveMembers = async () => {
     setSaving(true);
     try {
@@ -148,6 +169,7 @@ export default function OnboardingWizard({ onComplete }) {
           }))
         }))}),
       });
+      setCompletedSteps(s => [...new Set([...s, 1])]);
       setStep(2);
     } catch (e) { setError(e.message); }
     finally { setSaving(false); }
@@ -163,6 +185,7 @@ export default function OnboardingWizard({ onComplete }) {
         method: "POST",
         body: JSON.stringify({ restrictions }),
       });
+      setCompletedSteps(s => [...new Set([...s, 2])]);
       setStep(3);
     } catch (e) { setError(e.message); }
     finally { setSaving(false); }
@@ -195,6 +218,7 @@ export default function OnboardingWizard({ onComplete }) {
           }))})
         });
       }
+      setCompletedSteps(s => [...new Set([...s, 4])]);
       setStep(5);
     } catch (e) { setError(e.message); }
     finally { setSaving(false); }
@@ -414,6 +438,27 @@ export default function OnboardingWizard({ onComplete }) {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                       <div style={{ fontSize: 12, color: C.muted }}>Allergies & dislikes <HelpTip text="Allergy = medical — ingredient must never appear. Dislike = preference — avoided where possible. Both can coexist." visible={help.restrictions} onToggle={() => toggleHelp("restrictions")} /></div>
                     </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#F7F4EE", border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "7px 10px", marginBottom: 6 }}>
+                      <span style={{ fontSize: 13, color: C.muted }}>⌕</span>
+                      <input value={ingSearch} onChange={e => searchIngredients(e.target.value)} placeholder="Search ingredient to add..." style={{ border: "none", background: "transparent", fontSize: 13, color: C.text, outline: "none", flex: 1, width: "100%" }} />
+                    </div>
+                    {ingResults.length > 0 && (
+                      <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 8, marginBottom: 8, maxHeight: 140, overflowY: "auto" }}>
+                        {ingResults.map(ing => (
+                          <div key={ing.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 10px", borderBottom: `0.5px solid ${C.border}`, cursor: "pointer" }}
+                            onClick={() => {
+                              const exists = (editMember.restrictions || []).find(r => r.ingredient_id === ing.id && r.restriction_type === "Allergy");
+                              if (!exists) {
+                                setEditMember(em => ({ ...em, restrictions: [...(em.restrictions || []), { ingredient_id: ing.id, name_en: ing.name_en, name_ta: ing.name_ta, restriction_type: "Allergy" }] }));
+                              }
+                              setIngSearch(""); setIngResults([]);
+                            }}>
+                            <span style={{ fontSize: 13, color: C.text }}>{ing.name_en}</span>
+                            <span style={{ fontSize: 11, color: C.deepTeal }}>+ Add</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <div style={{ background: "#F7F4EE", border: `0.5px solid ${C.border}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12 }}>
                       {(editMember.restrictions || []).length === 0 && (
                         <div style={{ fontSize: 12, color: C.muted, textAlign: "center", padding: "8px 0" }}>No restrictions added yet</div>
@@ -450,7 +495,7 @@ export default function OnboardingWizard({ onComplete }) {
                 <div style={{ fontSize: 17, fontWeight: 500, color: C.text }}>Satvik definition</div>
                 <HelpTip text="Select ingredients your household avoids on Satvik days. e.g. most Tamil Brahmin households avoid onion and garlic. These rules apply on all Satvik-tagged days." visible={help.satvik} onToggle={() => toggleHelp("satvik")} />
               </div>
-              <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Select what to avoid. Search across all categories.</div>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Select what your household <strong>AVOIDS</strong> on Satvik days. Search across all categories.</div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#F7F4EE", border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "8px 10px", marginBottom: 10 }}>
                 <span style={{ fontSize: 14, color: C.muted }}>⌕</span>
                 <input value={satvikSearch} onChange={e => setSatvikSearch(e.target.value)} placeholder="Search — e.g. onion, meat, wheat..." style={{ border: "none", background: "transparent", fontSize: 13, color: C.text, outline: "none", flex: 1, width: "100%" }} />
@@ -536,7 +581,7 @@ export default function OnboardingWizard({ onComplete }) {
                 )}
                 {events.map((e, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 0", borderBottom: `0.5px solid ${C.border}` }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: e.is_sattvic_required ? C.teal : C.mint, flexShrink: 0 }} />
+                    <div style={{ fontSize: 18, width: 24, textAlign: "center", flexShrink: 0 }}>{e.icon || (e.is_sattvic_required ? "🙏" : "🎉")}</div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, color: C.text }}>{e.event_name}</div>
                       <div style={{ fontSize: 11, color: C.muted }}>{e.event_date}{e.recurring_annual ? " — every year" : ""}</div>
@@ -554,13 +599,23 @@ export default function OnboardingWizard({ onComplete }) {
                     <Field label="Event name">
                       <input value={newEvent.event_name} onChange={e => setNewEvent(n => ({ ...n, event_name: e.target.value }))} placeholder="e.g. Bala's Birthday" style={inputStyle} />
                     </Field>
-                    <Field label="Date (DD-MM or YYYY-MM-DD)">
-                      <input value={newEvent.event_date} onChange={e => setNewEvent(n => ({ ...n, event_date: e.target.value }))} placeholder="e.g. 15-03 or 2026-03-15" style={inputStyle} />
+                    <Field label="Date (DD-MM)" hint="Day and month only — e.g. 15-03 for 15th March">
+                      <input value={newEvent.event_date} onChange={e => setNewEvent(n => ({ ...n, event_date: e.target.value }))} placeholder="e.g. 15-03" style={inputStyle} />
                     </Field>
                     <Field label="Type">
                       <div style={{ display: "flex", gap: 6 }}>
                         {["Personal", "Social", "Ritual"].map(t => (
                           <Chip key={t} label={t} active={newEvent.event_type === t} onClick={() => setNewEvent(n => ({ ...n, event_type: t }))} />
+                        ))}
+                      </div>
+                    </Field>
+                    <Field label="Icon">
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {EVENT_ICONS.map(icon => (
+                          <button key={icon} onClick={() => setNewEvent(n => ({ ...n, icon }))}
+                            style={{ width: 34, height: 34, borderRadius: 8, fontSize: 18, border: `0.5px solid ${newEvent.icon === icon ? C.teal : C.border}`, background: newEvent.icon === icon ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
+                            {icon}
+                          </button>
                         ))}
                       </div>
                     </Field>
@@ -577,7 +632,7 @@ export default function OnboardingWizard({ onComplete }) {
                       <button onClick={() => {
                         if (!newEvent.event_name || !newEvent.event_date) return;
                         setEvents(ev => [...ev, { ...newEvent }]);
-                        setNewEvent({ event_name: "", event_date: "", event_type: "Personal", is_sattvic_required: false, recurring_annual: true });
+                        setNewEvent({ event_name: "", event_date: "", event_type: "Personal", is_sattvic_required: false, recurring_annual: true, icon: "🎂" });
                         setAddingEvent(false);
                       }} style={{ flex: 2, padding: 9, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, color: C.green, background: C.mint, cursor: "pointer" }}>Add event</button>
                     </div>
@@ -603,10 +658,10 @@ export default function OnboardingWizard({ onComplete }) {
               </div>
               <div style={cardStyle}>
                 {[
-                  ["Member profiles", data?.wizard_status?.members_done],
-                  ["Satvik definition", data?.wizard_status?.satvik_done],
+                  ["Member profiles", completedSteps.includes(1) || data?.wizard_status?.members_done],
+                  ["Satvik definition", completedSteps.includes(2) || data?.wizard_status?.satvik_done],
                   ["Lunar calendar", !!panchangamId],
-                  ["Events & special days", data?.wizard_status?.events_done],
+                  ["Events & special days", completedSteps.includes(4) || data?.wizard_status?.events_done],
                 ].map(([label, done]) => (
                   <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `0.5px solid ${C.border}` }}>
                     <div style={{ width: 20, height: 20, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, flexShrink: 0, background: done ? "#1D9E75" : "#F7F4EE", color: done ? "white" : C.muted, border: done ? "none" : `0.5px solid ${C.border}` }}>
