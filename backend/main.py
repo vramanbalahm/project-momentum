@@ -142,6 +142,10 @@ app.include_router(auth_router)
 from routers.lookup import router as lookup_router
 app.include_router(lookup_router)
 
+# --- 5d. ONBOARDING ROUTER (schema v12) ---
+from routers.onboarding import router as onboarding_router
+app.include_router(onboarding_router)
+
 # --- 6. WEEKLY PLAN ROUTER (FT-030) ---
 from routers.weekly_plan import router as weekly_plan_router
 app.include_router(weekly_plan_router)
