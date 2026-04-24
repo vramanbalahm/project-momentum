@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import IngredientSelector, { restrictionsToValue, valueToRestrictions } from "../components/IngredientSelector";
 
 const C = {
   green: "#1A3A2E", mint: "#9FE1CB", teal: "#5DCAA5", deepTeal: "#0F6E56",
@@ -36,15 +37,13 @@ export default function MyProfile({ onBack }) {
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState(null);
   const [success, setSuccess]   = useState(false);
-  const [ingSearch, setIngSearch] = useState("");
-  const [ingResults, setIngResults] = useState([]);
   const [form, setForm]         = useState({
     dietary_preference: null,
     age_group:          null,
     gender:             null,
     phone_number:       "",
   });
-  const [restrictions, setRestrictions] = useState([]);
+  const [restrictionValue, setRestrictionValue] = useState({});
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -59,35 +58,11 @@ export default function MyProfile({ onBack }) {
           gender:             p.gender,
           phone_number:       p.phone_number || "",
         });
-        setRestrictions(p.restrictions || []);
+        setRestrictionValue(restrictionsToValue(p.restrictions || []));
       } catch (e) { setError("Failed to load profile."); }
       finally { setLoading(false); }
     })();
   }, []);
-
-  const searchIngredients = async (q) => {
-    setIngSearch(q);
-    if (q.length < 2) { setIngResults([]); return; }
-    try {
-      const res = await apiFetch(`/lookup/ingredients/search?q=${encodeURIComponent(q)}&limit=8`);
-      setIngResults(res || []);
-    } catch { setIngResults([]); }
-  };
-
-  const addRestriction = (ing, type = "Allergy") => {
-    if (restrictions.find(r => r.ingredient_id === ing.id && r.restriction_type === type)) return;
-    setRestrictions(r => [...r, { ingredient_id: ing.id, name_en: ing.name_en, name_ta: ing.name_ta, restriction_type: type }]);
-    setIngSearch(""); setIngResults([]);
-  };
-
-  const removeRestriction = (idx) => setRestrictions(r => r.filter((_, i) => i !== idx));
-
-  const toggleRestrictionType = (idx) => {
-    setRestrictions(r => r.map((item, i) => i === idx
-      ? { ...item, restriction_type: item.restriction_type === "Allergy" ? "Dislike" : "Allergy" }
-      : item
-    ));
-  };
 
   const handleSave = async () => {
     setSaving(true); setError(null); setSuccess(false);
@@ -107,10 +82,7 @@ export default function MyProfile({ onBack }) {
             age_group:          form.age_group,
             gender:             form.gender,
             phone_number:       form.phone_number,
-            restrictions:       restrictions.map(r => ({
-              ingredient_id:    r.ingredient_id,
-              restriction_type: r.restriction_type,
-            }))
+            restrictions:       valueToRestrictions(restrictionValue)
           }]
         }),
       });
@@ -230,47 +202,16 @@ export default function MyProfile({ onBack }) {
         {/* ── Allergies & dislikes ── */}
         <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Allergies & dislikes</div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
-          {/* Search */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#F7F4EE", border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "8px 10px", marginBottom: 8 }}>
-            <span style={{ fontSize: 14, color: C.muted }}>⌕</span>
-            <input value={ingSearch} onChange={e => searchIngredients(e.target.value)} placeholder="Search ingredient — e.g. peanuts, shellfish..." style={{ border: "none", background: "transparent", fontSize: 13, color: C.text, outline: "none", flex: 1 }} />
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
+            Tap <strong style={{color:"#E24B4A"}}>🚫 Allergy</strong> for medical restrictions · <strong style={{color:"#BA7517"}}>😕 Dislike</strong> for preferences
           </div>
-          {ingResults.length > 0 && (
-            <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 8, marginBottom: 8, maxHeight: 160, overflowY: "auto" }}>
-              {ingResults.map(ing => (
-                <div key={ing.id} style={{ borderBottom: `0.5px solid ${C.border}` }}>
-                  <div style={{ padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div>
-                      <div style={{ fontSize: 13, color: C.text }}>{ing.name_en}</div>
-                      {ing.name_ta && <div style={{ fontSize: 10, color: C.muted }}>{ing.name_ta}</div>}
-                    </div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button onClick={() => addRestriction(ing, "Allergy")} style={{ padding: "3px 8px", fontSize: 11, borderRadius: 6, border: "none", background: "#FAECE7", color: "#712B13", cursor: "pointer" }}>Allergy</button>
-                      <button onClick={() => addRestriction(ing, "Dislike")} style={{ padding: "3px 8px", fontSize: 11, borderRadius: 6, border: "none", background: "#FAEEDA", color: "#633806", cursor: "pointer" }}>Dislike</button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {/* Restriction list */}
-          {restrictions.length === 0 && ingSearch.length < 2 && (
-            <div style={{ fontSize: 12, color: C.muted, textAlign: "center", padding: "10px 0" }}>No restrictions added — search above to add</div>
-          )}
-          {restrictions.map((r, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: i < restrictions.length - 1 ? `0.5px solid ${C.border}` : "none" }}>
-              {r.thumb_url && <img src={r.thumb_url} alt={r.name_en} style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />}
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, color: C.text }}>{r.name_en}</div>
-                {r.name_ta && <div style={{ fontSize: 10, color: C.muted }}>{r.name_ta}</div>}
-              </div>
-              <div onClick={() => toggleRestrictionType(i)} style={{ display: "flex", border: `0.5px solid ${C.border}`, borderRadius: 6, overflow: "hidden", cursor: "pointer", flexShrink: 0 }}>
-                <div style={{ padding: "3px 7px", fontSize: 10, background: r.restriction_type === "Allergy" ? "#FAECE7" : "transparent", color: r.restriction_type === "Allergy" ? "#712B13" : C.muted }}>Allergy</div>
-                <div style={{ padding: "3px 7px", fontSize: 10, background: r.restriction_type === "Dislike" ? "#FAEEDA" : "transparent", color: r.restriction_type === "Dislike" ? "#633806" : C.muted }}>Dislike</div>
-              </div>
-              <span onClick={() => removeRestriction(i)} style={{ fontSize: 14, color: "#E24B4A", cursor: "pointer", marginLeft: 4 }}>✕</span>
-            </div>
-          ))}
+          <IngredientSelector
+            mode="restriction"
+            value={restrictionValue}
+            onChange={setRestrictionValue}
+            showImages={true}
+            maxHeight="320px"
+          />
         </div>
       </div>
 

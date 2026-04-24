@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import IngredientSelector, { satvikToValue, valueToSatvik, restrictionsToValue, valueToRestrictions } from "../components/IngredientSelector";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
@@ -115,9 +116,7 @@ export default function OnboardingWizard({ onComplete }) {
   const [copyTo, setCopyTo]     = useState({});
 
   // Step 3 — Satvik state
-  const [satvikIngredients, setSatvikIngredients] = useState({});
-  const [satvikSearch, setSatvikSearch] = useState("");
-  const [satvikSelected, setSatvikSelected] = useState({});
+  const [satvikValue, setSatvikValue] = useState({});
 
   // Step 4 — Panchangam state
   const [panchangamId, setPanchangamId] = useState(null);
@@ -147,16 +146,12 @@ export default function OnboardingWizard({ onComplete }) {
           restrictions: m.restrictions || [],
         })));
         // Pre-fill Satvik
-        const sel = {};
-        d.satvik.forEach(s => { sel[s.ingredient_id] = s.is_avoided; });
-        setSatvikSelected(sel);
+        setSatvikValue(satvikToValue(d.satvik));
         // Pre-fill Panchangam
         if (d.panchangam_selected) setPanchangamId(d.panchangam_selected.id);
         // Pre-fill events
         setEvents(d.events.filter(e => e.source === "USER"));
-        // Load satvik ingredients
-        const ing = await apiFetch("/onboarding/satvik-ingredients");
-        setSatvikIngredients(ing);
+
       } catch (e) {
         setError("Failed to load setup data. Please restart.");
       } finally {
@@ -205,12 +200,9 @@ export default function OnboardingWizard({ onComplete }) {
   const saveSatvik = async () => {
     setSaving(true);
     try {
-      const restrictions = Object.entries(satvikSelected)
-        .filter(([, v]) => v)
-        .map(([id]) => ({ ingredient_id: parseInt(id), is_avoided: true }));
       await apiFetch("/onboarding/satvik", {
         method: "POST",
-        body: JSON.stringify({ restrictions }),
+        body: JSON.stringify({ restrictions: valueToSatvik(satvikValue) }),
       });
       setCompletedSteps(s => [...new Set([...s, 2])]);
       setStep(3);
@@ -273,27 +265,6 @@ export default function OnboardingWizard({ onComplete }) {
     ));
     setCopyTo({});
     setCopyFrom(null);
-  };
-
-  // ── Satvik search filter ───────────────────────────────────────────────────
-  const filteredSatvik = () => {
-    if (!satvikSearch.trim()) return satvikIngredients;
-    const q = satvikSearch.toLowerCase();
-    const result = {};
-    Object.entries(satvikIngredients).forEach(([cat, items]) => {
-      const filtered = items.filter(i =>
-        i.name_en.toLowerCase().includes(q) || (i.name_ta || "").includes(q)
-      );
-      if (filtered.length) result[cat] = filtered;
-    });
-    return result;
-  };
-
-  const toggleCategoryAll = (cat, value) => {
-    const items = satvikIngredients[cat] || [];
-    const updates = {};
-    items.forEach(i => { updates[i.id] = value; });
-    setSatvikSelected(s => ({ ...s, ...updates }));
   };
 
   // ── Loading / error states ─────────────────────────────────────────────────
@@ -551,40 +522,16 @@ export default function OnboardingWizard({ onComplete }) {
             <div style={{ display: "flex", flexDirection: "column", minHeight: 480 }}>
               <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
                 <div style={{ fontSize: 17, fontWeight: 500, color: C.text }}>Satvik definition</div>
-                <HelpTip text="Select ingredients your household avoids on Satvik days. e.g. most Tamil Brahmin households avoid onion and garlic. These rules apply on all Satvik-tagged days." visible={help.satvik} onToggle={() => toggleHelp("satvik")} />
+                <HelpTip text="Select ingredients your household AVOIDS on Satvik days. e.g. most Tamil Brahmin households avoid onion and garlic. These rules apply on all Satvik-tagged days." visible={help.satvik} onToggle={() => toggleHelp("satvik")} />
               </div>
-              <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Select what your household <strong>AVOIDS</strong> on Satvik days. Search across all categories.</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#F7F4EE", border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "8px 10px", marginBottom: 10 }}>
-                <span style={{ fontSize: 14, color: C.muted }}>⌕</span>
-                <input value={satvikSearch} onChange={e => setSatvikSearch(e.target.value)} placeholder="Search — e.g. onion, meat, wheat..." style={{ border: "none", background: "transparent", fontSize: 13, color: C.text, outline: "none", flex: 1, width: "100%" }} />
-              </div>
-              <div style={{ flex: 1, overflowY: "auto", maxHeight: 320 }}>
-                {Object.entries(filteredSatvik()).map(([cat, items]) => (
-                  <div key={cat}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0 4px" }}>
-                      <span style={{ fontSize: 11, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{cat}</span>
-                      <div style={{ display: "flex", gap: 10 }}>
-                        <span onClick={() => toggleCategoryAll(cat, true)} style={{ fontSize: 11, color: C.deepTeal, cursor: "pointer" }}>Enable all</span>
-                        <span onClick={() => toggleCategoryAll(cat, false)} style={{ fontSize: 11, color: "#E24B4A", cursor: "pointer" }}>Disable all</span>
-                      </div>
-                    </div>
-                    <div style={{ ...cardStyle, padding: "8px 12px", marginBottom: 6 }}>
-                      {items.map((item, i) => (
-                        <div key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < items.length - 1 ? `0.5px solid ${C.border}` : "none" }}>
-                          <div>
-                            <div style={{ fontSize: 13, color: C.text }}>{item.name_en}</div>
-                            {item.name_ta && <div style={{ fontSize: 10, color: C.muted }}>{item.name_ta}</div>}
-                          </div>
-                          <Toggle value={!!satvikSelected[item.id]} onChange={v => setSatvikSelected(s => ({ ...s, [item.id]: v }))} />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                {Object.keys(filteredSatvik()).length === 0 && (
-                  <div style={{ textAlign: "center", padding: "20px 0", fontSize: 13, color: C.muted }}>No ingredients found</div>
-                )}
-              </div>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Toggle ingredients your household <strong>AVOIDS</strong> on Satvik days.</div>
+              <IngredientSelector
+                mode="satvik"
+                value={satvikValue}
+                onChange={setSatvikValue}
+                showImages={true}
+                maxHeight="320px"
+              />
               <NavButtons onBack={() => setStep(1)} onSkip={() => setStep(3)} onNext={saveSatvik} loading={saving} />
             </div>
           )}
