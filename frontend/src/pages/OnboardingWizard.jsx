@@ -21,6 +21,27 @@ const C = {
 };
 
 const DIET_PREFS = ["Veg", "Non-Veg", "Vegan", "Eggitarian"];
+const AGE_GROUPS = [
+  { value: "Child",  label: "Child",  sub: "0–12 yrs",  emoji: "👶" },
+  { value: "Teen",   label: "Teen",   sub: "13–17 yrs", emoji: "🧒" },
+  { value: "Adult",  label: "Adult",  sub: "18–59 yrs", emoji: "🧑" },
+  { value: "Senior", label: "Senior", sub: "60+ yrs",   emoji: "👴" },
+];
+
+const GENDERS = [
+  { value: "Male",               emoji: "👨" },
+  { value: "Female",             emoji: "👩" },
+  { value: "Transgender",        emoji: "🏳️" },
+  { value: "Prefer not to say",  emoji: "🤐" },
+];
+
+const DIET_IMAGES = {
+  "Veg":        "https://cdn-icons-png.flaticon.com/512/2153/2153788.png",
+  "Non-Veg":    "https://cdn-icons-png.flaticon.com/512/857/857681.png",
+  "Vegan":      "https://cdn-icons-png.flaticon.com/512/2153/2153786.png",
+  "Eggitarian": "https://cdn-icons-png.flaticon.com/512/837/837560.png",
+};
+
 const EVENT_ICONS = [
   "🎂", "🎉", "🎊", "💍", "🙏", "⭐", "🌸", "🕉️",
   "👶", "🎓", "🏠", "❤️", "🌙", "🔔", "🪔", "🌺"
@@ -120,6 +141,9 @@ export default function OnboardingWizard({ onComplete }) {
         setMembers(d.members.map(m => ({
           ...m,
           dietary_preference: m.dietary_preference || d.household.dietary_preference || "Veg",
+          age_group:          m.age_group || null,
+          gender:             m.gender || null,
+          phone_number:       m.phone_number || null,
           restrictions: m.restrictions || [],
         })));
         // Pre-fill Satvik
@@ -163,6 +187,9 @@ export default function OnboardingWizard({ onComplete }) {
         body: JSON.stringify({ members: members.map(m => ({
           user_id:            m.user_id,
           dietary_preference: m.dietary_preference,
+          age_group:          m.age_group,
+          gender:             m.gender,
+          phone_number:       m.phone_number,
           restrictions:       m.restrictions.map(r => ({
             ingredient_id:    r.ingredient_id,
             restriction_type: r.restriction_type,
@@ -430,10 +457,41 @@ export default function OnboardingWizard({ onComplete }) {
                     <Field label="Dietary preference">
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 14 }}>
                         {DIET_PREFS.map(d => (
-                          <Chip key={d} label={d} active={editMember.dietary_preference === d}
-                            onClick={() => setEditMember(em => ({ ...em, dietary_preference: d }))} />
+                          <div key={d} onClick={() => setEditMember(em => ({ ...em, dietary_preference: d }))}
+                            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "8px 6px", borderRadius: 10, border: `0.5px solid ${editMember.dietary_preference === d ? C.teal : C.border}`, background: editMember.dietary_preference === d ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
+                            <img src={DIET_IMAGES[d]} alt={d} style={{ width: 28, height: 28, objectFit: "contain" }} onError={e => e.target.style.display='none'} />
+                            <span style={{ fontSize: 11, fontWeight: 500, color: editMember.dietary_preference === d ? C.deepTeal : C.muted }}>{d}</span>
+                          </div>
                         ))}
                       </div>
+                    </Field>
+                    <Field label="Age group">
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 14 }}>
+                        {AGE_GROUPS.map(ag => (
+                          <div key={ag.value} onClick={() => setEditMember(em => ({ ...em, age_group: ag.value }))}
+                            style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, border: `0.5px solid ${editMember.age_group === ag.value ? C.teal : C.border}`, background: editMember.age_group === ag.value ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
+                            <span style={{ fontSize: 20 }}>{ag.emoji}</span>
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 500, color: editMember.age_group === ag.value ? C.deepTeal : C.text }}>{ag.label}</div>
+                              <div style={{ fontSize: 10, color: C.muted }}>{ag.sub}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </Field>
+                    <Field label="Gender">
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+                        {GENDERS.map(g => (
+                          <div key={g.value} onClick={() => setEditMember(em => ({ ...em, gender: g.value }))}
+                            style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 20, border: `0.5px solid ${editMember.gender === g.value ? C.teal : C.border}`, background: editMember.gender === g.value ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
+                            <span style={{ fontSize: 16 }}>{g.emoji}</span>
+                            <span style={{ fontSize: 11, color: editMember.gender === g.value ? C.deepTeal : C.muted }}>{g.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </Field>
+                    <Field label="Phone number (optional)">
+                      <input value={editMember.phone_number || ""} onChange={e => setEditMember(em => ({ ...em, phone_number: e.target.value }))} placeholder="e.g. 98765 43210" style={inputStyle} />
                     </Field>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                       <div style={{ fontSize: 12, color: C.muted }}>Allergies & dislikes <HelpTip text="Allergy = medical — ingredient must never appear. Dislike = preference — avoided where possible. Both can coexist." visible={help.restrictions} onToggle={() => toggleHelp("restrictions")} /></div>

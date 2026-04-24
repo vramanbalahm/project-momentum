@@ -111,6 +111,14 @@ export default function Dashboard({ onNavigate }) {
                       </div>
                     </div>
 
+                    {/* My Profile — available to all */}
+                    <SettingsItem
+                      icon="👤"
+                      label="My Profile"
+                      available={true}
+                      onClick={() => { setMenuOpen(false); onNavigate("my_profile"); }}
+                    />
+
                     {/* Change Password — available to all */}
                     <SettingsItem
                       icon="🔑"

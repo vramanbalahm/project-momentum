@@ -235,6 +235,9 @@ class RestrictionItem(BaseModel):
 class MemberPrefItem(BaseModel):
     user_id:            str
     dietary_preference: str
+    age_group:          Optional[str] = None  # Child | Teen | Adult | Senior
+    gender:             Optional[str] = None  # Male | Female | Transgender | Prefer not to say
+    phone_number:       Optional[str] = None
     restrictions:       List[RestrictionItem] = []
 
 class SaveMembersRequest(BaseModel):
@@ -279,16 +282,28 @@ async def save_member_preferences(
             raise HTTPException(status_code=404,
                 detail=f"User {m.user_id} not found in this household")
 
-        # Upsert member_preferences
+        # Update phone if provided
+        if m.phone_number is not None:
+            db.execute(text("""
+                UPDATE users SET phone_number = :phone
+                WHERE user_id = CAST(:uid AS uuid)
+            """), {"phone": m.phone_number or None, "uid": m.user_id})
+
+        # Upsert member_preferences including age_group and gender
         db.execute(text("""
-            INSERT INTO member_preferences (user_id, house_id, dietary_preference, updated_by)
-            VALUES (CAST(:uid AS uuid), CAST(:hid AS uuid), CAST(:pref AS diet_pref), CAST(:admin AS uuid))
+            INSERT INTO member_preferences
+                (user_id, house_id, dietary_preference, age_group, gender, updated_by)
+            VALUES
+                (CAST(:uid AS uuid), CAST(:hid AS uuid), CAST(:pref AS diet_pref),
+                 :age, :gender, CAST(:admin AS uuid))
             ON CONFLICT (user_id) DO UPDATE
             SET dietary_preference = CAST(:pref AS diet_pref),
-                updated_at = NOW(),
-                updated_by = CAST(:admin AS uuid)
-        """), {"uid": m.user_id, "hid": house_id,
-               "pref": m.dietary_preference, "admin": admin_id})
+                age_group          = COALESCE(:age,    member_preferences.age_group),
+                gender             = COALESCE(:gender, member_preferences.gender),
+                updated_at         = NOW(),
+                updated_by         = CAST(:admin AS uuid)
+        """), {"uid": m.user_id, "hid": house_id, "pref": m.dietary_preference,
+               "age": m.age_group, "gender": m.gender, "admin": admin_id})
 
         # Replace restrictions — delete existing, insert new
         db.execute(text("""

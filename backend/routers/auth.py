@@ -620,3 +620,126 @@ async def deactivate_member(
 
     status_str = "activated" if req.is_active else "deactivated"
     return {"user_id": req.user_id, "is_active": req.is_active, "message": f"{target.name} has been {status_str}."}
+
+
+# ── My Profile ────────────────────────────────────────────────────────────────
+
+class MyProfileUpdateRequest(BaseModel):
+    age_group:    str = None   # Child | Teen | Adult | Senior
+    gender:       str = None   # Male | Female | Transgender | Prefer not to say
+    phone_number: str = None
+    dietary_preference: str = None
+    # Restrictions handled separately via /onboarding/members
+
+@router.get("/my-profile")
+async def get_my_profile(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns the logged-in user's personal profile — name, email, phone,
+    dietary preference, age group, gender, allergies and dislikes.
+    Available to all authenticated users.
+    """
+    user_id  = current_user["user_id"]
+    house_id = current_user["house_id"]
+
+    # Get user details
+    user = db.execute(text("""
+        SELECT user_id, name, email, role, phone_number, created_at
+        FROM users WHERE user_id = CAST(:uid AS uuid)
+    """), {"uid": user_id}).fetchone()
+
+    # Get member preferences
+    pref = db.execute(text("""
+        SELECT dietary_preference, age_group, gender, display_name
+        FROM member_preferences
+        WHERE user_id = CAST(:uid AS uuid)
+    """), {"uid": user_id}).fetchone()
+
+    # Get restrictions
+    restrictions = db.execute(text("""
+        SELECT mr.id, mr.restriction_type,
+               ic.id as ingredient_id, ic.name_en, ic.name_ta,
+               ic.category, ic.thumb_url
+        FROM member_restrictions mr
+        JOIN ingredient_catalog ic ON ic.id = mr.ingredient_id
+        WHERE mr.user_id = CAST(:uid AS uuid)
+        ORDER BY mr.restriction_type, ic.name_en
+    """), {"uid": user_id}).fetchall()
+
+    return {
+        "user_id":            str(user.user_id),
+        "name":               user.name,
+        "email":              user.email,
+        "phone_number":       user.phone_number,
+        "role":               str(user.role),
+        "dietary_preference": str(pref.dietary_preference) if pref and pref.dietary_preference else None,
+        "age_group":          pref.age_group if pref else None,
+        "gender":             pref.gender if pref else None,
+        "display_name":       pref.display_name if pref else None,
+        "restrictions": [{
+            "id":               r.id,
+            "ingredient_id":    r.ingredient_id,
+            "name_en":          r.name_en,
+            "name_ta":          r.name_ta,
+            "category":         r.category,
+            "thumb_url":        r.thumb_url,
+            "restriction_type": r.restriction_type,
+        } for r in restrictions]
+    }
+
+@router.put("/my-profile", status_code=200)
+async def update_my_profile(
+    req: MyProfileUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Updates the logged-in user's personal profile.
+    Available to all authenticated users — each user manages their own profile.
+    """
+    user_id  = current_user["user_id"]
+    house_id = current_user["house_id"]
+
+    valid_age    = {"Child", "Teen", "Adult", "Senior", None}
+    valid_gender = {"Male", "Female", "Transgender", "Prefer not to say", None}
+    valid_diet   = {"Veg", "Non-Veg", "Vegan", "Eggitarian", None}
+
+    if req.age_group not in valid_age:
+        raise HTTPException(status_code=422, detail=f"Invalid age_group: {req.age_group}")
+    if req.gender not in valid_gender:
+        raise HTTPException(status_code=422, detail=f"Invalid gender: {req.gender}")
+    if req.dietary_preference not in valid_diet:
+        raise HTTPException(status_code=422, detail=f"Invalid dietary_preference: {req.dietary_preference}")
+
+    # Update phone_number on users table
+    if req.phone_number is not None:
+        db.execute(text("""
+            UPDATE users SET phone_number = :phone
+            WHERE user_id = CAST(:uid AS uuid)
+        """), {"phone": req.phone_number or None, "uid": user_id})
+
+    # Upsert member_preferences
+    db.execute(text("""
+        INSERT INTO member_preferences
+            (user_id, house_id, dietary_preference, age_group, gender, updated_by)
+        VALUES
+            (CAST(:uid AS uuid), CAST(:hid AS uuid),
+             CAST(:diet AS diet_pref), :age, :gender, CAST(:uid AS uuid))
+        ON CONFLICT (user_id) DO UPDATE
+        SET dietary_preference = COALESCE(CAST(:diet AS diet_pref), member_preferences.dietary_preference),
+            age_group          = COALESCE(:age,    member_preferences.age_group),
+            gender             = COALESCE(:gender, member_preferences.gender),
+            updated_at         = NOW(),
+            updated_by         = CAST(:uid AS uuid)
+    """), {
+        "uid":    user_id,
+        "hid":    house_id,
+        "diet":   req.dietary_preference,
+        "age":    req.age_group,
+        "gender": req.gender,
+    })
+
+    db.commit()
+    return {"message": "Profile updated successfully."}
