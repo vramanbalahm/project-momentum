@@ -98,10 +98,13 @@ export default function IngredientSelector({
     }
   };
 
-  const enableAllRestriction = (cat) => {
+  const enableAllRestriction = (cat, type = "allergy") => {
     const items = grouped[cat] || [];
     const next = { ...value };
-    items.forEach(i => { next[i.id] = { allergy: true, dislike: false }; });
+    items.forEach(i => {
+      const current = next[i.id] || { allergy: false, dislike: false };
+      next[i.id] = { ...current, [type]: true };
+    });
     onChange(next);
   };
 
@@ -168,11 +171,25 @@ export default function IngredientSelector({
             {/* Category header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0 4px", position: "sticky", top: 0, background: "white", zIndex: 2 }}>
               <span style={{ fontSize: 11, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{cat}</span>
-              <div style={{ display: "flex", gap: 10 }}>
-                <span onClick={() => mode === "satvik" ? enableAllSatvik(cat) : enableAllRestriction(cat)}
-                  style={{ fontSize: 11, color: C.deepTeal, cursor: "pointer" }}>Enable all</span>
-                <span onClick={() => mode === "satvik" ? disableAllSatvik(cat) : disableAllRestriction(cat)}
-                  style={{ fontSize: 11, color: "#E24B4A", cursor: "pointer" }}>Disable all</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                {mode === "restriction" && (
+                  <>
+                    <span onClick={() => enableAllRestriction(cat, "allergy")}
+                      style={{ fontSize: 11, color: "#E24B4A", cursor: "pointer" }}>All Allergy</span>
+                    <span onClick={() => enableAllRestriction(cat, "dislike")}
+                      style={{ fontSize: 11, color: "#BA7517", cursor: "pointer" }}>All Dislike</span>
+                    <span onClick={() => disableAllRestriction(cat)}
+                      style={{ fontSize: 11, color: C.muted, cursor: "pointer" }}>Clear</span>
+                  </>
+                )}
+                {mode === "satvik" && (
+                  <>
+                    <span onClick={() => enableAllSatvik(cat)}
+                      style={{ fontSize: 11, color: C.deepTeal, cursor: "pointer" }}>Enable all</span>
+                    <span onClick={() => disableAllSatvik(cat)}
+                      style={{ fontSize: 11, color: "#E24B4A", cursor: "pointer" }}>Disable all</span>
+                  </>
+                )}
               </div>
             </div>
 

@@ -1,5 +1,31 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import IngredientSelector, { restrictionsToValue, valueToRestrictions } from "../components/IngredientSelector";
+
+const C = {
+  green: "#1A3A2E", mint: "#9FE1CB", teal: "#5DCAA5", deepTeal: "#0F6E56",
+  card: "#FFF9F2", bg: "#F7F4EE", border: "#EDE8E0", text: "#2C2C2A", muted: "#888780",
+};
+
+const DIET_PREFS = ["Veg", "Non-Veg", "Vegan", "Eggitarian"];
+const DIET_IMAGES = {
+  "Veg":        "https://cdn-icons-png.flaticon.com/512/2153/2153788.png",
+  "Non-Veg":    "https://cdn-icons-png.flaticon.com/512/857/857681.png",
+  "Vegan":      "https://cdn-icons-png.flaticon.com/512/2153/2153786.png",
+  "Eggitarian": "https://cdn-icons-png.flaticon.com/512/837/837560.png",
+};
+const AGE_GROUPS = [
+  { value: "Child",  label: "Child",  sub: "0–12",  emoji: "👶" },
+  { value: "Teen",   label: "Teen",   sub: "13–17", emoji: "🧒" },
+  { value: "Adult",  label: "Adult",  sub: "18–59", emoji: "🧑" },
+  { value: "Senior", label: "Senior", sub: "60+",   emoji: "👴" },
+];
+const GENDERS = [
+  { value: "Male",              emoji: "👨" },
+  { value: "Female",            emoji: "👩" },
+  { value: "Transgender",       emoji: "🏳️" },
+  { value: "Prefer not to say", emoji: "🤐" },
+];
 
 export default function ManageMembers({ onBack }) {
   const { user, apiFetch } = useAuth();
@@ -10,7 +36,10 @@ export default function ManageMembers({ onBack }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [addForm, setAddForm] = useState({ name: "", email: "", password: "" });
   const [adding, setAdding] = useState(false);
-  const [actionLoading, setActionLoading] = useState(null); // user_id being acted on
+  const [actionLoading, setActionLoading] = useState(null);
+  const [editMember, setEditMember]   = useState(null);
+  const [editForm, setEditForm]       = useState({});
+  const [editSaving, setEditSaving]   = useState(false);
 
   const loadMembers = async () => {
     try {
@@ -63,6 +92,59 @@ export default function ManageMembers({ onBack }) {
       setError(e.message);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const openEdit = async (m) => {
+    // Load full member profile from backend
+    try {
+      const profile = await apiFetch(`/auth/my-profile?user_id=${m.user_id}`);
+      setEditForm({
+        user_id:            m.user_id,
+        name:               m.name,
+        dietary_preference: profile.dietary_preference || "Veg",
+        age_group:          profile.age_group || null,
+        gender:             profile.gender || null,
+        phone_number:       profile.phone_number || "",
+        restrictionValue:   restrictionsToValue(profile.restrictions || []),
+      });
+    } catch {
+      // Fallback if profile not loaded
+      setEditForm({
+        user_id:            m.user_id,
+        name:               m.name,
+        dietary_preference: "Veg",
+        age_group:          null,
+        gender:             null,
+        phone_number:       "",
+        restrictionValue:   {},
+      });
+    }
+    setEditMember(m);
+  };
+
+  const handleSaveEdit = async () => {
+    setEditSaving(true);
+    try {
+      await apiFetch("/onboarding/members", {
+        method: "POST",
+        body: JSON.stringify({
+          members: [{
+            user_id:            editForm.user_id,
+            dietary_preference: editForm.dietary_preference,
+            age_group:          editForm.age_group,
+            gender:             editForm.gender,
+            phone_number:       editForm.phone_number,
+            restrictions:       valueToRestrictions(editForm.restrictionValue || {}),
+          }]
+        })
+      });
+      setSuccess(`${editForm.name}'s profile updated.`);
+      setEditMember(null);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -152,6 +234,13 @@ export default function ManageMembers({ onBack }) {
                     </div>
                   </div>
 
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+                    <button
+                      onClick={() => openEdit(m)}
+                      style={{ fontSize: 11, padding: "5px 10px", borderRadius: 8, border: "0.5px solid #EDE8E0", background: "#E1F5EE", color: "#0F6E56", cursor: "pointer", fontWeight: 500 }}
+                    >
+                      Edit profile
+                    </button>
                   {!isMe && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
                       <button
@@ -170,12 +259,85 @@ export default function ManageMembers({ onBack }) {
                       </button>
                     </div>
                   )}
+                  </div>
                 </div>
               </div>
             );
           })
         )}
       </div>
+
+      {/* Member Edit Bottom Sheet */}
+      {editMember && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <div style={{ background: C.card, borderRadius: "16px 16px 0 0", padding: 20, width: "100%", maxWidth: 480, maxHeight: "85vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div style={{ fontSize: 15, fontWeight: 500, color: C.text }}>Edit — {editMember.name}</div>
+              <span onClick={() => setEditMember(null)} style={{ fontSize: 16, color: C.muted, cursor: "pointer" }}>✕</span>
+            </div>
+
+            {/* Dietary preference */}
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Dietary preference</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 14 }}>
+              {DIET_PREFS.map(d => (
+                <div key={d} onClick={() => setEditForm(f => ({ ...f, dietary_preference: d }))}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, padding: "8px 6px", borderRadius: 10, border: `0.5px solid ${editForm.dietary_preference === d ? C.teal : C.border}`, background: editForm.dietary_preference === d ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
+                  <img src={DIET_IMAGES[d]} alt={d} style={{ width: 28, height: 28, objectFit: "contain" }} onError={e => e.target.style.display="none"} />
+                  <span style={{ fontSize: 11, fontWeight: 500, color: editForm.dietary_preference === d ? C.deepTeal : C.muted }}>{d}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Age group */}
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Age group</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 14 }}>
+              {AGE_GROUPS.map(ag => (
+                <div key={ag.value} onClick={() => setEditForm(f => ({ ...f, age_group: ag.value }))}
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, border: `0.5px solid ${editForm.age_group === ag.value ? C.teal : C.border}`, background: editForm.age_group === ag.value ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
+                  <span style={{ fontSize: 20 }}>{ag.emoji}</span>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: editForm.age_group === ag.value ? C.deepTeal : C.text }}>{ag.label}</div>
+                    <div style={{ fontSize: 10, color: C.muted }}>{ag.sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Gender */}
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Gender</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+              {GENDERS.map(g => (
+                <div key={g.value} onClick={() => setEditForm(f => ({ ...f, gender: g.value }))}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 20, border: `0.5px solid ${editForm.gender === g.value ? C.teal : C.border}`, background: editForm.gender === g.value ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
+                  <span style={{ fontSize: 16 }}>{g.emoji}</span>
+                  <span style={{ fontSize: 11, color: editForm.gender === g.value ? C.deepTeal : C.muted }}>{g.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Phone */}
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Phone number (optional)</div>
+            <input value={editForm.phone_number || ""} onChange={e => setEditForm(f => ({ ...f, phone_number: e.target.value }))}
+              placeholder="e.g. 98765 43210"
+              style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `0.5px solid ${C.border}`, fontSize: 13, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box", marginBottom: 14 }} />
+
+            {/* Allergies & dislikes */}
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Allergies & dislikes</div>
+            <IngredientSelector
+              mode="restriction"
+              value={editForm.restrictionValue || {}}
+              onChange={rv => setEditForm(f => ({ ...f, restrictionValue: rv }))}
+              showImages={true}
+              maxHeight="200px"
+            />
+
+            <button onClick={handleSaveEdit} disabled={editSaving}
+              style={{ width: "100%", padding: 12, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, color: C.green, background: C.mint, cursor: editSaving ? "not-allowed" : "pointer", opacity: editSaving ? 0.7 : 1, marginTop: 14 }}>
+              {editSaving ? "Saving..." : "Save profile"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

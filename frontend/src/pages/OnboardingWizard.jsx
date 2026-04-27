@@ -376,7 +376,7 @@ export default function OnboardingWizard({ onComplete }) {
                           ))}
                         </div>
                       </div>
-                      <span onClick={() => setEditMember(m)} style={{ fontSize: 11, color: C.deepTeal, cursor: "pointer" }}>Edit</span>
+                      <span onClick={() => setEditMember({ ...m, restrictionValue: restrictionsToValue(m.restrictions || []) })} style={{ fontSize: 11, color: C.deepTeal, cursor: "pointer" }}>Edit</span>
                       {!isAdmin && <span style={{ fontSize: 11, color: "#E24B4A", cursor: "pointer" }}>Del</span>}
                     </div>
                   );
@@ -464,50 +464,27 @@ export default function OnboardingWizard({ onComplete }) {
                     <Field label="Phone number (optional)">
                       <input value={editMember.phone_number || ""} onChange={e => setEditMember(em => ({ ...em, phone_number: e.target.value }))} placeholder="e.g. 98765 43210" style={inputStyle} />
                     </Field>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                      <div style={{ fontSize: 12, color: C.muted }}>Allergies & dislikes <HelpTip text="Allergy = medical — ingredient must never appear. Dislike = preference — avoided where possible. Both can coexist." visible={help.restrictions} onToggle={() => toggleHelp("restrictions")} /></div>
+                    <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>
+                      Allergies & dislikes
+                      <HelpTip text="Allergy = medical restriction. Dislike = preference. Both can be active for the same ingredient." visible={help.restrictions} onToggle={() => toggleHelp("restrictions")} />
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#F7F4EE", border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "7px 10px", marginBottom: 6 }}>
-                      <span style={{ fontSize: 13, color: C.muted }}>⌕</span>
-                      <input value={ingSearch} onChange={e => searchIngredients(e.target.value)} placeholder="Search ingredient to add..." style={{ border: "none", background: "transparent", fontSize: 13, color: C.text, outline: "none", flex: 1, width: "100%" }} />
-                    </div>
-                    {ingResults.length > 0 && (
-                      <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 8, marginBottom: 8, maxHeight: 140, overflowY: "auto" }}>
-                        {ingResults.map(ing => (
-                          <div key={ing.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 10px", borderBottom: `0.5px solid ${C.border}`, cursor: "pointer" }}
-                            onClick={() => {
-                              const exists = (editMember.restrictions || []).find(r => r.ingredient_id === ing.id && r.restriction_type === "Allergy");
-                              if (!exists) {
-                                setEditMember(em => ({ ...em, restrictions: [...(em.restrictions || []), { ingredient_id: ing.id, name_en: ing.name_en, name_ta: ing.name_ta, restriction_type: "Allergy" }] }));
-                              }
-                              setIngSearch(""); setIngResults([]);
-                            }}>
-                            <span style={{ fontSize: 13, color: C.text }}>{ing.name_en}</span>
-                            <span style={{ fontSize: 11, color: C.deepTeal }}>+ Add</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div style={{ background: "#F7F4EE", border: `0.5px solid ${C.border}`, borderRadius: 10, padding: "8px 12px", marginBottom: 12 }}>
-                      {(editMember.restrictions || []).length === 0 && (
-                        <div style={{ fontSize: 12, color: C.muted, textAlign: "center", padding: "8px 0" }}>No restrictions added yet</div>
-                      )}
-                      {(editMember.restrictions || []).map((r, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: i < editMember.restrictions.length - 1 ? `0.5px solid ${C.border}` : "none" }}>
-                          <div style={{ flex: 1, fontSize: 13, color: C.text }}>{r.name_en}</div>
-                          <div style={{ display: "flex", border: `0.5px solid ${C.border}`, borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
-                            <button onClick={() => setEditMember(em => ({ ...em, restrictions: em.restrictions.map((x, j) => j === i ? { ...x, restriction_type: "Allergy" } : x) }))}
-                              style={{ padding: "3px 7px", fontSize: 10, cursor: "pointer", border: "none", background: r.restriction_type === "Allergy" ? "#FAECE7" : "transparent", color: r.restriction_type === "Allergy" ? "#712B13" : C.muted }}>Allergy</button>
-                            <button onClick={() => setEditMember(em => ({ ...em, restrictions: em.restrictions.map((x, j) => j === i ? { ...x, restriction_type: "Dislike" } : x) }))}
-                              style={{ padding: "3px 7px", fontSize: 10, cursor: "pointer", border: "none", background: r.restriction_type === "Dislike" ? "#FAEEDA" : "transparent", color: r.restriction_type === "Dislike" ? "#633806" : C.muted }}>Dislike</button>
-                          </div>
-                          <span onClick={() => setEditMember(em => ({ ...em, restrictions: em.restrictions.filter((_, j) => j !== i) }))} style={{ fontSize: 13, color: "#E24B4A", cursor: "pointer", marginLeft: 4 }}>✕</span>
-                        </div>
-                      ))}
-                    </div>
+                    <IngredientSelector
+                      mode="restriction"
+                      value={editMember.restrictionValue || {}}
+                      onChange={rv => setEditMember(em => ({ ...em, restrictionValue: rv }))}
+                      showImages={true}
+                      maxHeight="200px"
+                    />
                     <button onClick={() => {
-                      setMembers(ms => ms.map(m => m.user_id === editMember.user_id ? { ...m, dietary_preference: editMember.dietary_preference, restrictions: editMember.restrictions } : m));
+                      const restrictions = valueToRestrictions(editMember.restrictionValue || {});
+                      setMembers(ms => ms.map(m => m.user_id === editMember.user_id
+                        ? { ...m, dietary_preference: editMember.dietary_preference,
+                            age_group: editMember.age_group, gender: editMember.gender,
+                            phone_number: editMember.phone_number,
+                            restrictions, restrictionValue: editMember.restrictionValue }
+                        : m));
                       setEditMember(null);
+                      setIngSearch(""); setIngResults([]);
                     }} style={{ width: "100%", padding: 11, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, color: C.green, background: C.mint, cursor: "pointer" }}>
                       Save
                     </button>
