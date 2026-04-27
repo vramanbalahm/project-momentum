@@ -633,16 +633,32 @@ class MyProfileUpdateRequest(BaseModel):
 
 @router.get("/my-profile")
 async def get_my_profile(
+    target_user_id: str = None,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Returns the logged-in user's personal profile — name, email, phone,
-    dietary preference, age group, gender, allergies and dislikes.
-    Available to all authenticated users.
+    Returns a user's personal profile.
+    If target_user_id is provided and caller is admin — returns that member's profile.
+    Otherwise returns the logged-in user's own profile.
     """
-    user_id  = current_user["user_id"]
-    house_id = current_user["house_id"]
+    is_admin = current_user["role"] in ("household_admin", "platform_admin")
+
+    # Admin can view any member in their household
+    if target_user_id and is_admin:
+        # Verify target belongs to same household
+        check = db.execute(text("""
+            SELECT user_id FROM users
+            WHERE user_id = CAST(:uid AS uuid)
+              AND house_id = CAST(:hid AS uuid)
+        """), {"uid": target_user_id, "hid": current_user["house_id"]}).fetchone()
+        if not check:
+            raise HTTPException(status_code=404, detail="Member not found in your household.")
+        user_id  = target_user_id
+        house_id = current_user["house_id"]
+    else:
+        user_id  = current_user["user_id"]
+        house_id = current_user["house_id"]
 
     # Get user details
     user = db.execute(text("""

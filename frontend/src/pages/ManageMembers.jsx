@@ -67,6 +67,7 @@ export default function ManageMembers({ onBack }) {
         body: JSON.stringify({ user_id: memberId, new_role: newRole })
       });
       setSuccess(res.message);
+      setTimeout(() => setSuccess(null), 4000);
       await loadMembers();
     } catch (e) {
       setError(e.message);
@@ -87,6 +88,7 @@ export default function ManageMembers({ onBack }) {
         body: JSON.stringify({ user_id: memberId, is_active: !currentActive })
       });
       setSuccess(res.message);
+      setTimeout(() => setSuccess(null), 4000);
       await loadMembers();
     } catch (e) {
       setError(e.message);
@@ -139,8 +141,9 @@ export default function ManageMembers({ onBack }) {
           }]
         })
       });
-      setSuccess(`${editForm.name}'s profile updated.`);
+      setSuccess(`${editForm.name}'s profile updated successfully!`);
       setEditMember(null);
+      setTimeout(() => setSuccess(null), 4000);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -158,7 +161,8 @@ export default function ManageMembers({ onBack }) {
         method: "POST",
         body: JSON.stringify(addForm)
       });
-      setSuccess(`${addForm.name} added successfully.`);
+      setSuccess(`${addForm.name} added successfully!`);
+      setTimeout(() => setSuccess(null), 4000);
       setAddForm({ name: "", email: "", password: "" });
       setShowAddForm(false);
       await loadMembers();

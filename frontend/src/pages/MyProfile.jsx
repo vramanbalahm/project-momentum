@@ -87,7 +87,8 @@ export default function MyProfile({ onBack }) {
         }),
       });
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      setTimeout(() => setSuccess(false), 4000);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e) { setError(e.message); }
     finally { setSaving(false); }
   };
@@ -130,8 +131,8 @@ export default function MyProfile({ onBack }) {
           </div>
         )}
         {success && (
-          <div style={{ background: "#E1F5EE", border: `0.5px solid ${C.teal}`, borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: C.deepTeal }}>
-            ✓ Profile saved successfully
+          <div style={{ background: "#1D9E75", borderRadius: 10, padding: "12px 14px", marginBottom: 14, fontSize: 13, color: "white", fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 16 }}>✓</span> Profile saved successfully!
           </div>
         )}
 

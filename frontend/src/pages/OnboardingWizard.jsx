@@ -185,10 +185,12 @@ export default function OnboardingWizard({ onComplete }) {
           age_group:          m.age_group,
           gender:             m.gender,
           phone_number:       m.phone_number,
-          restrictions:       m.restrictions.map(r => ({
-            ingredient_id:    r.ingredient_id,
-            restriction_type: r.restriction_type,
-          }))
+          restrictions: m.restrictionValue
+            ? valueToRestrictions(m.restrictionValue)
+            : (m.restrictions || []).map(r => ({
+                ingredient_id:    r.ingredient_id,
+                restriction_type: r.restriction_type,
+              }))
         }))}),
       });
       setCompletedSteps(s => [...new Set([...s, 1])]);
