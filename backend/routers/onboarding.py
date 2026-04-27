@@ -289,7 +289,7 @@ async def save_member_preferences(
                 WHERE user_id = CAST(:uid AS uuid)
             """), {"phone": m.phone_number or None, "uid": m.user_id})
 
-        # Upsert member_preferences including age_group and gender
+        # Upsert member_preferences — always overwrite all fields
         db.execute(text("""
             INSERT INTO member_preferences
                 (user_id, house_id, dietary_preference, age_group, gender, updated_by)
@@ -298,8 +298,8 @@ async def save_member_preferences(
                  :age, :gender, CAST(:admin AS uuid))
             ON CONFLICT (user_id) DO UPDATE
             SET dietary_preference = CAST(:pref AS diet_pref),
-                age_group          = COALESCE(:age,    member_preferences.age_group),
-                gender             = COALESCE(:gender, member_preferences.gender),
+                age_group          = :age,
+                gender             = :gender,
                 updated_at         = NOW(),
                 updated_by         = CAST(:admin AS uuid)
         """), {"uid": m.user_id, "hid": house_id, "pref": m.dietary_preference,

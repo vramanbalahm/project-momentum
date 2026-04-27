@@ -158,6 +158,38 @@ export default function IngredientSelector({
         )}
       </div>
 
+      {/* Selected items summary — shown at top */}
+      {Object.keys(value).length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: "#888780", marginBottom: 6, fontWeight: 500 }}>
+            {mode === "restriction" ? "Currently selected:" : "Marked to avoid:"}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+            {Object.entries(value).map(([id, flags]) => {
+              // Find ingredient name
+              const allItems = Object.values(grouped || {}).flat();
+              const ing = allItems.find(i => String(i.id) === String(id));
+              if (!ing) return null;
+              if (mode === "satvik" && !flags) return null;
+              if (mode === "restriction" && !flags.allergy && !flags.dislike) return null;
+              return (
+                <span key={id} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, padding: "3px 8px", borderRadius: 20,
+                  background: mode === "satvik" ? "#E1F5EE" :
+                    (flags.allergy && flags.dislike) ? "#F5E6FA" :
+                    flags.allergy ? "#FAECE7" : "#FAEEDA",
+                  color: mode === "satvik" ? "#0F6E56" :
+                    (flags.allergy && flags.dislike) ? "#6B2D8B" :
+                    flags.allergy ? "#712B13" : "#633806"
+                }}>
+                  {mode === "satvik" ? "🚫" : flags.allergy && flags.dislike ? "🚫😕" : flags.allergy ? "🚫" : "😕"}
+                  {" "}{ing.name_en}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Scrollable list */}
       <div style={{ maxHeight, overflowY: "auto" }}>
         {Object.keys(display).length === 0 && (
@@ -255,15 +287,7 @@ export default function IngredientSelector({
         ))}
       </div>
 
-      {/* Selection summary */}
-      {Object.keys(value).length > 0 && (
-        <div style={{ marginTop: 8, padding: "8px 10px", background: "#E1F5EE", border: `0.5px solid ${C.teal}`, borderRadius: 8, fontSize: 11, color: C.deepTeal }}>
-          {mode === "restriction"
-            ? `${Object.values(value).filter(v => v.allergy).length} allergies · ${Object.values(value).filter(v => v.dislike).length} dislikes selected`
-            : `${Object.values(value).filter(Boolean).length} ingredients marked to avoid`
-          }
-        </div>
-      )}
+
     </div>
   );
 }

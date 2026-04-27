@@ -37,9 +37,10 @@ export default function ManageMembers({ onBack }) {
   const [addForm, setAddForm] = useState({ name: "", email: "", password: "" });
   const [adding, setAdding] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
-  const [editMember, setEditMember]   = useState(null);
-  const [editForm, setEditForm]       = useState({});
-  const [editSaving, setEditSaving]   = useState(false);
+  const [editMember, setEditMember]     = useState(null);
+  const [editForm, setEditForm]         = useState({});
+  const [editSaving, setEditSaving]     = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   const loadMembers = async () => {
     try {
@@ -98,19 +99,10 @@ export default function ManageMembers({ onBack }) {
   };
 
   const openEdit = async (m) => {
-    // Set basic info immediately so sheet opens fast
-    setEditForm({
-      user_id:            m.user_id,
-      name:               m.name,
-      dietary_preference: "Veg",
-      age_group:          null,
-      gender:             null,
-      phone_number:       "",
-      restrictionValue:   {},
-    });
-    setEditMember(m);
-    // Load full profile from DB — target_user_id param allows admin to view any member
+    setProfileLoading(true);
+    setEditMember(m);  // Open sheet with loading state
     try {
+      // Load full profile from DB — target_user_id allows admin to view any member
       const profile = await apiFetch(`/auth/my-profile?target_user_id=${m.user_id}`);
       setEditForm({
         user_id:            m.user_id,
@@ -122,8 +114,10 @@ export default function ManageMembers({ onBack }) {
         restrictionValue:   restrictionsToValue(profile.restrictions || []),
       });
     } catch (e) {
-      // Keep defaults if load fails
-      console.error("Failed to load member profile:", e);
+      setError("Failed to load member profile.");
+      setEditMember(null);
+    } finally {
+      setProfileLoading(false);
     }
   };
 
@@ -286,6 +280,12 @@ export default function ManageMembers({ onBack }) {
               <span onClick={() => setEditMember(null)} style={{ fontSize: 16, color: C.muted, cursor: "pointer" }}>✕</span>
             </div>
 
+            {profileLoading ? (
+              <div style={{ textAlign: "center", padding: "40px 0", fontSize: 13, color: C.muted }}>
+                Loading profile...
+              </div>
+            ) : (<>
+
             {/* Dietary preference */}
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Dietary preference</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 14 }}>
@@ -345,6 +345,7 @@ export default function ManageMembers({ onBack }) {
               style={{ width: "100%", padding: 12, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, color: C.green, background: C.mint, cursor: editSaving ? "not-allowed" : "pointer", opacity: editSaving ? 0.7 : 1, marginTop: 14 }}>
               {editSaving ? "Saving..." : "Save profile"}
             </button>
+            </>)}
           </div>
         </div>
       )}
