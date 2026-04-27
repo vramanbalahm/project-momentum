@@ -28,72 +28,93 @@ const GENDERS = [
   { value: "Prefer not to say", emoji: "🤐" },
 ];
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
-
 export default function MyProfile({ onBack }) {
   const { apiFetch } = useAuth();
-  const [profile, setProfile]   = useState(null);
-  const [loading, setLoading]   = useState(true);
-  const [saving, setSaving]     = useState(false);
-  const [error, setError]       = useState(null);
-  const [success, setSuccess]   = useState(false);
-  const [form, setForm]         = useState({
-    dietary_preference: null,
-    age_group:          null,
-    gender:             null,
-    phone_number:       "",
-  });
+  const [profile, setProfile]           = useState(null);
+  const [loading, setLoading]           = useState(true);
+  const [saving, setSaving]             = useState(false);
+  const [error, setError]               = useState(null);
+  const [successMsg, setSuccessMsg]     = useState(null);
+  const [dietPref, setDietPref]         = useState("Veg");
+  const [ageGroup, setAgeGroup]         = useState(null);
+  const [gender, setGender]             = useState(null);
+  const [phone, setPhone]               = useState("");
   const [restrictionValue, setRestrictionValue] = useState({});
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
+  // Load profile on mount
   useEffect(() => {
     (async () => {
       try {
         const p = await apiFetch("/auth/my-profile");
         setProfile(p);
-        setForm({
-          dietary_preference: p.dietary_preference,
-          age_group:          p.age_group,
-          gender:             p.gender,
-          phone_number:       p.phone_number || "",
-        });
+        setDietPref(p.dietary_preference || "Veg");
+        setAgeGroup(p.age_group || null);
+        setGender(p.gender || null);
+        setPhone(p.phone_number || "");
         setRestrictionValue(restrictionsToValue(p.restrictions || []));
-      } catch (e) { setError("Failed to load profile."); }
-      finally { setLoading(false); }
+      } catch (e) {
+        setError("Failed to load profile. Please try again.");
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
-  const handleSave = async () => {
-    setSaving(true); setError(null); setSuccess(false);
-    try {
-      // Save profile fields
-      await apiFetch("/auth/my-profile", {
-        method: "PUT",
-        body: JSON.stringify(form),
-      });
-      // Save restrictions via onboarding endpoint
-      await apiFetch("/onboarding/members", {
-        method: "POST",
-        body: JSON.stringify({
-          members: [{
-            user_id:            profile.user_id,
-            dietary_preference: form.dietary_preference || "Veg",
-            age_group:          form.age_group,
-            gender:             form.gender,
-            phone_number:       form.phone_number,
-            restrictions:       valueToRestrictions(restrictionValue)
-          }]
-        }),
-      });
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 4000);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (e) { setError(e.message); }
-    finally { setSaving(false); }
+  const showSuccess = (msg) => {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(null), 5000);
   };
 
-  const inputStyle = { width: "100%", padding: "9px 12px", borderRadius: 8, border: `0.5px solid ${C.border}`, fontSize: 13, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box" };
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      // Step 1: Save dietary preference, age group, gender, phone
+      await apiFetch("/auth/my-profile", {
+        method: "PUT",
+        body: JSON.stringify({
+          dietary_preference: dietPref,
+          age_group:          ageGroup,
+          gender:             gender,
+          phone_number:       phone,
+        }),
+      });
+
+      // Step 2: Save restrictions via dedicated self-restrictions endpoint
+      const restrictions = valueToRestrictions(restrictionValue);
+      await apiFetch("/auth/my-profile/restrictions", {
+        method: "POST",
+        body: JSON.stringify({ restrictions }),
+      });
+
+      // Step 3: Reload profile from DB to confirm what was saved
+      const updated = await apiFetch("/auth/my-profile");
+      setProfile(updated);
+      setDietPref(updated.dietary_preference || "Veg");
+      setAgeGroup(updated.age_group || null);
+      setGender(updated.gender || null);
+      setPhone(updated.phone_number || "");
+      setRestrictionValue(restrictionsToValue(updated.restrictions || []));
+
+      showSuccess("✓ Profile saved successfully!");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      setError(e.message || "Save failed. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputStyle = {
+    width: "100%", padding: "9px 12px", borderRadius: 8,
+    border: `0.5px solid ${C.border}`, fontSize: 13, color: C.text,
+    background: "#F1EFE8", outline: "none", boxSizing: "border-box",
+  };
+
+  // Restriction summary counts
+  const allergyCount = Object.values(restrictionValue).filter(v => v.allergy).length;
+  const dislikeCount = Object.values(restrictionValue).filter(v => v.dislike).length;
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -110,7 +131,6 @@ export default function MyProfile({ onBack }) {
           <span onClick={onBack} style={{ color: C.mint, fontSize: 20, cursor: "pointer" }}>←</span>
           <div style={{ fontSize: 17, fontWeight: 500, color: "#FDFCF8" }}>My Profile</div>
         </div>
-        {/* Avatar */}
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ width: 56, height: 56, borderRadius: "50%", background: C.mint, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 500, color: C.green }}>
             {(profile?.name || "U")[0].toUpperCase()}
@@ -118,26 +138,31 @@ export default function MyProfile({ onBack }) {
           <div>
             <div style={{ fontSize: 17, fontWeight: 500, color: "#FDFCF8" }}>{profile?.name}</div>
             <div style={{ fontSize: 12, color: "#5DCAA5", marginTop: 2 }}>{profile?.email || "No email set"}</div>
-            <div style={{ fontSize: 11, color: "#5DCAA5", marginTop: 1, textTransform: "uppercase", letterSpacing: "0.04em" }}>{profile?.role?.replace("_", " ")}</div>
+            <div style={{ fontSize: 11, color: "#5DCAA5", marginTop: 1, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              {(profile?.role || "").replace(/_/g, " ")}
+            </div>
           </div>
         </div>
       </div>
 
       <div style={{ padding: "16px 16px 100px" }}>
 
-        {error && (
-          <div style={{ background: C.error, border: `0.5px solid #F5C4B3`, borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: C.errorText }}>
-            {error}
+        {/* Success message — fixed at top, prominent */}
+        {successMsg && (
+          <div style={{ background: "#1D9E75", borderRadius: 10, padding: "14px 16px", marginBottom: 16, fontSize: 14, color: "white", fontWeight: 500, display: "flex", alignItems: "center", gap: 10, boxShadow: "0 4px 12px rgba(29,158,117,0.3)" }}>
+            <span style={{ fontSize: 20 }}>✓</span>
+            <span>{successMsg}</span>
           </div>
         )}
-        {success && (
-          <div style={{ background: "#1D9E75", borderRadius: 10, padding: "12px 14px", marginBottom: 14, fontSize: 13, color: "white", fontWeight: 500, display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 16 }}>✓</span> Profile saved successfully!
+
+        {error && (
+          <div style={{ background: C.error, border: `0.5px solid #F5C4B3`, borderRadius: 10, padding: "12px 14px", marginBottom: 14, fontSize: 13, color: C.errorText }}>
+            {error}
           </div>
         )}
 
         {/* ── Personal details ── */}
-        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Personal details</div>
+        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Personal details</div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Full name</div>
@@ -151,34 +176,34 @@ export default function MyProfile({ onBack }) {
           </div>
           <div>
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Phone number <span style={{ color: "#B4B2A9" }}>(optional)</span></div>
-            <input value={form.phone_number} onChange={e => set("phone_number", e.target.value)} placeholder="e.g. 98765 43210" style={inputStyle} />
+            <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 98765 43210" style={inputStyle} />
           </div>
         </div>
 
         {/* ── Dietary preference ── */}
-        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Dietary preference</div>
+        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Dietary preference</div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {DIET_PREFS.map(d => (
-              <div key={d} onClick={() => set("dietary_preference", d)}
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "10px 8px", borderRadius: 12, border: `0.5px solid ${form.dietary_preference === d ? C.teal : C.border}`, background: form.dietary_preference === d ? "#E1F5EE" : "transparent", cursor: "pointer", transition: "all 0.15s" }}>
+              <div key={d} onClick={() => setDietPref(d)}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "10px 8px", borderRadius: 12, border: `0.5px solid ${dietPref === d ? C.teal : C.border}`, background: dietPref === d ? "#E1F5EE" : "transparent", cursor: "pointer", transition: "all 0.15s" }}>
                 <img src={DIET_IMAGES[d]} alt={d} style={{ width: 32, height: 32, objectFit: "contain" }} onError={e => e.target.style.display = "none"} />
-                <span style={{ fontSize: 12, fontWeight: 500, color: form.dietary_preference === d ? C.deepTeal : C.muted }}>{d}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: dietPref === d ? C.deepTeal : C.muted }}>{d}</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* ── Age group ── */}
-        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Age group</div>
+        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Age group</div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {AGE_GROUPS.map(ag => (
-              <div key={ag.value} onClick={() => set("age_group", ag.value)}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, border: `0.5px solid ${form.age_group === ag.value ? C.teal : C.border}`, background: form.age_group === ag.value ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
+              <div key={ag.value} onClick={() => setAgeGroup(ageGroup === ag.value ? null : ag.value)}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, border: `0.5px solid ${ageGroup === ag.value ? C.teal : C.border}`, background: ageGroup === ag.value ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
                 <span style={{ fontSize: 24 }}>{ag.emoji}</span>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: form.age_group === ag.value ? C.deepTeal : C.text }}>{ag.label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: ageGroup === ag.value ? C.deepTeal : C.text }}>{ag.label}</div>
                   <div style={{ fontSize: 10, color: C.muted }}>{ag.sub}</div>
                 </div>
               </div>
@@ -187,24 +212,39 @@ export default function MyProfile({ onBack }) {
         </div>
 
         {/* ── Gender ── */}
-        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Gender</div>
+        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Gender</div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {GENDERS.map(g => (
-              <div key={g.value} onClick={() => set("gender", g.value)}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 20, border: `0.5px solid ${form.gender === g.value ? C.teal : C.border}`, background: form.gender === g.value ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
+              <div key={g.value} onClick={() => setGender(gender === g.value ? null : g.value)}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 20, border: `0.5px solid ${gender === g.value ? C.teal : C.border}`, background: gender === g.value ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
                 <span style={{ fontSize: 18 }}>{g.emoji}</span>
-                <span style={{ fontSize: 12, color: form.gender === g.value ? C.deepTeal : C.muted }}>{g.value}</span>
+                <span style={{ fontSize: 12, color: gender === g.value ? C.deepTeal : C.muted }}>{g.value}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* ── Allergies & dislikes ── */}
-        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Allergies & dislikes</div>
+        {/* ── Allergies & dislikes — summary at top ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>Allergies & dislikes</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {allergyCount > 0 && (
+              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#FAECE7", color: "#712B13", fontWeight: 500 }}>
+                🚫 {allergyCount} {allergyCount === 1 ? "allergy" : "allergies"}
+              </span>
+            )}
+            {dislikeCount > 0 && (
+              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#FAEEDA", color: "#633806", fontWeight: 500 }}>
+                😕 {dislikeCount} {dislikeCount === 1 ? "dislike" : "dislikes"}
+              </span>
+            )}
+          </div>
+        </div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
-            Tap <strong style={{color:"#E24B4A"}}>🚫 Allergy</strong> for medical restrictions · <strong style={{color:"#BA7517"}}>😕 Dislike</strong> for preferences
+            Tap <strong style={{ color: "#E24B4A" }}>🚫 Allergy</strong> for medical restrictions ·
+            <strong style={{ color: "#BA7517" }}> 😕 Dislike</strong> for preferences
           </div>
           <IngredientSelector
             mode="restriction"
@@ -217,8 +257,9 @@ export default function MyProfile({ onBack }) {
       </div>
 
       {/* Fixed save button */}
-      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: C.card, padding: "14px 16px 28px", borderTop: `0.5px solid ${C.border}`, boxSizing: "border-box" }}>
-        <button onClick={handleSave} disabled={saving} style={{ width: "100%", padding: 13, border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, color: C.green, background: C.mint, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
+      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: C.card, padding: "14px 16px 28px", borderTop: `0.5px solid ${C.border}`, boxSizing: "border-box", zIndex: 10 }}>
+        <button onClick={handleSave} disabled={saving}
+          style={{ width: "100%", padding: 13, border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, color: C.green, background: C.mint, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
           {saving ? "Saving..." : "Save profile"}
         </button>
       </div>

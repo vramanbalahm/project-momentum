@@ -98,9 +98,20 @@ export default function ManageMembers({ onBack }) {
   };
 
   const openEdit = async (m) => {
-    // Load full member profile from backend
+    // Set basic info immediately so sheet opens fast
+    setEditForm({
+      user_id:            m.user_id,
+      name:               m.name,
+      dietary_preference: "Veg",
+      age_group:          null,
+      gender:             null,
+      phone_number:       "",
+      restrictionValue:   {},
+    });
+    setEditMember(m);
+    // Load full profile from DB — target_user_id param allows admin to view any member
     try {
-      const profile = await apiFetch(`/auth/my-profile?user_id=${m.user_id}`);
+      const profile = await apiFetch(`/auth/my-profile?target_user_id=${m.user_id}`);
       setEditForm({
         user_id:            m.user_id,
         name:               m.name,
@@ -110,30 +121,23 @@ export default function ManageMembers({ onBack }) {
         phone_number:       profile.phone_number || "",
         restrictionValue:   restrictionsToValue(profile.restrictions || []),
       });
-    } catch {
-      // Fallback if profile not loaded
-      setEditForm({
-        user_id:            m.user_id,
-        name:               m.name,
-        dietary_preference: "Veg",
-        age_group:          null,
-        gender:             null,
-        phone_number:       "",
-        restrictionValue:   {},
-      });
+    } catch (e) {
+      // Keep defaults if load fails
+      console.error("Failed to load member profile:", e);
     }
-    setEditMember(m);
   };
 
   const handleSaveEdit = async () => {
     setEditSaving(true);
+    setError(null);
     try {
+      // Save all member profile fields via admin endpoint
       await apiFetch("/onboarding/members", {
         method: "POST",
         body: JSON.stringify({
           members: [{
             user_id:            editForm.user_id,
-            dietary_preference: editForm.dietary_preference,
+            dietary_preference: editForm.dietary_preference || "Veg",
             age_group:          editForm.age_group,
             gender:             editForm.gender,
             phone_number:       editForm.phone_number,
@@ -141,11 +145,13 @@ export default function ManageMembers({ onBack }) {
           }]
         })
       });
+      // Reload member list to reflect changes
+      await loadMembers();
       setSuccess(`${editForm.name}'s profile updated successfully!`);
+      setTimeout(() => setSuccess(null), 5000);
       setEditMember(null);
-      setTimeout(() => setSuccess(null), 4000);
     } catch (e) {
-      setError(e.message);
+      setError(e.message || "Save failed. Please try again.");
     } finally {
       setEditSaving(false);
     }

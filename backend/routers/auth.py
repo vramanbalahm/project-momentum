@@ -736,7 +736,7 @@ async def update_my_profile(
             WHERE user_id = CAST(:uid AS uuid)
         """), {"phone": req.phone_number or None, "uid": user_id})
 
-    # Upsert member_preferences
+    # Upsert member_preferences — always update all provided fields
     db.execute(text("""
         INSERT INTO member_preferences
             (user_id, house_id, dietary_preference, age_group, gender, updated_by)
@@ -744,18 +744,63 @@ async def update_my_profile(
             (CAST(:uid AS uuid), CAST(:hid AS uuid),
              CAST(:diet AS diet_pref), :age, :gender, CAST(:uid AS uuid))
         ON CONFLICT (user_id) DO UPDATE
-        SET dietary_preference = COALESCE(CAST(:diet AS diet_pref), member_preferences.dietary_preference),
-            age_group          = COALESCE(:age,    member_preferences.age_group),
-            gender             = COALESCE(:gender, member_preferences.gender),
+        SET dietary_preference = CAST(:diet AS diet_pref),
+            age_group          = :age,
+            gender             = :gender,
             updated_at         = NOW(),
             updated_by         = CAST(:uid AS uuid)
     """), {
         "uid":    user_id,
         "hid":    house_id,
-        "diet":   req.dietary_preference,
+        "diet":   req.dietary_preference or "Veg",
         "age":    req.age_group,
         "gender": req.gender,
     })
 
     db.commit()
     return {"message": "Profile updated successfully."}
+
+
+# ── Save own restrictions (available to all users) ────────────────────────────
+
+class SelfRestrictionItem(BaseModel):
+    ingredient_id:    int
+    restriction_type: str  # Allergy | Dislike
+
+class SaveSelfRestrictionsRequest(BaseModel):
+    restrictions: list
+
+@router.post("/my-profile/restrictions", status_code=200)
+async def save_my_restrictions(
+    req: SaveSelfRestrictionsRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Saves the logged-in user's own allergies and dislikes.
+    Available to ALL users — not just admins.
+    """
+    user_id  = current_user["user_id"]
+    house_id = current_user["house_id"]
+
+    # Delete existing restrictions for this user
+    db.execute(text("""
+        DELETE FROM member_restrictions WHERE user_id = CAST(:uid AS uuid)
+    """), {"uid": user_id})
+
+    # Insert new restrictions
+    for r in req.restrictions:
+        ing_id = r.get("ingredient_id") if isinstance(r, dict) else r.ingredient_id
+        rtype  = r.get("restriction_type") if isinstance(r, dict) else r.restriction_type
+        if rtype not in ("Allergy", "Dislike"):
+            continue
+        db.execute(text("""
+            INSERT INTO member_restrictions
+                (user_id, house_id, ingredient_id, restriction_type, updated_by)
+            VALUES
+                (CAST(:uid AS uuid), CAST(:hid AS uuid), :iid, :rtype, CAST(:uid AS uuid))
+            ON CONFLICT (user_id, ingredient_id, restriction_type) DO NOTHING
+        """), {"uid": user_id, "hid": house_id, "iid": ing_id, "rtype": rtype})
+
+    db.commit()
+    return {"message": "Restrictions saved.", "count": len(req.restrictions)}
