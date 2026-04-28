@@ -11,6 +11,7 @@ import SwapCopyBar from './components/SwapCopyBar';
 import { swapSlots, swapDays, auditBlueprint, persistSwap } from './services/swapService';
 import { useAuth } from './context/AuthContext';
 import MemberAvailability from './pages/MemberAvailability';
+import ChangePassword from './pages/ChangePassword';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 // HH_ID now comes from authenticated user — see App() below
@@ -155,6 +156,8 @@ export default function App({ onBack }) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "household_admin" || user?.role === "platform_admin";
   const [showAvailabilityOverlay, setShowAvailabilityOverlay] = useState(false);
+  const [plannerMenuOpen, setPlannerMenuOpen] = useState(false);
+  const [plannerShowChangePassword, setPlannerShowChangePassword] = useState(false);
   const [authScreen, setAuthScreen] = useState('login'); // kept for reference — auth gate moved to main.jsx
   const [blueprint, setBlueprint] = useState({});
   const [suggestions, setSuggestions] = useState([]);
@@ -569,17 +572,42 @@ export default function App({ onBack }) {
                   {cta.label}
                 </button>
               )}
-              <div
-                onClick={logout}
-                title="Tap to sign out"
-                style={{
-                  width: 34, height: 34, borderRadius: "50%",
-                  background: "#2C4A3E", border: "2px solid #5DCAA5",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "#9FE1CB", fontSize: 13, fontWeight: 500, flexShrink: 0,
-                  cursor: "pointer"
-                }}>
-                {user?.name?.charAt(0).toUpperCase() || 'U'}
+              {/* Avatar — opens settings menu, consistent with Dashboard */}
+              <div style={{ position: "relative" }}>
+                <div
+                  onClick={() => setPlannerMenuOpen(o => !o)}
+                  style={{
+                    width: 34, height: 34, borderRadius: "50%",
+                    background: "#2C4A3E", border: "2px solid #5DCAA5",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "#9FE1CB", fontSize: 13, fontWeight: 500, flexShrink: 0,
+                    cursor: "pointer"
+                  }}>
+                  {user?.name?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                {plannerMenuOpen && (
+                  <>
+                    <div onClick={() => setPlannerMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+                    <div style={{
+                      position: "absolute", top: 40, right: 0, zIndex: 50,
+                      background: "#FFF9F2", borderRadius: 14,
+                      boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
+                      border: "0.5px solid #EDE8E0",
+                      overflow: "hidden", minWidth: 200
+                    }}>
+                      <div style={{ padding: "12px 16px", borderBottom: "0.5px solid #EDE8E0", background: "#F7F4EE" }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#2C2C2A" }}>{user?.name}</div>
+                        <div style={{ fontSize: 11, color: "#888780", marginTop: 2 }}>{user?.email}</div>
+                      </div>
+                      {onBack && (
+                        <PlannerMenuItem icon="🏠" label="Dashboard" onClick={() => { setPlannerMenuOpen(false); onBack(); }} />
+                      )}
+                      <PlannerMenuItem icon="👤" label="My Profile" onClick={() => { setPlannerMenuOpen(false); onBack && onBack(); /* navigate via dashboard */ }} />
+                      <PlannerMenuItem icon="🔑" label="Change Password" onClick={() => { setPlannerMenuOpen(false); setPlannerShowChangePassword(true); }} />
+                      <PlannerMenuItem icon="🚪" label="Sign out" onClick={() => { setPlannerMenuOpen(false); logout(); }} danger />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -983,6 +1011,11 @@ export default function App({ onBack }) {
           />
         )}
 
+        {/* ── CHANGE PASSWORD OVERLAY ── */}
+        {plannerShowChangePassword && (
+          <ChangePassword onClose={() => setPlannerShowChangePassword(false)} />
+        )}
+
         {/* ── AVAILABILITY OVERLAY — admin only, full screen overlay within planner ── */}
         {showAvailabilityOverlay && (
           <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#F7F4EE" }}>
@@ -993,5 +1026,23 @@ export default function App({ onBack }) {
           </div>
         )}
     </>
+  );
+}
+
+function PlannerMenuItem({ icon, label, onClick, danger }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        padding: "12px 16px", display: "flex", alignItems: "center", gap: 10,
+        cursor: "pointer", fontSize: 13,
+        color: danger ? "#993C1D" : "#2C2C2A",
+        borderBottom: "0.5px solid #EDE8E0",
+        background: "transparent"
+      }}
+    >
+      <span style={{ fontSize: 16 }}>{icon}</span>
+      <span>{label}</span>
+    </div>
   );
 }
