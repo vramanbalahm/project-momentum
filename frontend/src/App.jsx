@@ -10,6 +10,7 @@ import MealEditScreen from './components/MealEditScreen';
 import SwapCopyBar from './components/SwapCopyBar';
 import { swapSlots, swapDays, auditBlueprint, persistSwap } from './services/swapService';
 import { useAuth } from './context/AuthContext';
+import MemberAvailability from './pages/MemberAvailability';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 // HH_ID now comes from authenticated user — see App() below
@@ -152,6 +153,8 @@ const WeekThumbCard = ({ meal, slotId, onClick, isSelected = false, isSwapMode =
 
 export default function App({ onBack }) {
   const { user, logout } = useAuth();
+  const isAdmin = user?.role === "household_admin" || user?.role === "platform_admin";
+  const [showAvailabilityOverlay, setShowAvailabilityOverlay] = useState(false);
   const [authScreen, setAuthScreen] = useState('login'); // kept for reference — auth gate moved to main.jsx
   const [blueprint, setBlueprint] = useState({});
   const [suggestions, setSuggestions] = useState([]);
@@ -538,8 +541,22 @@ export default function App({ onBack }) {
               <div style={{ color: "#FDFCF8", fontSize: 16, fontWeight: 500, letterSpacing: -0.3 }}>Your week awaits</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {/* Save button in header — hidden when viewing past weeks */}
-              {isCurrentWeek && (
+              {/* Availability button — admin only */}
+              {isAdmin && isCurrentWeek && (
+                <button
+                  onClick={() => setShowAvailabilityOverlay(true)}
+                  style={{
+                    background: "rgba(159,225,203,0.15)", color: "#9FE1CB",
+                    border: "0.5px solid rgba(159,225,203,0.3)",
+                    borderRadius: 12, padding: "8px 12px",
+                    fontSize: 12, fontWeight: 500, cursor: "pointer"
+                  }}
+                >
+                  👥 Availability
+                </button>
+              )}
+              {/* Save button in header — admin only, hidden when viewing past weeks */}
+              {isAdmin && isCurrentWeek && (
                 <button
                   onClick={cta.onClick}
                   style={{
@@ -595,7 +612,7 @@ export default function App({ onBack }) {
 
             </button>
           ))}
-          {isDirty && (
+          {isAdmin && isDirty && (
             <div style={{ marginLeft: "auto", fontSize: 10, color: "#EF9F27", fontWeight: 500 }}>
               ● Unsaved changes
             </div>
@@ -746,7 +763,7 @@ export default function App({ onBack }) {
                       auditResult={auditResult}
                       isEditable={isCurrentWeek}
                       isHighlighted={demoEvents.some(ev => ev.dayName === selectedDay)}
-                      onClick={(data) => isCurrentWeek && setEditing(data)}
+                      onClick={(data) => isAdmin && isCurrentWeek && setEditing(data)}
                     />
                   </div>
                 ))}
@@ -771,13 +788,15 @@ export default function App({ onBack }) {
               ) : (
               <>
               <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 6, fontStyle: "italic" }}>
-                {isCurrentWeek
-                  ? (swapMode ? "" : "Tap any meal to edit that day")
-                  : "Read-only view — use Copy to Current Week to edit"}
+                {!isAdmin
+                  ? "View only — planning is managed by your household admin"
+                  : isCurrentWeek
+                    ? (swapMode ? "" : "Tap any meal to edit that day")
+                    : "Read-only view — use Copy to Current Week to edit"}
               </div>
 
-              {/* Swap / Copy action bar — current week only */}
-              {isCurrentWeek && (
+              {/* Swap / Copy action bar — admin + current week only */}
+              {isAdmin && isCurrentWeek && (
                 <SwapCopyBar
                   mode={swapMode}
                   selectedKey={swapSelected}
@@ -869,8 +888,8 @@ export default function App({ onBack }) {
             </div>
           ))}
 
-          {/* Past week → Copy button only. Current week → normal CTA */}
-          {!isCurrentWeek ? (
+          {/* Past week → Copy button only (admin). Current week → normal CTA (admin). Members see nothing. */}
+          {isAdmin && !isCurrentWeek && (
             <button
               onClick={() => setShowCopyConfirm(true)}
               style={{
@@ -882,7 +901,8 @@ export default function App({ onBack }) {
             >
               Copy to Current Week
             </button>
-          ) : (
+          )}
+          {isAdmin && isCurrentWeek && (
             <button
               onClick={cta.onClick}
               style={{
@@ -895,6 +915,11 @@ export default function App({ onBack }) {
             >
               {cta.label}
             </button>
+          )}
+          {!isAdmin && (
+            <div style={{ fontSize: 11, color: "#5DCAA5", fontStyle: "italic" }}>
+              View only
+            </div>
           )}
         </div>
 
@@ -956,6 +981,16 @@ export default function App({ onBack }) {
               setIsSaved(false);
             }}
           />
+        )}
+
+        {/* ── AVAILABILITY OVERLAY — admin only, full screen overlay within planner ── */}
+        {showAvailabilityOverlay && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#F7F4EE" }}>
+            <MemberAvailability
+              onBack={() => setShowAvailabilityOverlay(false)}
+              onProceed={() => setShowAvailabilityOverlay(false)}
+            />
+          </div>
         )}
     </>
   );

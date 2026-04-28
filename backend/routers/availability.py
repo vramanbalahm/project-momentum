@@ -113,6 +113,7 @@ async def get_week_availability(
         "week_start": str(week_date),
         "week_end": str(week_end),
         "is_current_week": week_date == get_week_start(date.today()),
+        "has_saved": len(rows) > 0,   # True if any rows exist in DB for this week
         "members": [{"user_id": str(m.user_id), "name": m.name} for m in members],
         "slots": slots
     }
