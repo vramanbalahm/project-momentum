@@ -43,7 +43,11 @@ function getMonday(d = new Date()) {
 }
 
 function dateStr(d) {
-  return d.toISOString().slice(0, 10);
+  // Use local date parts to avoid UTC offset shifting the date (critical for IST +5:30)
+  const yyyy = d.getFullYear();
+  const mm   = String(d.getMonth() + 1).padStart(2, "0");
+  const dd   = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function formatDisplayDate(isoStr) {
