@@ -158,6 +158,19 @@ export default function App({ onBack }) {
   const [showAvailabilityOverlay, setShowAvailabilityOverlay] = useState(false);
   const [plannerMenuOpen, setPlannerMenuOpen] = useState(false);
   const [plannerShowChangePassword, setPlannerShowChangePassword] = useState(false);
+  const [plannerDirtyWarning, setPlannerDirtyWarning] = useState(false); // unsaved changes warning
+  const [pendingNavAction, setPendingNavAction] = useState(null); // action to run after user confirms
+
+  // Intercept navigation — warn if unsaved changes, else proceed
+  const safeNavigate = (action) => {
+    setPlannerMenuOpen(false);
+    if (isDirty) {
+      setPendingNavAction(() => action);
+      setPlannerDirtyWarning(true);
+    } else {
+      action();
+    }
+  };
   const [authScreen, setAuthScreen] = useState('login'); // kept for reference — auth gate moved to main.jsx
   const [blueprint, setBlueprint] = useState({});
   const [suggestions, setSuggestions] = useState([]);
@@ -539,7 +552,7 @@ export default function App({ onBack }) {
         <div style={{ background: "#1A3A2E", padding: "16px 20px 12px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div>
-              {onBack && <span onClick={onBack} style={{ color: "#9FE1CB", fontSize: 12, cursor: "pointer", display: "block", marginBottom: 4 }}>← Dashboard</span>}
+              {onBack && <span onClick={() => safeNavigate(onBack)} style={{ color: "#9FE1CB", fontSize: 12, cursor: "pointer", display: "block", marginBottom: 4 }}>← Dashboard</span>}
           <div style={{ color: "#9FE1CB", fontSize: 11, marginBottom: 1 }}>{greeting}, {user?.name?.split(' ')[0]} 👋</div>
               <div style={{ color: "#FDFCF8", fontSize: 16, fontWeight: 500, letterSpacing: -0.3 }}>Your week awaits</div>
             </div>
@@ -600,11 +613,10 @@ export default function App({ onBack }) {
                         <div style={{ fontSize: 11, color: "#888780", marginTop: 2 }}>{user?.email}</div>
                       </div>
                       {onBack && (
-                        <PlannerMenuItem icon="🏠" label="Dashboard" onClick={() => { setPlannerMenuOpen(false); onBack(); }} />
+                        <PlannerMenuItem icon="🏠" label="Dashboard" onClick={() => safeNavigate(onBack)} />
                       )}
-                      <PlannerMenuItem icon="👤" label="My Profile" onClick={() => { setPlannerMenuOpen(false); onBack && onBack(); /* navigate via dashboard */ }} />
                       <PlannerMenuItem icon="🔑" label="Change Password" onClick={() => { setPlannerMenuOpen(false); setPlannerShowChangePassword(true); }} />
-                      <PlannerMenuItem icon="🚪" label="Sign out" onClick={() => { setPlannerMenuOpen(false); logout(); }} danger />
+                      <PlannerMenuItem icon="🚪" label="Sign out" onClick={() => safeNavigate(logout)} danger />
                     </div>
                   </>
                 )}
@@ -1009,6 +1021,51 @@ export default function App({ onBack }) {
               setIsSaved(false);
             }}
           />
+        )}
+
+        {/* ── UNSAVED CHANGES WARNING ── */}
+        {plannerDirtyWarning && (
+          <div style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+            zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center"
+          }}>
+            <div style={{
+              width: "100%", maxWidth: 430, background: "#FFF9F2",
+              borderRadius: "24px 24px 0 0", padding: "28px 24px 40px"
+            }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#2C2C2A", marginBottom: 8 }}>
+                Unsaved changes
+              </div>
+              <div style={{ fontSize: 13, color: "#888780", marginBottom: 24, lineHeight: 1.6 }}>
+                Your plan has unsaved changes. Please save before leaving — or your changes will be lost.
+              </div>
+              <div style={{ display: "flex", gap: 12 }}>
+                <button
+                  onClick={() => setPlannerDirtyWarning(false)}
+                  style={{
+                    flex: 1, padding: "13px", borderRadius: 14,
+                    border: "1.5px solid #EDE8E0", background: "transparent",
+                    color: "#888780", fontSize: 14, fontWeight: 500, cursor: "pointer"
+                  }}
+                >
+                  Go back and save
+                </button>
+                <button
+                  onClick={() => {
+                    setPlannerDirtyWarning(false);
+                    if (pendingNavAction) { pendingNavAction(); setPendingNavAction(null); }
+                  }}
+                  style={{
+                    flex: 1, padding: "13px", borderRadius: 14,
+                    border: "none", background: "#993C1D",
+                    color: "#FDFCF8", fontSize: 14, fontWeight: 500, cursor: "pointer"
+                  }}
+                >
+                  Leave anyway
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ── CHANGE PASSWORD OVERLAY ── */}
