@@ -150,6 +150,10 @@ app.include_router(onboarding_router)
 from routers.weekly_plan import router as weekly_plan_router
 app.include_router(weekly_plan_router)
 
+# --- 6c. MEMBER AVAILABILITY ROUTER ---
+from routers.availability import router as availability_router
+app.include_router(availability_router)
+
 # --- 6b. FT-043: MEAL SWAP & STANDALONE AUDIT ---
 from services.swap_service import execute_swap, audit_slot
 

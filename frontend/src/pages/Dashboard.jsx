@@ -30,11 +30,19 @@ export default function Dashboard({ onNavigate }) {
       available: true,
     },
     {
+      id: "member_availability",
+      icon: "🗓️",
+      label: "Availability",
+      desc: "Who's home this week",
+      color: "#FFF3DC",
+      available: true,
+    },
+    {
       id: "family_profile",
       icon: "🏠",
       label: "Family Profile",
       desc: isAdmin ? "Update household settings" : "Admin access only",
-      color: "#FFF3DC",
+      color: "#E6F1FB",
       available: isAdmin,
     },
     {
@@ -117,6 +125,14 @@ export default function Dashboard({ onNavigate }) {
                       label="My Profile"
                       available={true}
                       onClick={() => { setMenuOpen(false); onNavigate("my_profile"); }}
+                    />
+
+                    {/* Member Availability — available to all */}
+                    <SettingsItem
+                      icon="🗓️"
+                      label="Member Availability"
+                      available={true}
+                      onClick={() => { setMenuOpen(false); onNavigate("member_availability"); }}
                     />
 
                     {/* Change Password — available to all */}
