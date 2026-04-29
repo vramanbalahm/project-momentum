@@ -256,6 +256,7 @@ export default function App({ onBack }) {
   // Load plan whenever weekOffset changes
   // weekOffset === 0 reloads current week (fixes returning from past week showing stale data)
   useEffect(() => {
+    if (!HH_ID) return; // wait until user is loaded — avoids /get-plan/undefined call
     const loadWeekPlan = async () => {
       setIsLoading(true);
       try {
@@ -322,11 +323,14 @@ export default function App({ onBack }) {
       }
     };
     loadWeekPlan();
-  }, [weekOffset]);
+  }, [weekOffset, suggestions.length, HH_ID]);
+  // HH_ID in deps: re-runs when user loads (fixes first-visit blank plan)
+  // suggestions.length in deps: re-runs gap-fill when suggestions arrive
 
   // Init — fetch suggestions + session constants once on load
   // Plan loading is handled entirely by the weekOffset useEffect
   useEffect(() => {
+    if (!HH_ID) return; // wait until user is loaded
     const init = async () => {
       try {
         const [suggRes, sessionRes] = await Promise.all([
@@ -351,7 +355,7 @@ export default function App({ onBack }) {
       }
     };
     init();
-  }, []);
+  }, [HH_ID]); // re-runs when user loads
 
   // RETAINED: Manual Audit
   const runAudit = async () => {
