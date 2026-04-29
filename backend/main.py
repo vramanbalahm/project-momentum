@@ -177,10 +177,14 @@ async def dev_reset_week(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    DEV ONLY — Deletes all plan data for the current week for this household.
+    Platform admin only — Deletes all plan data for the current week for this household.
     Removes meal_event_header (cascades to detail + audit), meal_attendance_log,
     and weekly_planning_session. Takes user back to a clean slate.
+    Future: expose to household_admin as "Start over this week" feature.
     """
+    if current_user["role"] != "platform_admin":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Platform admin access only.")
     from datetime import date, timedelta
     house_id = current_user["house_id"]
     today = date.today()

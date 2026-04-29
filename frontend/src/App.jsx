@@ -156,6 +156,7 @@ export default function App({ onBack }) {
   const { user, logout } = useAuth();
   const HH_ID = user?.house_id; // declared early — used in useEffects below
   const isAdmin = user?.role === "household_admin" || user?.role === "platform_admin";
+  const isPlatformAdmin = user?.role === "platform_admin";
   const [showAvailabilityOverlay, setShowAvailabilityOverlay] = useState(false);
   const [plannerMenuOpen, setPlannerMenuOpen] = useState(false);
   const [plannerShowChangePassword, setPlannerShowChangePassword] = useState(false);
@@ -572,7 +573,7 @@ export default function App({ onBack }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div>
               {onBack && <span onClick={() => safeNavigate(onBack)} style={{ color: "#9FE1CB", fontSize: 12, cursor: "pointer", display: "block", marginBottom: 4 }}>← Dashboard</span>}
-              {isAdmin && isCurrentWeek && (
+              {isPlatformAdmin && isCurrentWeek && (
                 <span
                   onClick={() => setShowResetConfirm(true)}
                   style={{ color: "#E24B4A", fontSize: 10, cursor: "pointer", display: "block", marginTop: 2, opacity: 0.7 }}
