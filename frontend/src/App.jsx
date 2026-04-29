@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
-import axios from 'axios';
+import axios from './api/client'; // uses configured client with auth interceptor
 
 // Component Imports
 import DayColumn from './components/DayColumn';
@@ -525,8 +525,8 @@ export default function App({ onBack }) {
 
   const cta = getCtaButton();
 
-  // HH_ID from authenticated user
-  const HH_ID = user?.house_id || 'HOUSEHOLD_001';
+  // HH_ID from authenticated user — always set after login
+  const HH_ID = user?.house_id;
 
   // ── AUTH GATE — after all hooks ──
   // FIX 1: Demo events matched to actual current week dates

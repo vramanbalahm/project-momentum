@@ -4,7 +4,7 @@ import uuid
 
 # --- 1. PLAN RETRIEVAL (FT-033: Multi-dish per slot) ---
 def fetch_active_plan(db: Session, h_id: str, week_start: str = None):
-    clean_h_id = "733b3f63-0fb4-4170-877c-eb2a70f29ccb" if h_id == "HOUSEHOLD_001" else h_id
+    clean_h_id = h_id  # h_id always from authenticated user — no fallback needed
 
     # FT-033: Query now returns ALL dishes per slot (main + sides)
     # week_start (YYYY-MM-DD): if provided, filter to that 7-day window only
@@ -81,8 +81,7 @@ def fetch_active_plan(db: Session, h_id: str, week_start: str = None):
 # --- 2. SUGGESTIONS & SCORING (Fixed: UUID Capture) ---
 def get_suggestions(db: Session, pref: str, h_id: str):
     current_pref = str(pref).strip() if pref else "Veg"
-    test_uuid = "733b3f63-0fb4-4170-877c-eb2a70f29ccb"
-    clean_h_id = test_uuid if h_id == "HOUSEHOLD_001" else h_id
+    clean_h_id = h_id  # h_id always from authenticated user
 
     filter_sql = "AND r.diet_type IN ('Veg', 'Vegan')" if current_pref == "Veg" else ""
 
@@ -164,7 +163,7 @@ from uuid import uuid4
 from sqlalchemy import text
 
 def persist_plan(db: Session, h_id: str, plan_data: list):
-    clean_h_id = "733b3f63-0fb4-4170-877c-eb2a70f29ccb" if h_id == "HOUSEHOLD_001" else h_id
+    clean_h_id = h_id  # h_id always from authenticated user — no fallback needed
 
     try:
         # 1. Purge only the dates being saved — not the entire household
@@ -262,7 +261,7 @@ def persist_plan(db: Session, h_id: str, plan_data: list):
 
 # --- 5. HOUSEHOLD PREFERENCES ---
 def get_dietary_pref(db: Session, h_id: str):
-    clean_h_id = "550e8400-e29b-41d4-a716-446655440000" if h_id == "HOUSEHOLD_001" else h_id
+    clean_h_id = h_id  # h_id always from authenticated user — no fallback needed
     res = db.execute(
         text("SELECT dietary_preference FROM household_master WHERE household_id = CAST(:h_id AS uuid)"),
         {"h_id": clean_h_id}
@@ -280,7 +279,7 @@ def get_session_constants(db: Session, h_id: str):
       - dietary_preference: household dietary pref
       - member_count: number of active household members
     """
-    clean_h_id = "733b3f63-0fb4-4170-877c-eb2a70f29ccb" if h_id == "HOUSEHOLD_001" else h_id
+    clean_h_id = h_id  # h_id always from authenticated user — no fallback needed
 
     # 1. Oldest week with any meal_event_header record
     oldest_row = db.execute(

@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Security
+from auth.dependencies import get_current_user
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
@@ -36,9 +37,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Testing constant — ACTIVE_H_ID used until auth is built (FT-001)
-# # ACTIVE_H_ID = "550e8400-e29b-41d4-a716-446655440000"
-ACTIVE_H_ID = "733b3f63-0fb4-4170-877c-eb2a70f29ccb"
+# ACTIVE_H_ID removed — all endpoints now use get_current_user from JWT token (auth wired FT-001)
 
 def get_db():
     db = SessionLocal()
@@ -50,20 +49,26 @@ def get_db():
 # --- 1. CORE SUGGESTIONS & PREFERENCES ---
 
 @app.get("/generate-suggestions/{household_id}")
-async def generate_suggestions(household_id: str, db: Session = Depends(get_db)):
-    # If the frontend sends "HOUSEHOLD_001", we swap it for the real ACTIVE_H_ID
-    clean_h_id = ACTIVE_H_ID if household_id == "HOUSEHOLD_001" else household_id
-    """Standardized to use price_logs while keeping yesterday's mapping."""
-    pref = get_dietary_pref(db, clean_h_id)
-    # Passed h_id to ensure inventory bonus (+50) and price penalty (-80) work
-    return get_suggestions(db, pref, clean_h_id)
+async def generate_suggestions(
+    household_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Standardized to use price_logs. house_id from authenticated user."""
+    h_id = current_user["house_id"]
+    pref = get_dietary_pref(db, h_id)
+    return get_suggestions(db, pref, h_id)
 
 # --- 2. AUDIT & INVENTORY ---
 
 @app.post("/audit")
-async def run_audit(changes: List[AuditItem], db: Session = Depends(get_db)):
-    """Yesterday's logic: Calculates impact of inventory changes."""
-    return execute_audit(db, ACTIVE_H_ID, changes)
+async def run_audit(
+    changes: List[AuditItem],
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Calculates impact of inventory changes. house_id from authenticated user."""
+    return execute_audit(db, current_user["house_id"], changes)
 
 @app.post("/inventory/update")
 def set_inventory(h_id: str, s_id: str, status: str, db: Session = Depends(get_db)):
@@ -74,21 +79,29 @@ def set_inventory(h_id: str, s_id: str, status: str, db: Session = Depends(get_d
 # --- 3. PLAN PERSISTENCE (FT-033: Multi-dish) ---
 
 @app.post("/save-plan")
-async def save_plan(request: SavePlanRequest, db: Session = Depends(get_db)):
+async def save_plan(
+    request: SavePlanRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
     try:
-        # FT-033: persist_plan now handles main + sides per slot
-        return persist_plan(db, ACTIVE_H_ID, request.plan)
+        # FT-033: persist_plan handles main + sides per slot. house_id from authenticated user.
+        return persist_plan(db, current_user["house_id"], request.plan)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/get-plan/{household_id}")
-async def get_plan(household_id: str, week_start: Optional[str] = None, db: Session = Depends(get_db)):
+async def get_plan(
+    household_id: str,
+    week_start: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
     """FT-033: Returns grouped plan — main + sides per slot.
     week_start (YYYY-MM-DD): if provided, returns plan for that specific week only.
-    If omitted, returns current week records.
+    If omitted, returns current week records. house_id from authenticated user.
     """
-    h_id = ACTIVE_H_ID if household_id == "HOUSEHOLD_001" else household_id
-    plan = fetch_active_plan(db, h_id, week_start=week_start)
+    plan = fetch_active_plan(db, current_user["house_id"], week_start=week_start)
     return plan
 
 # --- 4. MARKET SIGNALS & CONTENT VAULT ---
@@ -126,13 +139,16 @@ def get_recipe_details(recipe_id: str, db: Session = Depends(get_db)):
 
 # --- 5. SESSION CONSTANTS (fetched once on load) ---
 @app.get("/session-constants/{household_id}")
-async def session_constants(household_id: str, db: Session = Depends(get_db)):
+async def session_constants(
+    household_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
     """
     Single call on app load — returns oldest_plan_week, dietary_preference, member_count.
-    Frontend caches these for the session — no repeated DB hits per navigation.
+    Frontend caches these for the session. house_id from authenticated user.
     """
-    h_id = ACTIVE_H_ID if household_id == "HOUSEHOLD_001" else household_id
-    return get_session_constants(db, h_id)
+    return get_session_constants(db, current_user["house_id"])
 
 # --- 5b. AUTH ROUTER ---
 from routers.auth import router as auth_router
@@ -158,28 +174,38 @@ app.include_router(availability_router)
 from services.swap_service import execute_swap, audit_slot
 
 @app.post("/meal/swap")
-def swap_meals(payload: dict, db: Session = Depends(get_db)):
+def swap_meals(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
     """
     Generic meal slot swap. Works for within-day and cross-day.
     Day swap: caller loops over meal types, sends one request per type.
     payload: { source: {day, type, date}, target: {day, type, date} }
+    house_id from authenticated user.
     """
     return execute_swap(
         db=db,
-        h_id=ACTIVE_H_ID,
+        h_id=current_user["house_id"],
         source=payload["source"],
         target=payload["target"]
     )
 
 @app.post("/meal/audit-slot")
-def audit_meal_slot(payload: dict, db: Session = Depends(get_db)):
+def audit_meal_slot(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
     """
     Standalone slot audit — callable anytime, anywhere.
     payload: { date: YYYY-MM-DD, meal_slot: Breakfast|Lunch|Dinner }
+    house_id from authenticated user.
     """
     return audit_slot(
         db=db,
-        h_id=ACTIVE_H_ID,
+        h_id=current_user["house_id"],
         event_date=payload["date"],
         meal_slot=payload["meal_slot"]
     )
@@ -237,7 +263,11 @@ def search_recipes(q: str = "", db: Session = Depends(get_db)):
 
 # --- 8. FT-041: MEAL SLOT EDIT ---
 @app.post("/meal-slot/edit")
-def edit_meal_slot(payload: dict, db: Session = Depends(get_db)):
+def edit_meal_slot(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
     """
     Replace a dish in a meal slot and log to behavioral_tracker.
     payload: {
@@ -248,7 +278,7 @@ def edit_meal_slot(payload: dict, db: Session = Depends(get_db)):
         week_start_date
     }
     """
-    h_id = ACTIVE_H_ID if payload.get("house_id") == "HOUSEHOLD_001" else payload.get("house_id", ACTIVE_H_ID)
+    h_id = current_user["house_id"]
 
     # 1. Update meal_event_detail — replace the recipe for this dish
     db.execute(text("""

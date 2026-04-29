@@ -5,6 +5,7 @@
 #            run_plan_audit, send_planning_reminder
 
 from fastapi import APIRouter, Depends, HTTPException
+from auth.dependencies import get_current_user
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from datetime import date, datetime
@@ -14,8 +15,7 @@ from services.weekly_plan_service import generate_weekly_plan
 
 router = APIRouter(prefix="/weekly-plan", tags=["weekly_plan"])
 
-# Testing constant — replaced by auth once FT-001 is built
-ACTIVE_H_ID = "733b3f63-0fb4-4170-877c-eb2a70f29ccb"
+# ACTIVE_H_ID removed — endpoints now use get_current_user
 
 def get_db():
     db = SessionLocal()
@@ -33,7 +33,8 @@ def generate_weekly_plan_rule_based(
     guest_count: Optional[int] = 0,
     veg_nonveg_split: Optional[str] = "As Profile",
     questionnaire_week: Optional[int] = 1,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     FT-030: Generate a 7-day rule-based meal plan.
@@ -71,7 +72,7 @@ def generate_weekly_plan_rule_based(
 
     plan = generate_weekly_plan(
         db=db,
-        h_id=ACTIVE_H_ID,
+        h_id=current_user["house_id"],
         week_start_date=week_date,
         context=context
     )
@@ -83,12 +84,13 @@ def generate_weekly_plan_rule_based(
 @router.get("/history/{week_start_date}")
 def get_previous_week_plan(
     week_start_date: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     FT-035: Read-only view of any past week plan.
     Returns saved plan from meal_event_header + meal_event_detail.
+    house_id from authenticated user.
     """
     from services.plan_service import fetch_active_plan
-    # Reuse fetch_active_plan with date filter — full implementation in FT-035
-    return fetch_active_plan(db, ACTIVE_H_ID)
+    return fetch_active_plan(db, current_user["house_id"])
