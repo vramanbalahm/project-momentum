@@ -43,6 +43,24 @@ export default function ManageMembers({ onBack }) {
   const [profileLoading, setProfileLoading] = useState(false);
   const [copyFrom, setCopyFrom]             = useState(null);
   const [copyTo, setCopyTo]                 = useState({});
+  const [addFormPrefs, setAddFormPrefs]     = useState(null); // copied preferences for new member
+
+  // Copy preferences from an existing member into the add form
+  const applyCopyFrom = async (memberId) => {
+    setCopyFrom(memberId);
+    if (!memberId) return;
+    try {
+      const profile = await apiFetch(`/auth/my-profile?target_user_id=${memberId}`);
+      setAddFormPrefs({
+        dietary_preference: profile.dietary_preference || "Veg",
+        age_group:          profile.age_group || null,
+        gender:             profile.gender || null,
+        restrictionValue:   restrictionsToValue(profile.restrictions || []),
+      });
+    } catch {
+      // silently ignore — copy is best-effort
+    }
+  };
 
   const loadMembers = async () => {
     try {
@@ -164,13 +182,35 @@ export default function ManageMembers({ onBack }) {
     if (addForm.password.length < 8) { setError("Password must be at least 8 characters."); return; }
     setAdding(true);
     try {
-      await apiFetch("/auth/members/create", {
+      const newMember = await apiFetch("/auth/members/create", {
         method: "POST",
         body: JSON.stringify(addForm)
       });
+      // If preferences were copied — save them against the new member
+      if (addFormPrefs && newMember?.user_id) {
+        await apiFetch(`/auth/my-profile?target_user_id=${newMember.user_id}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            dietary_preference: addFormPrefs.dietary_preference,
+            age_group:          addFormPrefs.age_group,
+            gender:             addFormPrefs.gender,
+          })
+        });
+        if (addFormPrefs.restrictionValue && Object.keys(addFormPrefs.restrictionValue).length > 0) {
+          await apiFetch("/auth/my-profile/restrictions", {
+            method: "POST",
+            body: JSON.stringify({
+              target_user_id: newMember.user_id,
+              restrictions: valueToRestrictions(addFormPrefs.restrictionValue),
+            })
+          });
+        }
+      }
       setSuccess(`${addForm.name} added successfully!`);
       setTimeout(() => setSuccess(null), 4000);
       setAddForm({ name: "", email: "", password: "" });
+      setAddFormPrefs(null);
+      setCopyFrom(null);
       setShowAddForm(false);
       await loadMembers();
     } catch (e) {
@@ -211,8 +251,31 @@ export default function ManageMembers({ onBack }) {
           <div style={{ background: "#FFF9F2", borderRadius: 16, padding: "20px 16px", marginBottom: 16, border: "0.5px solid #EDE8E0" }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "#2C2C2A", marginBottom: 14 }}>New member</div>
             <input type="text" placeholder="Full name *" value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))} style={inputStyle} />
-            <input type="email" placeholder="Email address *" value={addForm.email} onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))} style={inputStyle} />
+            <input type="email" placeholder="Email address (optional)" value={addForm.email} onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))} style={inputStyle} />
             <input type="password" placeholder="Temporary password (min 8 chars) *" value={addForm.password} onChange={e => setAddForm(p => ({ ...p, password: e.target.value }))} style={{ ...inputStyle, marginBottom: 14 }} />
+
+            {/* Copy preferences from existing member */}
+            {members.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Copy preferences from (optional)</div>
+                <select
+                  value={copyFrom || ""}
+                  onChange={e => applyCopyFrom(e.target.value || null)}
+                  style={{ ...inputStyle, marginBottom: 0, appearance: "none", cursor: "pointer" }}
+                >
+                  <option value="">— Don't copy —</option>
+                  {members.map(m => (
+                    <option key={m.user_id} value={m.user_id}>{m.name}</option>
+                  ))}
+                </select>
+                {addFormPrefs && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: "#0F6E56", background: "#E1F5EE", borderRadius: 8, padding: "6px 10px" }}>
+                    ✓ Preferences copied from {members.find(m => m.user_id === copyFrom)?.name} — diet, age, gender and restrictions will be pre-filled
+                  </div>
+                )}
+              </div>
+            )}
+
             <button onClick={handleAddMember} disabled={adding} style={{ width: "100%", background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 12, padding: "12px", fontSize: 14, fontWeight: 500, cursor: adding ? "not-allowed" : "pointer", opacity: adding ? 0.7 : 1 }}>
               {adding ? "Adding..." : "Add member"}
             </button>
