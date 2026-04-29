@@ -41,6 +41,8 @@ export default function ManageMembers({ onBack }) {
   const [editForm, setEditForm]         = useState({});
   const [editSaving, setEditSaving]     = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [copyFrom, setCopyFrom]             = useState(null);
+  const [copyTo, setCopyTo]                 = useState({});
 
   const loadMembers = async () => {
     try {
@@ -106,7 +108,7 @@ export default function ManageMembers({ onBack }) {
       const profile = await apiFetch(`/auth/my-profile?target_user_id=${m.user_id}`);
       setEditForm({
         user_id:            m.user_id,
-        name:               m.name,
+        name:               m.name,  // editable by admin
         dietary_preference: profile.dietary_preference || "Veg",
         age_group:          profile.age_group || null,
         gender:             profile.gender || null,
@@ -125,18 +127,23 @@ export default function ManageMembers({ onBack }) {
     setEditSaving(true);
     setError(null);
     try {
-      // Save all member profile fields via admin endpoint
-      await apiFetch("/onboarding/members", {
+      // Save name + phone via PUT /auth/my-profile with target_user_id
+      await apiFetch(`/auth/my-profile?target_user_id=${editForm.user_id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name:               editForm.name,
+          dietary_preference: editForm.dietary_preference || "Veg",
+          age_group:          editForm.age_group,
+          gender:             editForm.gender,
+          phone_number:       editForm.phone_number,
+        })
+      });
+      // Save restrictions separately
+      await apiFetch("/auth/my-profile/restrictions", {
         method: "POST",
         body: JSON.stringify({
-          members: [{
-            user_id:            editForm.user_id,
-            dietary_preference: editForm.dietary_preference || "Veg",
-            age_group:          editForm.age_group,
-            gender:             editForm.gender,
-            phone_number:       editForm.phone_number,
-            restrictions:       valueToRestrictions(editForm.restrictionValue || {}),
-          }]
+          target_user_id: editForm.user_id,
+          restrictions: valueToRestrictions(editForm.restrictionValue || {}),
         })
       });
       // Reload member list to reflect changes
@@ -285,6 +292,15 @@ export default function ManageMembers({ onBack }) {
                 Loading profile...
               </div>
             ) : (<>
+
+            {/* Name */}
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Full name</div>
+            <input
+              value={editForm.name || ""}
+              onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="Full name"
+              style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `0.5px solid ${C.border}`, fontSize: 13, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box", marginBottom: 14 }}
+            />
 
             {/* Dietary preference */}
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Dietary preference</div>

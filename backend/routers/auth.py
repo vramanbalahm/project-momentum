@@ -625,6 +625,7 @@ async def deactivate_member(
 # ── My Profile ────────────────────────────────────────────────────────────────
 
 class MyProfileUpdateRequest(BaseModel):
+    name:         str = None   # Admin can update any member's name; user can update own
     age_group:    str = None   # Child | Teen | Adult | Senior
     gender:       str = None   # Male | Female | Transgender | Prefer not to say
     phone_number: str = None
@@ -709,13 +710,16 @@ async def get_my_profile(
 async def update_my_profile(
     req: MyProfileUpdateRequest,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    target_user_id: str = None
 ):
     """
     Updates the logged-in user's personal profile.
-    Available to all authenticated users — each user manages their own profile.
+    Admin can pass ?target_user_id= to update any member's profile (including name).
     """
-    user_id  = current_user["user_id"]
+    is_admin = current_user["role"] in ("household_admin", "platform_admin")
+    # Admin can target another member — otherwise always own profile
+    user_id  = target_user_id if (target_user_id and is_admin) else current_user["user_id"]
     house_id = current_user["house_id"]
 
     valid_age    = {"Child", "Teen", "Adult", "Senior", None}
@@ -728,6 +732,13 @@ async def update_my_profile(
         raise HTTPException(status_code=422, detail=f"Invalid gender: {req.gender}")
     if req.dietary_preference not in valid_diet:
         raise HTTPException(status_code=422, detail=f"Invalid dietary_preference: {req.dietary_preference}")
+
+    # Update name on users table (admin can update any member via target_user_id)
+    if req.name is not None and req.name.strip():
+        db.execute(text("""
+            UPDATE users SET name = :name
+            WHERE user_id = CAST(:uid AS uuid)
+        """), {"name": req.name.strip(), "uid": user_id})
 
     # Update phone_number on users table
     if req.phone_number is not None:
