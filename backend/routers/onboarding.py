@@ -521,3 +521,81 @@ async def confirm_onboarding(
 
     db.commit()
     return {"message": "Onboarding confirmed. Weekly Planner is now unlocked."}
+
+
+# ── GET /onboarding/household-restrictions ────────────────────────────────────
+@router.get("/household-restrictions")
+async def get_household_restrictions(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns household-level allergy and dislike restrictions.
+    Available to all authenticated users — readable by all.
+    """
+    house_id = current_user["house_id"]
+
+    rows = db.execute(text("""
+        SELECT
+            hr.id, hr.ingredient_id, hr.restriction_type,
+            ic.name_en, ic.name_ta, ic.category, ic.thumb_url
+        FROM household_restrictions hr
+        JOIN ingredient_catalog ic ON hr.ingredient_id = ic.id
+        WHERE hr.house_id = CAST(:hid AS uuid)
+        ORDER BY hr.restriction_type, ic.name_en
+    """), {"hid": house_id}).fetchall()
+
+    return [{
+        "id":               r.id,
+        "ingredient_id":    r.ingredient_id,
+        "restriction_type": r.restriction_type,
+        "name_en":          r.name_en,
+        "name_ta":          r.name_ta,
+        "category":         r.category,
+        "thumb_url":        r.thumb_url,
+    } for r in rows]
+
+
+# ── POST /onboarding/household-restrictions ───────────────────────────────────
+class HouseholdRestrictionsRequest(BaseModel):
+    restrictions: list  # [{ ingredient_id, restriction_type }]
+
+@router.post("/household-restrictions", status_code=200)
+async def save_household_restrictions(
+    req: HouseholdRestrictionsRequest,
+    current_user: dict = Depends(require_role("household_admin", "platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Saves household-level allergy and dislike restrictions.
+    Admin only — replaces all existing household restrictions with submitted list.
+    """
+    house_id = current_user["house_id"]
+    user_id  = current_user["user_id"]
+
+    # Delete all existing household restrictions and replace
+    db.execute(text("""
+        DELETE FROM household_restrictions
+        WHERE house_id = CAST(:hid AS uuid)
+    """), {"hid": house_id})
+
+    for r in req.restrictions:
+        ing_id = r.get("ingredient_id")
+        rtype  = r.get("restriction_type")
+        if not ing_id or rtype not in ("Allergy", "Dislike"):
+            continue
+        db.execute(text("""
+            INSERT INTO household_restrictions
+                (house_id, ingredient_id, restriction_type, updated_by)
+            VALUES
+                (CAST(:hid AS uuid), :ing_id, :rtype, CAST(:uid AS uuid))
+            ON CONFLICT (house_id, ingredient_id, restriction_type) DO NOTHING
+        """), {
+            "hid":    house_id,
+            "ing_id": ing_id,
+            "rtype":  rtype,
+            "uid":    user_id,
+        })
+
+    db.commit()
+    return {"message": "Household restrictions saved.", "count": len(req.restrictions)}
