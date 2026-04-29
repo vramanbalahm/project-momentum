@@ -149,7 +149,7 @@ export default function FamilyProfile({ onBack }) {
         method: "POST",
         body: JSON.stringify({ restrictions: valueToRestrictions(householdRestrictions) })
       });
-      setSuccess(res.message || "Profile updated successfully.");
+      setSuccess("Family profile saved successfully.");
     } catch (e) {
       setError(e.message);
     } finally {
