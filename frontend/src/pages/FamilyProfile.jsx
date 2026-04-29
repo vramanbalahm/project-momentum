@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import IngredientSelector, { restrictionsToValue, valueToRestrictions } from "../components/IngredientSelector";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const DIET_PREFS = ["Veg", "Non-Veg", "Vegan", "Eggetarian"];
@@ -36,6 +37,7 @@ export default function FamilyProfile({ onBack }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [householdRestrictions, setHouseholdRestrictions] = useState({});
 
   const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
@@ -55,7 +57,11 @@ export default function FamilyProfile({ onBack }) {
         setCuisineStates(cis);
 
         // Load current household profile — pre-fill all fields from /auth/me
-        const me = await apiFetch("/auth/me");
+        const [me, hRestrictions] = await Promise.all([
+          apiFetch("/auth/me"),
+          apiFetch("/onboarding/household-restrictions").catch(() => [])
+        ]);
+        setHouseholdRestrictions(restrictionsToValue(hRestrictions));
         setForm(prev => ({
           ...prev,
           house_name:            me.house_name || "",
@@ -138,6 +144,11 @@ export default function FamilyProfile({ onBack }) {
         cuisine_sub_region_id: form.cuisine_sub_region_id ? parseInt(form.cuisine_sub_region_id) : undefined
       };
       const res = await apiFetch("/auth/profile", { method: "PUT", body: JSON.stringify(payload) });
+      // Save household-level restrictions
+      await apiFetch("/onboarding/household-restrictions", {
+        method: "POST",
+        body: JSON.stringify({ restrictions: valueToRestrictions(householdRestrictions) })
+      });
       setSuccess(res.message || "Profile updated successfully.");
     } catch (e) {
       setError(e.message);
@@ -252,6 +263,23 @@ export default function FamilyProfile({ onBack }) {
               </select>
             </Field>
           )}
+        </div>
+
+      </div>
+
+        {/* Family-level restrictions */}
+        <div style={{ background: "#FFF9F2", borderRadius: 16, padding: "20px 16px", marginBottom: 100 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#B4B2A9", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Family Restrictions</div>
+          <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 14, lineHeight: 1.5 }}>
+            Ingredients that nobody in the family eats — these apply to the whole household and will be excluded from all meal suggestions.
+          </div>
+          <IngredientSelector
+            mode="restriction"
+            value={householdRestrictions}
+            onChange={setHouseholdRestrictions}
+            showImages={true}
+            maxHeight="250px"
+          />
         </div>
 
       </div>
