@@ -265,8 +265,6 @@ export default function FamilyProfile({ onBack }) {
           )}
         </div>
 
-      </div>
-
         {/* Family-level restrictions */}
         <div style={{ background: "#FFF9F2", borderRadius: 16, padding: "20px 16px", marginBottom: 100 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: "#B4B2A9", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Family Restrictions</div>
