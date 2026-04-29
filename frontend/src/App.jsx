@@ -154,6 +154,7 @@ const WeekThumbCard = ({ meal, slotId, onClick, isSelected = false, isSwapMode =
 
 export default function App({ onBack }) {
   const { user, logout } = useAuth();
+  const HH_ID = user?.house_id; // declared early — used in useEffects below
   const isAdmin = user?.role === "household_admin" || user?.role === "platform_admin";
   const [showAvailabilityOverlay, setShowAvailabilityOverlay] = useState(false);
   const [plannerMenuOpen, setPlannerMenuOpen] = useState(false);
@@ -529,8 +530,7 @@ export default function App({ onBack }) {
 
   const cta = getCtaButton();
 
-  // HH_ID from authenticated user — always set after login
-  const HH_ID = user?.house_id;
+  // HH_ID declared above useAuth() — see line 157
 
   // ── AUTH GATE — after all hooks ──
   // FIX 1: Demo events matched to actual current week dates
