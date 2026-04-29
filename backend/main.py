@@ -182,9 +182,11 @@ async def dev_reset_week(
     and weekly_planning_session. Takes user back to a clean slate.
     Future: expose to household_admin as "Start over this week" feature.
     """
-    if current_user["role"] != "platform_admin":
+    # TODO: restrict to platform_admin before release
+    # Currently open to household_admin for testing
+    if current_user["role"] not in ("platform_admin", "household_admin"):
         from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="Platform admin access only.")
+        raise HTTPException(status_code=403, detail="Admin access only.")
     from datetime import date, timedelta
     house_id = current_user["house_id"]
     today = date.today()

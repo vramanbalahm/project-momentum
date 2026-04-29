@@ -573,7 +573,7 @@ export default function App({ onBack }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div>
               {onBack && <span onClick={() => safeNavigate(onBack)} style={{ color: "#9FE1CB", fontSize: 12, cursor: "pointer", display: "block", marginBottom: 4 }}>← Dashboard</span>}
-              {isPlatformAdmin && isCurrentWeek && (
+              {isAdmin && isCurrentWeek && ( // TODO: restrict to isPlatformAdmin before release
                 <span
                   onClick={() => setShowResetConfirm(true)}
                   style={{ color: "#E24B4A", fontSize: 10, cursor: "pointer", display: "block", marginTop: 2, opacity: 0.7 }}
