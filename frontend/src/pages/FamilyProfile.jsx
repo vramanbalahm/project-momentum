@@ -26,7 +26,7 @@ export default function FamilyProfile({ onBack }) {
   const [form, setForm] = useState({
     house_name: "", dietary_preference: "Veg",
     cuisine_state: "", cuisine_region: "", cuisine_sub_region_id: "",
-    city_state: "", current_city: "", household_allergies: ""
+    city_state: "", current_city: ""
   });
   const [regions, setRegions] = useState([]);
   const [subRegions, setSubRegions] = useState([]);
@@ -66,7 +66,7 @@ export default function FamilyProfile({ onBack }) {
           ...prev,
           house_name:            me.house_name || "",
           dietary_preference:    me.dietary_preference || "Veg",
-          household_allergies:   me.household_allergies || "",
+          // household_allergies removed — handled by IngredientSelector household restrictions
           cuisine_state:         me.cuisine_state || "",
           cuisine_region:        me.cuisine_region || "",
           cuisine_sub_region_id: me.cuisine_sub_region_id ? String(me.cuisine_sub_region_id) : "",
@@ -140,7 +140,7 @@ export default function FamilyProfile({ onBack }) {
         house_name: form.house_name,
         dietary_preference: form.dietary_preference,
         current_city: form.current_city || undefined,
-        household_allergies: form.household_allergies || undefined,
+        // household_allergies removed — handled by /onboarding/household-restrictions
         cuisine_sub_region_id: form.cuisine_sub_region_id ? parseInt(form.cuisine_sub_region_id) : undefined
       };
       const res = await apiFetch("/auth/profile", { method: "PUT", body: JSON.stringify(payload) });
@@ -203,9 +203,7 @@ export default function FamilyProfile({ onBack }) {
             </div>
           </Field>
 
-          <Field label="Household allergies" hint="Select ingredients the household is allergic to — this affects meal suggestions">
-            <input type="text" value={form.household_allergies} onChange={e => set("household_allergies", e.target.value)} placeholder="e.g. Peanuts, Shellfish, Gluten" style={inputStyle} />
-          </Field>
+
         </div>
 
         {/* Cuisine region */}
