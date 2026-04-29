@@ -159,6 +159,21 @@ export default function App({ onBack }) {
   const [showAvailabilityOverlay, setShowAvailabilityOverlay] = useState(false);
   const [plannerMenuOpen, setPlannerMenuOpen] = useState(false);
   const [plannerShowChangePassword, setPlannerShowChangePassword] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const handleDevReset = async () => {
+    setResetting(true);
+    try {
+      await axios.delete(`${API_BASE}/dev/reset-week`);
+      setShowResetConfirm(false);
+      onBack && onBack(); // go back to dashboard
+    } catch (e) {
+      console.error("Reset failed:", e);
+    } finally {
+      setResetting(false);
+    }
+  };
   const [plannerDirtyWarning, setPlannerDirtyWarning] = useState(false); // unsaved changes warning
   const [pendingNavAction, setPendingNavAction] = useState(null); // action to run after user confirms
 
@@ -557,6 +572,14 @@ export default function App({ onBack }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div>
               {onBack && <span onClick={() => safeNavigate(onBack)} style={{ color: "#9FE1CB", fontSize: 12, cursor: "pointer", display: "block", marginBottom: 4 }}>← Dashboard</span>}
+              {isAdmin && isCurrentWeek && (
+                <span
+                  onClick={() => setShowResetConfirm(true)}
+                  style={{ color: "#E24B4A", fontSize: 10, cursor: "pointer", display: "block", marginTop: 2, opacity: 0.7 }}
+                >
+                  🗑 Reset week [DEV]
+                </span>
+              )}
           <div style={{ color: "#9FE1CB", fontSize: 11, marginBottom: 1 }}>{greeting}, {user?.name?.split(' ')[0]} 👋</div>
               <div style={{ color: "#FDFCF8", fontSize: 16, fontWeight: 500, letterSpacing: -0.3 }}>Your week awaits</div>
             </div>
@@ -1025,6 +1048,28 @@ export default function App({ onBack }) {
               setIsSaved(false);
             }}
           />
+        )}
+
+        {/* ── DEV RESET CONFIRMATION ── */}
+        {showResetConfirm && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+            <div style={{ width: "100%", maxWidth: 430, background: "#FFF9F2", borderRadius: "24px 24px 0 0", padding: "28px 24px 40px" }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#2C2C2A", marginBottom: 8 }}>🗑 Reset this week?</div>
+              <div style={{ fontSize: 13, color: "#888780", marginBottom: 24, lineHeight: 1.6 }}>
+                This will permanently delete all meal plan data, availability, and session records for the current week. Used for testing only.
+              </div>
+              <div style={{ display: "flex", gap: 12 }}>
+                <button onClick={() => setShowResetConfirm(false)}
+                  style={{ flex: 1, padding: "13px", borderRadius: 14, border: "1.5px solid #EDE8E0", background: "transparent", color: "#888780", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+                  Cancel
+                </button>
+                <button onClick={handleDevReset} disabled={resetting}
+                  style={{ flex: 1, padding: "13px", borderRadius: 14, border: "none", background: "#E24B4A", color: "#FDFCF8", fontSize: 14, fontWeight: 500, cursor: resetting ? "not-allowed" : "pointer", opacity: resetting ? 0.7 : 1 }}>
+                  {resetting ? "Resetting…" : "Yes, reset"}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ── UNSAVED CHANGES WARNING ── */}

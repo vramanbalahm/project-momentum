@@ -170,6 +170,40 @@ app.include_router(weekly_plan_router)
 from routers.availability import router as availability_router
 app.include_router(availability_router)
 
+# --- DEV ONLY: Reset current week plan ---
+@app.delete("/dev/reset-week")
+async def dev_reset_week(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    DEV ONLY — Deletes all plan data for the current week for this household.
+    Removes meal_event_header (cascades to detail + audit), meal_attendance_log,
+    and weekly_planning_session. Takes user back to a clean slate.
+    """
+    from datetime import date, timedelta
+    house_id = current_user["house_id"]
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())  # Monday
+    week_end   = week_start + timedelta(days=6)
+
+    # Delete meal events for this week
+    db.execute(text("""
+        DELETE FROM meal_event_header
+        WHERE house_id = CAST(:hid AS uuid)
+          AND event_date BETWEEN :start AND :end
+    """), {"hid": house_id, "start": week_start, "end": week_end})
+
+    # Delete weekly planning session (cascades to meal_attendance_log)
+    db.execute(text("""
+        DELETE FROM weekly_planning_session
+        WHERE house_id = CAST(:hid AS uuid)
+          AND week_start_date = :start
+    """), {"hid": house_id, "start": week_start})
+
+    db.commit()
+    return {"message": f"Week of {week_start} cleared for household.", "week_start": str(week_start)}
+
 # --- 6b. FT-043: MEAL SWAP & STANDALONE AUDIT ---
 from services.swap_service import execute_swap, audit_slot
 
