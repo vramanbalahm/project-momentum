@@ -1,89 +1,122 @@
 -- ============================================================
 -- Momentum Data Cleanup v1
--- Run dry run first: psql ... -f this_file (reads SELECT only)
--- Run fix: psql ... -v apply=true -f this_file
+-- Fixes: bad meal slots, Vegan→Veg misclassification
+-- Run DRY RUN section first, then FIX section after review
 -- ============================================================
 
--- ── DRY RUN — shows what will change ──────────────────────────────────────
+-- ── DRY RUN — shows what will change ─────────────────────────────────────
 
 -- 1. Bad meal slots — current distribution
 SELECT 'BAD MEAL SLOTS — BEFORE' as check_name,
        meal_slots, diet_type, COUNT(*) as count
 FROM recipe_dna_master
-WHERE meal_slots && ARRAY['Snack','Snacks','Dessert','Festival Food','Side Dish','Snack & Tiffin']::text[]
+WHERE meal_slots && ARRAY['Snack','Snacks','Dessert','Festival Food']::text[]
+   OR meal_slots = ARRAY['Side Dish']::text[]
 GROUP BY meal_slots, diet_type
 ORDER BY meal_slots::text, diet_type;
 
--- 2. Vegan misclassification — recipes tagged Vegan but contain dairy ingredients
+-- 2. Vegan misclassification — recipes tagged Vegan but contain dairy
+-- ingredients_json lives in recipe_content_vault, joined here
 SELECT 'VEGAN MISCLASSIFIED — BEFORE' as check_name,
-       r.recipe_id, r.dish_name, r.diet_type,
-       r.ingredients_json::text
+       r.recipe_id, r.dish_name, r.diet_type
 FROM recipe_dna_master r
+JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
 WHERE r.diet_type = 'Vegan'
   AND (
-    LOWER(r.ingredients_json::text) LIKE '%ghee%'
-    OR LOWER(r.ingredients_json::text) LIKE '%milk%'
-    OR LOWER(r.ingredients_json::text) LIKE '%curd%'
-    OR LOWER(r.ingredients_json::text) LIKE '%butter%'
-    OR LOWER(r.ingredients_json::text) LIKE '%paneer%'
-    OR LOWER(r.ingredients_json::text) LIKE '%cream%'
-    OR LOWER(r.ingredients_json::text) LIKE '%yogurt%'
-    OR LOWER(r.ingredients_json::text) LIKE '%yoghurt%'
-    OR LOWER(r.ingredients_json::text) LIKE '%cheese%'
-    OR LOWER(r.ingredients_json::text) LIKE '%khoa%'
-    OR LOWER(r.ingredients_json::text) LIKE '%khoya%'
+    v.ingredients_json::text ILIKE '%ghee%'
+    OR v.ingredients_json::text ILIKE '%milk%'
+    OR v.ingredients_json::text ILIKE '%curd%'
+    OR v.ingredients_json::text ILIKE '%butter%'
+    OR v.ingredients_json::text ILIKE '%paneer%'
+    OR v.ingredients_json::text ILIKE '%cream%'
+    OR v.ingredients_json::text ILIKE '%yogurt%'
+    OR v.ingredients_json::text ILIKE '%yoghurt%'
+    OR v.ingredients_json::text ILIKE '%cheese%'
+    OR v.ingredients_json::text ILIKE '%khoa%'
+    OR v.ingredients_json::text ILIKE '%khoya%'
   )
 ORDER BY r.dish_name;
 
-
 -- ============================================================
--- FIX SCRIPT — Run only after reviewing dry run output above
--- Copy everything below into pgAdmin and run manually
+-- FIX SCRIPT — Run after reviewing dry run output
+-- Copy the UPDATE statements below into pgAdmin and run
 -- ============================================================
 
 -- ── FIX 1: Remap bad meal slots ───────────────────────────────────────────
 
--- Snack → Side Dish
+-- {Breakfast, Festival Food} → {Breakfast, Lunch}
 UPDATE recipe_dna_master
-SET meal_slots = ARRAY['Side Dish']::text[]
-WHERE meal_slots = ARRAY['Snack']::text[];
+SET meal_slots = ARRAY['Breakfast', 'Lunch']::text[]
+WHERE meal_slots = ARRAY['Breakfast', 'Festival Food']::text[];
 
--- Snacks → Side Dish
-UPDATE recipe_dna_master
-SET meal_slots = ARRAY['Side Dish']::text[]
-WHERE meal_slots = ARRAY['Snacks']::text[];
-
--- Dessert → Side Dish
-UPDATE recipe_dna_master
-SET meal_slots = ARRAY['Side Dish']::text[]
-WHERE meal_slots = ARRAY['Dessert']::text[];
-
--- Festival Food → Lunch
+-- {Festival Food} → {Lunch}
 UPDATE recipe_dna_master
 SET meal_slots = ARRAY['Lunch']::text[]
 WHERE meal_slots = ARRAY['Festival Food']::text[];
 
+-- {Breakfast, Snack} → {Breakfast, Side Dish}
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Breakfast', 'Side Dish']::text[]
+WHERE meal_slots = ARRAY['Breakfast', 'Snack']::text[];
+
+-- {Lunch, Snack} → {Lunch, Side Dish}
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Lunch', 'Side Dish']::text[]
+WHERE meal_slots = ARRAY['Lunch', 'Snack']::text[];
+
+-- {Lunch, Snacks} → {Lunch, Side Dish}
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Lunch', 'Snacks']::text[]
+WHERE meal_slots = ARRAY['Lunch', 'Snacks']::text[];
+
+-- {Snack, Dinner} → {Side Dish}
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Side Dish']::text[]
+WHERE meal_slots = ARRAY['Snack', 'Dinner']::text[];
+
+-- {Snack} → {Side Dish}
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Side Dish']::text[]
+WHERE meal_slots = ARRAY['Snack']::text[];
+
+-- {Snacks} → {Side Dish}
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Side Dish']::text[]
+WHERE meal_slots = ARRAY['Snacks']::text[];
+
+-- {Dessert} → {Side Dish}
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Side Dish']::text[]
+WHERE meal_slots = ARRAY['Dessert']::text[];
+
+-- {Breakfast, Side Dish} → {Side Dish} (side dish only — cleaner)
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Side Dish']::text[]
+WHERE meal_slots = ARRAY['Breakfast', 'Side Dish']::text[];
+
 -- ── FIX 2: Reclassify Vegan → Veg where dairy ingredients present ─────────
 
-UPDATE recipe_dna_master
+UPDATE recipe_dna_master r
 SET diet_type = 'Veg',
     is_vegan  = false
-WHERE diet_type = 'Vegan'
+FROM recipe_content_vault v
+WHERE v.recipe_id = r.recipe_id
+  AND r.diet_type = 'Vegan'
   AND (
-    LOWER(ingredients_json::text) LIKE '%ghee%'
-    OR LOWER(ingredients_json::text) LIKE '%milk%'
-    OR LOWER(ingredients_json::text) LIKE '%curd%'
-    OR LOWER(ingredients_json::text) LIKE '%butter%'
-    OR LOWER(ingredients_json::text) LIKE '%paneer%'
-    OR LOWER(ingredients_json::text) LIKE '%cream%'
-    OR LOWER(ingredients_json::text) LIKE '%yogurt%'
-    OR LOWER(ingredients_json::text) LIKE '%yoghurt%'
-    OR LOWER(ingredients_json::text) LIKE '%cheese%'
-    OR LOWER(ingredients_json::text) LIKE '%khoa%'
-    OR LOWER(ingredients_json::text) LIKE '%khoya%'
+    v.ingredients_json::text ILIKE '%ghee%'
+    OR v.ingredients_json::text ILIKE '%milk%'
+    OR v.ingredients_json::text ILIKE '%curd%'
+    OR v.ingredients_json::text ILIKE '%butter%'
+    OR v.ingredients_json::text ILIKE '%paneer%'
+    OR v.ingredients_json::text ILIKE '%cream%'
+    OR v.ingredients_json::text ILIKE '%yogurt%'
+    OR v.ingredients_json::text ILIKE '%yoghurt%'
+    OR v.ingredients_json::text ILIKE '%cheese%'
+    OR v.ingredients_json::text ILIKE '%khoa%'
+    OR v.ingredients_json::text ILIKE '%khoya%'
   );
 
--- ── VERIFY — run after fix to confirm results ─────────────────────────────
+-- ── VERIFY — run after fix ─────────────────────────────────────────────────
 
 SELECT 'MEAL SLOTS — AFTER' as check_name,
        meal_slots, diet_type, COUNT(*) as count
