@@ -312,3 +312,15 @@ WHERE meal_slots IS NULL OR meal_slots = '{}'::text[]
    OR dish_name ILIKE '%Chicken Curry%'
    OR dish_name ILIKE '%Aloo Jeera%'
    OR dish_name ILIKE '%Dal Tadka%';
+
+-- ── ROUND 3 FIX: Chettinad Chicken Curry — Lunch only → Lunch + Dinner ────
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Lunch', 'Dinner']::text[]
+WHERE dish_name = 'Chettinad Chicken Curry'
+  AND meal_slots = ARRAY['Lunch']::text[];
+
+-- Final clean verify
+SELECT meal_slots, diet_type, COUNT(*) as count
+FROM recipe_dna_master
+GROUP BY meal_slots, diet_type
+ORDER BY meal_slots::text, diet_type;
