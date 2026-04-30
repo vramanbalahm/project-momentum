@@ -166,3 +166,21 @@ WHERE r.diet_type = 'Vegan'
     OR v.ingredients_json::text ILIKE '%khoya%'
   )
 ORDER BY r.dish_name;
+
+-- ── CLEANUP ROUND 2 ────────────────────────────────────────────────────────
+
+-- Check 1: {Lunch, Snacks} missed by previous update
+SELECT 'STILL BAD — Lunch,Snacks' as check_name, dish_name, diet_type, meal_slots
+FROM recipe_dna_master
+WHERE meal_slots = ARRAY['Lunch', 'Snacks']::text[];
+
+-- Check 2: Recipes with NULL or empty meal_slots
+SELECT 'NULL MEAL SLOTS' as check_name, dish_name, diet_type, meal_slots
+FROM recipe_dna_master
+WHERE meal_slots IS NULL OR meal_slots = '{}'::text[]
+ORDER BY diet_type, dish_name;
+
+-- FIX: {Lunch, Snacks} → {Lunch, Side Dish}
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Lunch', 'Side Dish']::text[]
+WHERE meal_slots = ARRAY['Lunch', 'Snacks']::text[];
