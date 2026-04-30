@@ -184,3 +184,20 @@ ORDER BY diet_type, dish_name;
 UPDATE recipe_dna_master
 SET meal_slots = ARRAY['Lunch', 'Side Dish']::text[]
 WHERE meal_slots = ARRAY['Lunch', 'Snacks']::text[];
+
+-- ── DIAGNOSTIC: Show exact meal_slot values as stored in DB ───────────────
+SELECT dish_name, diet_type,
+       meal_slots,
+       array_to_string(meal_slots, '|') as slots_piped
+FROM recipe_dna_master
+WHERE 'Snack' = ANY(meal_slots)
+   OR 'Snacks' = ANY(meal_slots)
+   OR 'Dessert' = ANY(meal_slots)
+   OR 'Festival Food' = ANY(meal_slots)
+ORDER BY slots_piped, diet_type;
+
+-- Also show null slots
+SELECT dish_name, diet_type, meal_slots
+FROM recipe_dna_master
+WHERE meal_slots IS NULL OR meal_slots = '{}'::text[]
+ORDER BY diet_type, dish_name;
