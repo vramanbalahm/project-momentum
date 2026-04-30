@@ -94,7 +94,10 @@ UPDATE recipe_dna_master
 SET meal_slots = ARRAY['Side Dish']::text[]
 WHERE meal_slots = ARRAY['Breakfast', 'Side Dish']::text[];
 
--- ── FIX 2: Reclassify Vegan → Veg where dairy ingredients present ─────────
+-- ── FIX 2: Reclassify Vegan → Veg where non-substitutable dairy present ─────
+-- Rule: ghee excluded (substitutable with oil)
+--       coconut milk excluded (vegan)
+--       curd, butter, paneer, cream, yogurt, cheese, khoya → always Veg
 
 UPDATE recipe_dna_master r
 SET diet_type = 'Veg',
@@ -103,9 +106,7 @@ FROM recipe_content_vault v
 WHERE v.recipe_id = r.recipe_id
   AND r.diet_type = 'Vegan'
   AND (
-    v.ingredients_json::text ILIKE '%ghee%'
-    OR v.ingredients_json::text ILIKE '%milk%'
-    OR v.ingredients_json::text ILIKE '%curd%'
+    v.ingredients_json::text ILIKE '%curd%'
     OR v.ingredients_json::text ILIKE '%butter%'
     OR v.ingredients_json::text ILIKE '%paneer%'
     OR v.ingredients_json::text ILIKE '%cream%'
@@ -114,6 +115,8 @@ WHERE v.recipe_id = r.recipe_id
     OR v.ingredients_json::text ILIKE '%cheese%'
     OR v.ingredients_json::text ILIKE '%khoa%'
     OR v.ingredients_json::text ILIKE '%khoya%'
+    OR (v.ingredients_json::text ILIKE '% milk%'
+        AND v.ingredients_json::text NOT ILIKE '%coconut milk%')
   );
 
 -- ── VERIFY — run after fix ─────────────────────────────────────────────────
