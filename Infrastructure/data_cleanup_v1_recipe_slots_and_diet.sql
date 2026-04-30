@@ -10,7 +10,7 @@
 SELECT 'BAD MEAL SLOTS — BEFORE' as check_name,
        meal_slots, diet_type, COUNT(*) as count
 FROM recipe_dna_master
-WHERE meal_slots && ARRAY['Snack','Snacks','Dessert','Festival Food','Side Dish','Snack & Tiffin']::varchar[]
+WHERE meal_slots && ARRAY['Snack','Snacks','Dessert','Festival Food','Side Dish','Snack & Tiffin']::text[]
 GROUP BY meal_slots, diet_type
 ORDER BY meal_slots::text, diet_type;
 
@@ -45,23 +45,23 @@ ORDER BY r.dish_name;
 
 -- Snack → Side Dish
 UPDATE recipe_dna_master
-SET meal_slots = ARRAY['Side Dish']::varchar[]
-WHERE meal_slots = ARRAY['Snack']::varchar[];
+SET meal_slots = ARRAY['Side Dish']::text[]
+WHERE meal_slots = ARRAY['Snack']::text[];
 
 -- Snacks → Side Dish
 UPDATE recipe_dna_master
-SET meal_slots = ARRAY['Side Dish']::varchar[]
-WHERE meal_slots = ARRAY['Snacks']::varchar[];
+SET meal_slots = ARRAY['Side Dish']::text[]
+WHERE meal_slots = ARRAY['Snacks']::text[];
 
 -- Dessert → Side Dish
 UPDATE recipe_dna_master
-SET meal_slots = ARRAY['Side Dish']::varchar[]
-WHERE meal_slots = ARRAY['Dessert']::varchar[];
+SET meal_slots = ARRAY['Side Dish']::text[]
+WHERE meal_slots = ARRAY['Dessert']::text[];
 
 -- Festival Food → Lunch
 UPDATE recipe_dna_master
-SET meal_slots = ARRAY['Lunch']::varchar[]
-WHERE meal_slots = ARRAY['Festival Food']::varchar[];
+SET meal_slots = ARRAY['Lunch']::text[]
+WHERE meal_slots = ARRAY['Festival Food']::text[];
 
 -- ── FIX 2: Reclassify Vegan → Veg where dairy ingredients present ─────────
 
