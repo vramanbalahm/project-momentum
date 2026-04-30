@@ -43,19 +43,19 @@ ORDER BY r.dish_name;
 
 -- ── FIX 1: Remap bad meal slots ───────────────────────────────────────────
 
--- Snack → Dinner
+-- Snack → Side Dish
 UPDATE recipe_dna_master
-SET meal_slots = ARRAY['Dinner']::varchar[]
+SET meal_slots = ARRAY['Side Dish']::varchar[]
 WHERE meal_slots = ARRAY['Snack']::varchar[];
 
--- Snacks → Dinner
+-- Snacks → Side Dish
 UPDATE recipe_dna_master
-SET meal_slots = ARRAY['Dinner']::varchar[]
+SET meal_slots = ARRAY['Side Dish']::varchar[]
 WHERE meal_slots = ARRAY['Snacks']::varchar[];
 
--- Dessert → Dinner
+-- Dessert → Side Dish
 UPDATE recipe_dna_master
-SET meal_slots = ARRAY['Dinner']::varchar[]
+SET meal_slots = ARRAY['Side Dish']::varchar[]
 WHERE meal_slots = ARRAY['Dessert']::varchar[];
 
 -- Festival Food → Lunch
