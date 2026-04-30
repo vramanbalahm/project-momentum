@@ -300,3 +300,15 @@ WHERE 'Snack' = ANY(meal_slots)
    OR 'Festival Food' = ANY(meal_slots)
    OR meal_slots IS NULL
    OR meal_slots = '{}'::text[];
+
+-- ── ROUND 3: Fix the 5 null-slot dishes by name ───────────────────────────
+
+-- Check exact dish names first
+SELECT dish_name, meal_slots, diet_type
+FROM recipe_dna_master
+WHERE meal_slots IS NULL OR meal_slots = '{}'::text[]
+   OR dish_name ILIKE '%Paneer Butter%'
+   OR dish_name ILIKE '%White Gravy%'
+   OR dish_name ILIKE '%Chicken Curry%'
+   OR dish_name ILIKE '%Aloo Jeera%'
+   OR dish_name ILIKE '%Dal Tadka%';
