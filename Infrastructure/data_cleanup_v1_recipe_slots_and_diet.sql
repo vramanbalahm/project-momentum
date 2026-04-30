@@ -129,3 +129,37 @@ SELECT 'DIET TYPE SUMMARY — AFTER' as check_name,
 FROM recipe_dna_master
 GROUP BY diet_type
 ORDER BY diet_type;
+
+-- ── DIAGNOSTIC — check what dairy keyword triggered each misclassified dish ──
+SELECT
+    r.dish_name,
+    CASE WHEN v.ingredients_json::text ILIKE '%ghee%' THEN 'ghee ' ELSE '' END ||
+    CASE WHEN v.ingredients_json::text ILIKE '% milk%'
+          AND v.ingredients_json::text NOT ILIKE '%coconut milk%' THEN 'cow-milk ' ELSE '' END ||
+    CASE WHEN v.ingredients_json::text ILIKE '%curd%' THEN 'curd ' ELSE '' END ||
+    CASE WHEN v.ingredients_json::text ILIKE '%butter%' THEN 'butter ' ELSE '' END ||
+    CASE WHEN v.ingredients_json::text ILIKE '%paneer%' THEN 'paneer ' ELSE '' END ||
+    CASE WHEN v.ingredients_json::text ILIKE '%cream%' THEN 'cream ' ELSE '' END ||
+    CASE WHEN v.ingredients_json::text ILIKE '%yogurt%'
+          OR v.ingredients_json::text ILIKE '%yoghurt%' THEN 'yogurt ' ELSE '' END ||
+    CASE WHEN v.ingredients_json::text ILIKE '%cheese%' THEN 'cheese ' ELSE '' END ||
+    CASE WHEN v.ingredients_json::text ILIKE '%khoa%'
+          OR v.ingredients_json::text ILIKE '%khoya%' THEN 'khoya ' ELSE '' END
+    as triggers
+FROM recipe_dna_master r
+JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
+WHERE r.diet_type = 'Vegan'
+  AND (
+    v.ingredients_json::text ILIKE '%ghee%'
+    OR (v.ingredients_json::text ILIKE '% milk%' AND v.ingredients_json::text NOT ILIKE '%coconut milk%')
+    OR v.ingredients_json::text ILIKE '%curd%'
+    OR v.ingredients_json::text ILIKE '%butter%'
+    OR v.ingredients_json::text ILIKE '%paneer%'
+    OR v.ingredients_json::text ILIKE '%cream%'
+    OR v.ingredients_json::text ILIKE '%yogurt%'
+    OR v.ingredients_json::text ILIKE '%yoghurt%'
+    OR v.ingredients_json::text ILIKE '%cheese%'
+    OR v.ingredients_json::text ILIKE '%khoa%'
+    OR v.ingredients_json::text ILIKE '%khoya%'
+  )
+ORDER BY r.dish_name;
