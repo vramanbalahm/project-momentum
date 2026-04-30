@@ -201,3 +201,102 @@ SELECT dish_name, diet_type, meal_slots
 FROM recipe_dna_master
 WHERE meal_slots IS NULL OR meal_slots = '{}'::text[]
 ORDER BY diet_type, dish_name;
+
+-- ── FINAL FIXES — using ANY operator (array equality was failing) ──────────
+
+-- Fix meal slots using ANY instead of array equality
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Side Dish']::text[]
+WHERE 'Snack' = ANY(meal_slots) AND array_length(meal_slots, 1) = 1;
+
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Side Dish']::text[]
+WHERE 'Snacks' = ANY(meal_slots) AND array_length(meal_slots, 1) = 1;
+
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Side Dish']::text[]
+WHERE 'Dessert' = ANY(meal_slots) AND array_length(meal_slots, 1) = 1;
+
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Lunch']::text[]
+WHERE 'Festival Food' = ANY(meal_slots) AND array_length(meal_slots, 1) = 1;
+
+-- Multi-slot combinations
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Breakfast', 'Lunch']::text[]
+WHERE 'Breakfast' = ANY(meal_slots) AND 'Festival Food' = ANY(meal_slots);
+
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Breakfast', 'Side Dish']::text[]
+WHERE 'Breakfast' = ANY(meal_slots) AND 'Snack' = ANY(meal_slots);
+
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Lunch', 'Side Dish']::text[]
+WHERE 'Lunch' = ANY(meal_slots) AND 'Snack' = ANY(meal_slots);
+
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Lunch', 'Side Dish']::text[]
+WHERE 'Lunch' = ANY(meal_slots) AND 'Snacks' = ANY(meal_slots);
+
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Side Dish']::text[]
+WHERE 'Snack' = ANY(meal_slots) AND 'Dinner' = ANY(meal_slots);
+
+-- Tirunelveli Macaroon — {Lunch, Snacks} → {Side Dish}
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Side Dish']::text[]
+WHERE dish_name = 'Tirunelveli Macaroon';
+
+-- Fix null meal slots
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Lunch', 'Dinner']::text[]
+WHERE dish_name IN (
+    'Classic Paneer Butter Masala',
+    'White Gravy Paneer',
+    'Chicken Curry',
+    'Aloo Jeera',
+    'Homestyle Dal Tadka'
+);
+
+-- Fix Vegan → Veg reclassification using JOIN
+UPDATE recipe_dna_master r
+SET diet_type = 'Veg',
+    is_vegan  = false
+FROM recipe_content_vault v
+WHERE v.recipe_id = r.recipe_id
+  AND r.diet_type = 'Vegan'
+  AND (
+    v.ingredients_json::text ILIKE '%curd%'
+    OR v.ingredients_json::text ILIKE '%butter%'
+    OR v.ingredients_json::text ILIKE '%paneer%'
+    OR v.ingredients_json::text ILIKE '%cream%'
+    OR v.ingredients_json::text ILIKE '%yogurt%'
+    OR v.ingredients_json::text ILIKE '%yoghurt%'
+    OR v.ingredients_json::text ILIKE '%cheese%'
+    OR v.ingredients_json::text ILIKE '%khoa%'
+    OR v.ingredients_json::text ILIKE '%khoya%'
+    OR (v.ingredients_json::text ILIKE '% milk%'
+        AND v.ingredients_json::text NOT ILIKE '%coconut milk%')
+  );
+
+-- ── FINAL VERIFY ───────────────────────────────────────────────────────────
+SELECT 'FINAL — MEAL SLOTS' as check_name,
+       meal_slots, diet_type, COUNT(*) as count
+FROM recipe_dna_master
+GROUP BY meal_slots, diet_type
+ORDER BY meal_slots::text, diet_type;
+
+SELECT 'FINAL — DIET SUMMARY' as check_name,
+       diet_type, COUNT(*) as count
+FROM recipe_dna_master
+GROUP BY diet_type ORDER BY diet_type;
+
+-- Confirm no bad slots remain
+SELECT 'REMAINING BAD SLOTS' as check_name, dish_name, meal_slots
+FROM recipe_dna_master
+WHERE 'Snack' = ANY(meal_slots)
+   OR 'Snacks' = ANY(meal_slots)
+   OR 'Dessert' = ANY(meal_slots)
+   OR 'Festival Food' = ANY(meal_slots)
+   OR meal_slots IS NULL
+   OR meal_slots = '{}'::text[];
