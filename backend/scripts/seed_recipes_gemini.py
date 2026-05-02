@@ -36,7 +36,7 @@ import psycopg2
 from psycopg2.extras import execute_batch
 
 # ── Config ────────────────────────────────────────────────────────────────────
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCwsXt4Pkga-RmiJGORB56yQBDXvryXEh0")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")  # set in backend/.env — never hardcode
 GEMINI_MODEL   = os.getenv("GEMINI_MODEL",   "gemini-2.5-flash-lite")
 DATABASE_URL   = os.getenv("DATABASE_URL",   "postgresql://postgres:admin123@localhost:5432/food_momentum_db")
 
