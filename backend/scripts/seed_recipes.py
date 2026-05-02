@@ -352,13 +352,35 @@ def clean_ingredient_name(name):
 
 
 def dish_exists(cur, dish_name):
-    """Check exact + fuzzy match to prevent near-duplicate dishes."""
+    """
+    Check exact + fuzzy match to prevent near-duplicate dishes.
+    Fuzzy threshold raised to 0.85 — stricter to avoid false positives
+    like 'Egg Pongal' matching 'Pongal' or 'Ragi Idiyappam' matching 'Idiyappam'.
+    Additionally: if dish names share the same base but have a meaningful prefix
+    (Egg, Ragi, Kambu, Thinai, Varagu, Kuthiraivali, Samai, Kodo, Bajra, Foxtail)
+    they are treated as distinct dishes and never merged.
+    """
+    # Exact match
     cur.execute("SELECT 1 FROM recipe_dna_master WHERE LOWER(dish_name) = LOWER(%s)", (dish_name,))
     if cur.fetchone():
         return True
+
+    # Prefix guard — if the dish has a meaningful distinguishing prefix, skip fuzzy
+    DISTINCT_PREFIXES = [
+        "egg ", "muttai", "ragi ", "kambu ", "thinai ", "varagu ", "kuthiraivali ",
+        "samai ", "kodo ", "bajra ", "foxtail ", "little millet", "kuzhu ",
+        "ven ", "sweet ", "spicy ", "mini ", "set ", "neer "
+    ]
+    dish_lower = dish_name.lower()
+    for prefix in DISTINCT_PREFIXES:
+        if dish_lower.startswith(prefix):
+            # Only do exact match for prefixed dishes — skip fuzzy entirely
+            return False
+
+    # Fuzzy match — threshold 0.85 (was 0.6 — too aggressive)
     cur.execute("""
         SELECT dish_name FROM recipe_dna_master
-        WHERE similarity(LOWER(dish_name), LOWER(%s)) > 0.6
+        WHERE similarity(LOWER(dish_name), LOWER(%s)) > 0.85
         LIMIT 1
     """, (dish_name,))
     row = cur.fetchone()
