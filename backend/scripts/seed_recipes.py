@@ -111,8 +111,14 @@ MEAL_SLOT_INSTRUCTIONS = {
         "[\"Breakfast\",\"Lunch\"], [\"Breakfast\",\"Lunch\",\"Dinner\"]"
     ),
     "lunch": (
-        "Lunch MAIN DISH only — rice varieties, gravies, biryanis, curries, breads. "
+        "Lunch MAIN DISH only — gravies, kuzhambu, curries, rice varieties, biryanis, breads. "
         "DO NOT combine dishes. One standalone main dish per recipe. "
+        "IMPORTANT: Use [\"Lunch\",\"Dinner\"] for gravies, kuzhambu, curries, and any dish "
+        "equally suitable for both lunch and dinner. "
+        "Use [\"Lunch\"] ONLY for dishes specifically suited to lunch like rice varieties and pulao. "
+        "STRICTLY EXCLUDE these — they are side dishes, NOT lunch mains: "
+        "poriyal, thogayal, thoran, kootu, varuval (dry), pachadi, raita, chutney, "
+        "masiyal, podi curry (dry), stir-fry, fritters, vada (unless vada curry). "
         "meal_slots must be one of: [\"Lunch\"], [\"Lunch\",\"Dinner\"], "
         "[\"Breakfast\",\"Lunch\"], [\"Breakfast\",\"Lunch\",\"Dinner\"]"
     ),
