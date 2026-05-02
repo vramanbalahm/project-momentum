@@ -119,6 +119,10 @@ MEAL_SLOT_INSTRUCTIONS = {
     "dinner": (
         "Dinner MAIN DISH only — one standalone dish. "
         "DO NOT combine dishes. "
+        "IMPORTANT: Use [\"Lunch\",\"Dinner\"] for gravies, curries, kuzhambu, varuval, "
+        "masala, paya, or any dish equally suitable for both lunch and dinner. "
+        "Use [\"Dinner\"] ONLY for dishes specifically suited to dinner like heavy dosas, "
+        "parottas, or kothu dishes not typically eaten at lunch. "
         "meal_slots must be one of: [\"Dinner\"], [\"Lunch\",\"Dinner\"], "
         "[\"Breakfast\",\"Dinner\"], [\"Breakfast\",\"Lunch\",\"Dinner\"]"
     ),

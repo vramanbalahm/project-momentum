@@ -324,3 +324,66 @@ SELECT meal_slots, diet_type, COUNT(*) as count
 FROM recipe_dna_master
 GROUP BY meal_slots, diet_type
 ORDER BY meal_slots::text, diet_type;
+
+-- ── FIX: Non-Veg Dinner-only gravies/curries → Lunch + Dinner ─────────────
+-- Dishes with these keywords are equally valid for lunch and dinner
+
+-- DRY RUN first — see what will change
+SELECT dish_name, meal_slots, diet_type
+FROM recipe_dna_master
+WHERE meal_slots = ARRAY['Dinner']::text[]
+  AND diet_type = 'Non-Veg'
+  AND (
+    LOWER(dish_name) LIKE '%kuzhambu%'
+    OR LOWER(dish_name) LIKE '%kari%'
+    OR LOWER(dish_name) LIKE '%curry%'
+    OR LOWER(dish_name) LIKE '%varuval%'
+    OR LOWER(dish_name) LIKE '%masala%'
+    OR LOWER(dish_name) LIKE '%paya%'
+    OR LOWER(dish_name) LIKE '%kurma%'
+    OR LOWER(dish_name) LIKE '%gravy%'
+    OR LOWER(dish_name) LIKE '%pirattal%'
+    OR LOWER(dish_name) LIKE '%chukka%'
+  )
+ORDER BY dish_name;
+
+-- FIX — run after reviewing dry run
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Lunch', 'Dinner']::text[]
+WHERE meal_slots = ARRAY['Dinner']::text[]
+  AND diet_type = 'Non-Veg'
+  AND (
+    LOWER(dish_name) LIKE '%kuzhambu%'
+    OR LOWER(dish_name) LIKE '%kari%'
+    OR LOWER(dish_name) LIKE '%curry%'
+    OR LOWER(dish_name) LIKE '%varuval%'
+    OR LOWER(dish_name) LIKE '%masala%'
+    OR LOWER(dish_name) LIKE '%paya%'
+    OR LOWER(dish_name) LIKE '%kurma%'
+    OR LOWER(dish_name) LIKE '%gravy%'
+    OR LOWER(dish_name) LIKE '%pirattal%'
+    OR LOWER(dish_name) LIKE '%chukka%'
+  );
+
+-- Also fix Veg dinner-only gravies
+UPDATE recipe_dna_master
+SET meal_slots = ARRAY['Lunch', 'Dinner']::text[]
+WHERE meal_slots = ARRAY['Dinner']::text[]
+  AND diet_type IN ('Veg', 'Vegan')
+  AND (
+    LOWER(dish_name) LIKE '%kuzhambu%'
+    OR LOWER(dish_name) LIKE '%kari%'
+    OR LOWER(dish_name) LIKE '%kootu%'
+    OR LOWER(dish_name) LIKE '%varuval%'
+    OR LOWER(dish_name) LIKE '%masala%'
+    OR LOWER(dish_name) LIKE '%kurma%'
+    OR LOWER(dish_name) LIKE '%poriyal%'
+    OR LOWER(dish_name) LIKE '%pirattal%'
+  );
+
+-- Verify
+SELECT meal_slots, diet_type, COUNT(*) as count
+FROM recipe_dna_master
+WHERE 'Dinner' = ANY(meal_slots)
+GROUP BY meal_slots, diet_type
+ORDER BY meal_slots::text, diet_type;
