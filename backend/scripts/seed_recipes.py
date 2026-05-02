@@ -209,7 +209,9 @@ Each recipe must follow this EXACT structure:
 Focus on variety — cover different sub-regions, different base ingredients, different cooking methods.
 Include both everyday dishes and lesser-known authentic dishes.
 Do not include fusion dishes or non-Tamil Nadu dishes.
-"""
+
+{exclusion_clause}
+"""  
 
 # ── AI backends ───────────────────────────────────────────────────────────────
 
@@ -324,6 +326,16 @@ def fix_meal_slots(meal_slots, meal_arg):
 
 
 # ── DB helpers ────────────────────────────────────────────────────────────────
+
+def get_existing_dish_names():
+    """Fetch all existing dish names from DB for exclusion in prompt."""
+    conn = get_connection()
+    cur  = conn.cursor()
+    cur.execute("SELECT dish_name FROM recipe_dna_master ORDER BY dish_name")
+    names = [row[0] for row in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return names
 
 def get_connection():
     return psycopg2.connect(DATABASE_URL)
@@ -563,6 +575,23 @@ def main():
     allowed_examples = ALLOWED_SLOTS_BY_MEAL[args.meal]
     allowed_slots_example = json.dumps(allowed_examples[0])
 
+    # Fetch existing dish names and build exclusion clause
+    if not args.dry_run:
+        existing_names = get_existing_dish_names()
+        print(f"   Existing: {len(existing_names)} recipes already in DB — will exclude from prompt")
+    else:
+        existing_names = []
+
+    if existing_names:
+        names_list = "\n".join(f"- {n}" for n in existing_names)
+        exclusion_clause = (
+            f"IMPORTANT — Do NOT generate any of these {len(existing_names)} dishes that already exist:\n"
+            f"{names_list}\n"
+            "Generate only dishes that are NOT in the above list."
+        )
+    else:
+        exclusion_clause = ""
+
     # Build prompt
     prompt = PROMPT_TEMPLATE.format(
         count=args.count,
@@ -573,6 +602,7 @@ def main():
         diet_instruction=DIET_INSTRUCTIONS[args.diet],
         diet_type=args.diet,
         allowed_slots_example=allowed_slots_example,
+        exclusion_clause=exclusion_clause,
     )
 
     print(f"\n🌿 Momentum Recipe Seeder")
@@ -603,6 +633,7 @@ def main():
             diet_instruction=DIET_INSTRUCTIONS[args.diet],
             diet_type=args.diet,
             allowed_slots_example=allowed_slots_example,
+            exclusion_clause=exclusion_clause,
         )
         try:
             raw = call_ai(batch_prompt, count)
