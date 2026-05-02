@@ -127,8 +127,10 @@ MEAL_SLOT_INSTRUCTIONS = {
         "[\"Breakfast\",\"Dinner\"], [\"Breakfast\",\"Lunch\",\"Dinner\"]"
     ),
     "side_dish": (
-        "SIDE DISH only — accompaniments served alongside mains: chutneys, sambar, rasam, "
-        "kootu, poriyal, raita, pachadi, thogayal, pickle, papad preparations. "
+        "SIDE DISH only — accompaniments served alongside mains: chutneys, poriyal, kootu, "
+        "raita, pachadi, thogayal, pickle, papad, aviyal, stir-fry, dry preparations. "
+        "IMPORTANT: Kuzhambu (gravy), Curry, Mor Kuzhambu, Vathal Kuzhambu are NOT side dishes — skip them. "
+        "Rasam and Sambar are side dishes. Kootu is a side dish. Poriyal is a side dish. "
         "These are NOT standalone mains. One side dish per recipe. "
         "meal_slots must be exactly: [\"Side Dish\"]"
     ),
