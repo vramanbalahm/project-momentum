@@ -348,10 +348,12 @@ WHERE meal_slots = ARRAY['Dinner']::text[]
 ORDER BY dish_name;
 
 -- FIX — run after reviewing dry run
+-- Note: Thanjavur Mutton Kari Dosai excluded — dinner-specific dish
 UPDATE recipe_dna_master
 SET meal_slots = ARRAY['Lunch', 'Dinner']::text[]
 WHERE meal_slots = ARRAY['Dinner']::text[]
   AND diet_type = 'Non-Veg'
+  AND dish_name != 'Thanjavur Mutton Kari Dosai'
   AND (
     LOWER(dish_name) LIKE '%kuzhambu%'
     OR LOWER(dish_name) LIKE '%kari%'
