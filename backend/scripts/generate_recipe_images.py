@@ -100,8 +100,11 @@ def build_prompt(dish_name, regional_name, sub_region, diet_type, meal_slots, in
         if top_ings:
             ing_desc = f"Key ingredients: {', '.join(top_ings)}. "
 
+    # Include Tamil name if available — helps Imagen identify the dish more accurately
+    name_part = f"{dish_name} ({regional_name})" if regional_name and regional_name != dish_name else dish_name
+
     prompt = (
-        f"{dish_name}. "
+        f"{name_part}. "
         f"Authentic Tamil Nadu dish. "
         f"{ing_desc}"
         f"Professional food photography. "
