@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Security
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from auth.dependencies import get_current_user
 from sqlalchemy.orm import Session
 from sqlalchemy import text
