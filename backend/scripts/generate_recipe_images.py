@@ -84,15 +84,13 @@ def build_prompt(dish_name, regional_name, sub_region, diet_type, meal_slots):
         garnish = "garnished traditionally with curry leaves and a drizzle of ghee or oil"
 
     prompt = (
-        f"Professional food photography of {dish_name}, "
-        f"authentic {region_context}Tamil Nadu cuisine. "
-        f"Beautifully presented in a {vessel}. "
-        f"{garnish.capitalize()}. "
-        f"Warm natural lighting from the side, slightly overhead angle (45 degrees). "
-        f"Vibrant, appetising colours. Rustic wooden or stone background. "
-        f"Sharp focus on the food, soft bokeh background. "
-        f"No text, no watermarks, no people, no hands. "
-        f"Restaurant quality food styling."
+        f"{dish_name}. "
+        f"Professional Tamil Nadu food photography. "
+        f"Served in a {vessel}. "
+        f"Bright, vibrant, natural lighting. "
+        f"Appetising presentation, garnished traditionally. "
+        f"Clean rustic wooden background. "
+        f"No text, no people, no hands, no watermarks."
     )
     return prompt
 
