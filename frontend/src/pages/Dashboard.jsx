@@ -22,6 +22,7 @@ export default function Dashboard({ onNavigate }) {
   const [checkingAvailability, setCheckingAvailability] = useState(false);
 
   const isAdmin = user?.role === "household_admin" || user?.role === "platform_admin";
+  const isReviewer = user?.role === "platform_admin" || user?.role === "reviewer";
 
   // Smart Weekly Plan navigation — admin checks availability first, member goes straight to planner
   const handleWeeklyPlanTap = async () => {
@@ -172,6 +173,16 @@ export default function Dashboard({ onNavigate }) {
                       available={true}
                       onClick={() => { setMenuOpen(false); onNavigate("member_availability"); }}
                     />
+
+                    {/* Recipe Review — platform admin and reviewer only */}
+                    {isReviewer && (
+                      <SettingsItem
+                        icon="📋"
+                        label="Recipe Review"
+                        available={true}
+                        onClick={() => { setMenuOpen(false); onNavigate("recipe_review"); }}
+                      />
+                    )}
 
                     {/* Change Password — available to all */}
                     <SettingsItem

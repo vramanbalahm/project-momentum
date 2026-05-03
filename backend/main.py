@@ -175,6 +175,272 @@ app.include_router(weekly_plan_router)
 from routers.availability import router as availability_router
 app.include_router(availability_router)
 
+# --- RECIPE REVIEW ENDPOINTS ---
+
+@app.get("/recipes/review")
+async def get_recipes_for_review(
+    status: str = "under_review",
+    diet: str = None,
+    meal_slot: str = None,
+    sub_region: str = None,
+    page: int = 1,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Returns paginated recipe list for review screen.
+    Accessible to platform_admin and reviewer roles only.
+    """
+    role = current_user["role"]
+    if role not in ("platform_admin", "reviewer"):
+        raise HTTPException(status_code=403, detail="Recipe review access denied.")
+
+    conditions = []
+    params = {"status": status, "offset": (page - 1) * page_size, "limit": page_size}
+
+    if status != "all":
+        conditions.append("r.review_status = :status")
+    if diet:
+        conditions.append("r.diet_type::text = :diet")
+        params["diet"] = diet
+    if meal_slot:
+        conditions.append(":meal_slot = ANY(r.meal_slots)")
+        params["meal_slot"] = meal_slot
+    if sub_region:
+        conditions.append("r.sub_region ILIKE :sub_region")
+        params["sub_region"] = f"%{sub_region}%"
+
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    rows = db.execute(text(f"""
+        SELECT
+            r.recipe_id, r.dish_name, r.regional_name, r.sub_region,
+            r.diet_type::text as diet_type, r.is_sattvic, r.is_vegan,
+            r.intensity_level, r.meal_slots, r.review_status,
+            r.reviewed_at, r.review_notes,
+            v.hero_image_url, v.image_generation_count,
+            COUNT(*) OVER() as total_count
+        FROM recipe_dna_master r
+        LEFT JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
+        {where}
+        ORDER BY r.sub_region, r.dish_name
+        LIMIT :limit OFFSET :offset
+    """), params).fetchall()
+
+    total = rows[0].total_count if rows else 0
+
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "recipes": [{
+            "recipe_id":        str(r.recipe_id),
+            "dish_name":        r.dish_name,
+            "regional_name":    r.regional_name,
+            "sub_region":       r.sub_region,
+            "diet_type":        r.diet_type,
+            "is_sattvic":       r.is_sattvic,
+            "is_vegan":         r.is_vegan,
+            "intensity_level":  r.intensity_level,
+            "meal_slots":       r.meal_slots,
+            "review_status":    r.review_status,
+            "reviewed_at":      str(r.reviewed_at) if r.reviewed_at else None,
+            "review_notes":     r.review_notes,
+            "hero_image_url":   r.hero_image_url,
+            "image_generation_count": r.image_generation_count or 0,
+        } for r in rows]
+    }
+
+
+@app.get("/recipes/{recipe_id}/detail")
+async def get_recipe_detail(
+    recipe_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Full recipe detail for review edit sheet."""
+    role = current_user["role"]
+    if role not in ("platform_admin", "reviewer"):
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    r = db.execute(text("""
+        SELECT
+            r.recipe_id, r.dish_name, r.regional_name, r.sub_region,
+            r.diet_type::text, r.is_sattvic, r.is_vegan, r.intensity_level,
+            r.meal_slots, r.is_scalable, r.is_regional_specific,
+            r.prep_time_mins, r.cook_time_mins, r.serves, r.tags,
+            r.review_status, r.review_notes,
+            v.hero_image_url, v.prep_steps, v.youtube_urls,
+            v.image_generation_count
+        FROM recipe_dna_master r
+        LEFT JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
+        WHERE r.recipe_id = CAST(:rid AS uuid)
+    """), {"rid": recipe_id}).fetchone()
+
+    if not r:
+        raise HTTPException(status_code=404, detail="Recipe not found.")
+
+    # Fetch ingredients
+    ingredients = db.execute(text("""
+        SELECT ri.ingredient_id, ic.name_en, ic.name_ta, ic.category,
+               ri.quantity, ri.unit, ri.is_optional, ri.sort_order
+        FROM recipe_ingredients ri
+        JOIN ingredient_catalog ic ON ic.id = ri.ingredient_id
+        WHERE ri.recipe_id = CAST(:rid AS uuid)
+        ORDER BY ri.sort_order
+    """), {"rid": recipe_id}).fetchall()
+
+    return {
+        "recipe_id":            str(r.recipe_id),
+        "dish_name":            r.dish_name,
+        "regional_name":        r.regional_name,
+        "sub_region":           r.sub_region,
+        "diet_type":            r.diet_type,
+        "is_sattvic":           r.is_sattvic,
+        "is_vegan":             r.is_vegan,
+        "intensity_level":      r.intensity_level,
+        "meal_slots":           r.meal_slots,
+        "is_scalable":          r.is_scalable,
+        "is_regional_specific": r.is_regional_specific,
+        "prep_time_mins":       r.prep_time_mins,
+        "cook_time_mins":       r.cook_time_mins,
+        "serves":               r.serves,
+        "tags":                 r.tags,
+        "review_status":        r.review_status,
+        "review_notes":         r.review_notes,
+        "hero_image_url":       r.hero_image_url,
+        "prep_steps":           r.prep_steps,
+        "youtube_urls":         r.youtube_urls or [],
+        "image_generation_count": r.image_generation_count or 0,
+        "ingredients": [{
+            "ingredient_id": ing.ingredient_id,
+            "name_en":       ing.name_en,
+            "name_ta":       ing.name_ta,
+            "category":      ing.category,
+            "quantity":      ing.quantity,
+            "unit":          ing.unit,
+            "is_optional":   ing.is_optional,
+            "sort_order":    ing.sort_order,
+        } for ing in ingredients]
+    }
+
+
+@app.put("/recipes/{recipe_id}/review")
+async def update_recipe_review(
+    recipe_id: str,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Update recipe details + review status.
+    Accessible to platform_admin and reviewer.
+    """
+    role = current_user["role"]
+    if role not in ("platform_admin", "reviewer"):
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    user_id = current_user["user_id"]
+
+    # Update recipe_dna_master fields
+    db.execute(text("""
+        UPDATE recipe_dna_master SET
+            dish_name            = COALESCE(:dish_name, dish_name),
+            regional_name        = COALESCE(:regional_name, regional_name),
+            sub_region           = COALESCE(:sub_region, sub_region),
+            diet_type            = COALESCE(:diet_type::diet_pref, diet_type),
+            is_sattvic           = COALESCE(:is_sattvic, is_sattvic),
+            is_vegan             = COALESCE(:is_vegan, is_vegan),
+            intensity_level      = COALESCE(:intensity_level, intensity_level),
+            meal_slots           = COALESCE(:meal_slots, meal_slots),
+            is_scalable          = COALESCE(:is_scalable, is_scalable),
+            is_regional_specific = COALESCE(:is_regional_specific, is_regional_specific),
+            review_status        = COALESCE(:review_status, review_status),
+            review_notes         = COALESCE(:review_notes, review_notes),
+            reviewed_by          = CAST(:reviewed_by AS uuid),
+            reviewed_at          = NOW()
+        WHERE recipe_id = CAST(:recipe_id AS uuid)
+    """), {
+        "dish_name":            payload.get("dish_name"),
+        "regional_name":        payload.get("regional_name"),
+        "sub_region":           payload.get("sub_region"),
+        "diet_type":            payload.get("diet_type"),
+        "is_sattvic":           payload.get("is_sattvic"),
+        "is_vegan":             payload.get("is_vegan"),
+        "intensity_level":      payload.get("intensity_level"),
+        "meal_slots":           payload.get("meal_slots"),
+        "is_scalable":          payload.get("is_scalable"),
+        "is_regional_specific": payload.get("is_regional_specific"),
+        "review_status":        payload.get("review_status"),
+        "review_notes":         payload.get("review_notes"),
+        "reviewed_by":          user_id,
+        "recipe_id":            recipe_id,
+    })
+
+    # Update recipe_content_vault fields
+    db.execute(text("""
+        UPDATE recipe_content_vault SET
+            prep_steps    = COALESCE(:prep_steps, prep_steps),
+            youtube_urls  = COALESCE(:youtube_urls, youtube_urls),
+            hero_image_url = COALESCE(:hero_image_url, hero_image_url)
+        WHERE recipe_id = CAST(:recipe_id AS uuid)
+    """), {
+        "prep_steps":   payload.get("prep_steps"),
+        "youtube_urls": payload.get("youtube_urls"),
+        "hero_image_url": payload.get("hero_image_url"),
+        "recipe_id":    recipe_id,
+    })
+
+    # Update ingredient optional flags if provided
+    if payload.get("ingredients"):
+        for ing in payload["ingredients"]:
+            db.execute(text("""
+                UPDATE recipe_ingredients
+                SET is_optional = :is_optional
+                WHERE recipe_id = CAST(:recipe_id AS uuid)
+                  AND ingredient_id = :ingredient_id
+            """), {
+                "is_optional":    ing.get("is_optional", False),
+                "recipe_id":      recipe_id,
+                "ingredient_id":  ing.get("ingredient_id"),
+            })
+
+    db.commit()
+    return {"message": "Recipe updated successfully.", "recipe_id": recipe_id}
+
+
+@app.post("/recipes/bulk-approve")
+async def bulk_approve_recipes(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Bulk approve multiple recipes at once."""
+    role = current_user["role"]
+    if role not in ("platform_admin", "reviewer"):
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    recipe_ids = payload.get("recipe_ids", [])
+    if not recipe_ids:
+        raise HTTPException(status_code=400, detail="No recipe IDs provided.")
+
+    user_id = current_user["user_id"]
+    count = 0
+    for rid in recipe_ids:
+        db.execute(text("""
+            UPDATE recipe_dna_master
+            SET review_status = 'approved',
+                reviewed_by   = CAST(:uid AS uuid),
+                reviewed_at   = NOW()
+            WHERE recipe_id = CAST(:rid AS uuid)
+        """), {"uid": user_id, "rid": rid})
+        count += 1
+
+    db.commit()
+    return {"message": f"{count} recipes approved.", "count": count}
+
+
 # --- RECIPE IMAGE GENERATION ENDPOINT ---
 @app.post("/recipes/{recipe_id}/generate-image")
 async def generate_recipe_image(

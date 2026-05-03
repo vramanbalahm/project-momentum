@@ -12,12 +12,13 @@ import ManageMembers from './pages/ManageMembers.jsx'
 import OnboardingWizard from './pages/OnboardingWizard.jsx'
 import MyProfile from './pages/MyProfile.jsx'
 import MemberAvailability from './pages/MemberAvailability.jsx'
+import RecipeReview from './pages/RecipeReview.jsx'
 
 // AuthGate — isolated from App's state so Login/Register inputs never lose focus
 function AuthGate() {
   const { isAuthenticated, loading: authLoading, user } = useAuth();
   const [authScreen, setAuthScreen] = useState('login');
-  const [screen, setScreen] = useState('dashboard'); // dashboard | weekly_plan | family_profile | manage_members | member_availability
+  const [screen, setScreen] = useState('dashboard'); // dashboard | weekly_plan | family_profile | manage_members | member_availability | recipe_review
 
   if (authLoading) {
     return (
@@ -45,6 +46,9 @@ function AuthGate() {
   if (screen === 'family_profile') return <FamilyProfile onBack={() => setScreen('dashboard')} />;
   if (screen === 'my_profile') return <MyProfile onBack={() => setScreen('dashboard')} />;
   if (screen === 'manage_members') return <ManageMembers onBack={() => setScreen('dashboard')} />;
+  if (screen === 'recipe_review') return (
+    <RecipeReview onBack={() => setScreen('dashboard')} />
+  );
   if (screen === 'member_availability') return (
     <MemberAvailability
       onBack={() => setScreen('dashboard')}
