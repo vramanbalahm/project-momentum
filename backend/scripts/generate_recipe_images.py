@@ -122,8 +122,8 @@ def build_prompt(dish_name, regional_name, sub_region, diet_type, meal_slots, in
 
 def generate_image(prompt, recipe_id, dish_name):
     """
-    Call Gemini Imagen to generate a food image.
-    Returns path to saved image file, or None on failure.
+    Call gemini-2.5-flash-image using generateContent (free tier: 500/day).
+    This model uses generateContent, not generate_images/predict.
     """
     from google import genai
     from google.genai import types
@@ -131,25 +131,28 @@ def generate_image(prompt, recipe_id, dish_name):
     client = genai.Client(api_key=GEMINI_API_KEY)
 
     try:
-        response = client.models.generate_images(
+        response = client.models.generate_content(
             model="gemini-2.5-flash-image",
-            prompt=prompt,
-            config=types.GenerateImagesConfig(
-                number_of_images=1,
-                aspect_ratio="1:1",          # Square — works well for recipe cards
-                safety_filter_level="block_low_and_above",
-                person_generation="dont_allow",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE", "TEXT"],
             )
         )
 
-        if not response.generated_images:
-            print(f"    ✗ No image returned by Imagen")
+        # Extract image bytes from response parts
+        image_data = None
+        for part in response.candidates[0].content.parts:
+            if hasattr(part, "inline_data") and part.inline_data is not None:
+                image_data = part.inline_data.data
+                break
+
+        if not image_data:
+            print(f"    ✗ No image in response")
             return None
 
-        # Save image to disk — filename is sanitised dish name for easy tracing
-        image_data  = response.generated_images[0].image.image_bytes
-        safe_name   = sanitise_filename(dish_name)
-        file_path   = IMAGE_DIR / f"{safe_name}__{recipe_id[:8]}.jpg"
+        # Save image to disk
+        safe_name = sanitise_filename(dish_name)
+        file_path = IMAGE_DIR / f"{safe_name}__{recipe_id[:8]}.jpg"
         with open(file_path, "wb") as f:
             f.write(image_data)
 
@@ -159,8 +162,6 @@ def generate_image(prompt, recipe_id, dish_name):
         print(f"    ✗ Imagen API error: {e}")
         return None
 
-
-# ── DB helpers ────────────────────────────────────────────────────────────────
 
 def get_connection():
     return psycopg2.connect(DATABASE_URL)
