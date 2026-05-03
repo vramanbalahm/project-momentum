@@ -114,7 +114,7 @@ def generate_image(prompt, recipe_id):
             config=types.GenerateImagesConfig(
                 number_of_images=1,
                 aspect_ratio="1:1",          # Square — works well for recipe cards
-                safety_filter_level="block_only_high",
+                safety_filter_level="block_low_and_above",
                 person_generation="dont_allow",
             )
         )
