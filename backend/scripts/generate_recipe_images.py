@@ -52,6 +52,15 @@ if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # ── Image storage ─────────────────────────────────────────────────────────────
+
+def sanitise_filename(dish_name):
+    """Convert dish name to a safe filename — lowercase, spaces to underscores."""
+    import re
+    name = dish_name.lower().strip()
+    name = re.sub(r'[^a-z0-9\s]', '', name)   # remove special chars
+    name = re.sub(r'\s+', '_', name)            # spaces to underscores
+    name = name[:80]                             # max 80 chars
+    return name
 # Images stored at: backend/recipe_images/{recipe_id}.jpg
 # URL stored in DB: /recipe_images/{recipe_id}.jpg (served as static files)
 
@@ -87,9 +96,10 @@ def build_prompt(dish_name, regional_name, sub_region, diet_type, meal_slots):
         f"{dish_name}. "
         f"Professional Tamil Nadu food photography. "
         f"Served in a {vessel}. "
-        f"Bright, vibrant, natural lighting. "
-        f"Appetising presentation, garnished traditionally. "
-        f"Clean rustic wooden background. "
+        f"Bright, well-lit, daylight studio lighting, high key. "
+        f"Vibrant colours, crisp and clear. "
+        f"Appetising presentation, garnished traditionally with curry leaves. "
+        f"Clean light wooden background. "
         f"No text, no people, no hands, no watermarks."
     )
     return prompt
@@ -97,7 +107,7 @@ def build_prompt(dish_name, regional_name, sub_region, diet_type, meal_slots):
 
 # ── Gemini Imagen call ────────────────────────────────────────────────────────
 
-def generate_image(prompt, recipe_id):
+def generate_image(prompt, recipe_id, dish_name):
     """
     Call Gemini Imagen to generate a food image.
     Returns path to saved image file, or None on failure.
@@ -123,9 +133,10 @@ def generate_image(prompt, recipe_id):
             print(f"    ✗ No image returned by Imagen")
             return None
 
-        # Save image to disk
-        image_data = response.generated_images[0].image.image_bytes
-        file_path  = IMAGE_DIR / f"{recipe_id}.jpg"
+        # Save image to disk — filename is sanitised dish name for easy tracing
+        image_data  = response.generated_images[0].image.image_bytes
+        safe_name   = sanitise_filename(dish_name)
+        file_path   = IMAGE_DIR / f"{safe_name}__{recipe_id[:8]}.jpg"
         with open(file_path, "wb") as f:
             f.write(image_data)
 
@@ -257,7 +268,7 @@ def main():
         print(f"[{i}/{len(recipes)}] {dish_name} ({diet_type}, {sub_region or 'General'})")
 
         # Check if image already exists on disk
-        file_path = IMAGE_DIR / f"{recipe_id}.jpg"
+        file_path = IMAGE_DIR / f"{sanitise_filename(dish_name)}__{recipe_id[:8]}.jpg"
         if file_path.exists() and not args.force:
             print(f"    ⟳ Skipped — image already exists on disk")
             skipped += 1
@@ -267,11 +278,12 @@ def main():
         prompt = build_prompt(dish_name, regional, sub_region, diet_type, meal_slots)
 
         # Generate image
-        saved_path = generate_image(prompt, recipe_id)
+        saved_path = generate_image(prompt, recipe_id, dish_name)
 
         if saved_path:
             # Store relative URL in DB (served as static file by FastAPI)
-            image_url = f"/recipe_images/{recipe_id}.jpg"
+            safe_name = sanitise_filename(dish_name)
+            image_url = f"/recipe_images/{safe_name}__{recipe_id[:8]}.jpg"
             update_image_url(recipe_id, image_url)
             print(f"    ✓ Saved → {image_url}")
             generated += 1
