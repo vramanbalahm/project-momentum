@@ -132,7 +132,7 @@ def generate_image(prompt, recipe_id, dish_name):
 
     try:
         response = client.models.generate_images(
-            model="imagen-4.0-fast-generate-001",
+            model="gemini-2.5-flash-image",
             prompt=prompt,
             config=types.GenerateImagesConfig(
                 number_of_images=1,

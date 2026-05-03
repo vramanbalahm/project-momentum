@@ -506,7 +506,7 @@ async def generate_recipe_image(
     # Run image generation script as subprocess
     script_path = Path(__file__).resolve().parent / "scripts" / "generate_recipe_images.py"
     result = subprocess.run(
-        [sys.executable, str(script_path), "--recipe_id", recipe_id, "--force"],
+        [sys.executable, str(script_path), "--recipe_id", recipe_id, "--force", "--model", "gemini-2.5-flash-image"],
         capture_output=True, text=True,
         cwd=str(Path(__file__).resolve().parent)
     )
