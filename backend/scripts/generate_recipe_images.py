@@ -109,7 +109,7 @@ def generate_image(prompt, recipe_id):
 
     try:
         response = client.models.generate_images(
-            model="imagen-3.0-generate-002",
+            model="imagen-4.0-fast-generate-001",
             prompt=prompt,
             config=types.GenerateImagesConfig(
                 number_of_images=1,
