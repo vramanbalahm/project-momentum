@@ -649,8 +649,9 @@ def main():
     print(f"   Count   : {args.count}")
     print(f"   Dry run : {args.dry_run}\n")
 
-    # Batch into groups of 8 to avoid token limits
-    BATCH_SIZE  = 8
+    # Batch into groups of 4 for Non-Veg (complex recipes with long ingredient lists)
+    # and 8 for Veg — controlled by diet type
+    BATCH_SIZE  = 4 if args.diet in ('Non-Veg', 'Eggitarian') else 8
     all_recipes = []
     batches = [BATCH_SIZE] * (args.count // BATCH_SIZE)
     if args.count % BATCH_SIZE:
