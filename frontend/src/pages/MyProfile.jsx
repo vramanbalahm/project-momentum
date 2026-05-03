@@ -29,7 +29,8 @@ const GENDERS = [
 ];
 
 export default function MyProfile({ onBack }) {
-  const { apiFetch } = useAuth();
+  const { user, apiFetch } = useAuth();
+  const isAdmin = user?.role === "household_admin" || user?.role === "platform_admin";
   const [profile, setProfile]           = useState(null);
   const [loading, setLoading]           = useState(true);
   const [saving, setSaving]             = useState(false);
@@ -40,6 +41,11 @@ export default function MyProfile({ onBack }) {
   const [gender, setGender]             = useState(null);
   const [phone, setPhone]               = useState("");
   const [restrictionValue, setRestrictionValue] = useState({});
+  const [editName, setEditName]         = useState("");
+  // Add member sheet — admin only
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [addForm, setAddForm]           = useState({ name: "", email: "", password: "" });
+  const [addSaving, setAddSaving]       = useState(false);
 
   // Load profile on mount
   useEffect(() => {
@@ -47,6 +53,7 @@ export default function MyProfile({ onBack }) {
       try {
         const p = await apiFetch("/auth/my-profile");
         setProfile(p);
+        setEditName(p.name || "");
         setDietPref(p.dietary_preference || "Veg");
         setAgeGroup(p.age_group || null);
         setGender(p.gender || null);
@@ -60,6 +67,29 @@ export default function MyProfile({ onBack }) {
     })();
   }, []);
 
+  const handleAddMember = async () => {
+    if (!addForm.name.trim() || !addForm.password) { setError("Name and password are required."); return; }
+    setAddSaving(true);
+    setError(null);
+    try {
+      await apiFetch("/auth/members/create", {
+        method: "POST",
+        body: JSON.stringify({
+          name:     addForm.name.trim(),
+          email:    addForm.email.trim() || null,
+          password: addForm.password,
+        }),
+      });
+      setShowAddMember(false);
+      setAddForm({ name: "", email: "", password: "" });
+      showSuccess(`✓ ${addForm.name.trim()} added successfully!`);
+    } catch (e) {
+      setError(e.message || "Failed to add member.");
+    } finally {
+      setAddSaving(false);
+    }
+  };
+
   const showSuccess = (msg) => {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(null), 5000);
@@ -70,10 +100,11 @@ export default function MyProfile({ onBack }) {
     setError(null);
     setSuccessMsg(null);
     try {
-      // Step 1: Save dietary preference, age group, gender, phone
+      // Step 1: Save name (if admin), dietary preference, age group, gender, phone
       await apiFetch("/auth/my-profile", {
         method: "PUT",
         body: JSON.stringify({
+          name:               editName.trim() || undefined,
           dietary_preference: dietPref,
           age_group:          ageGroup,
           gender:             gender,
@@ -130,6 +161,12 @@ export default function MyProfile({ onBack }) {
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
           <span onClick={onBack} style={{ color: C.mint, fontSize: 20, cursor: "pointer" }}>←</span>
           <div style={{ fontSize: 17, fontWeight: 500, color: "#FDFCF8" }}>My Profile</div>
+          {isAdmin && (
+            <button
+              onClick={() => { setShowAddMember(true); setAddForm({ name: "", email: "", password: "" }); }}
+              style={{ marginLeft: "auto", background: C.mint, color: C.green, border: "none", borderRadius: 10, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+            >+ Add member</button>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ width: 56, height: 56, borderRadius: "50%", background: C.mint, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 500, color: C.green }}>
@@ -166,8 +203,19 @@ export default function MyProfile({ onBack }) {
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Full name</div>
-            <div style={{ fontSize: 14, color: C.text, padding: "9px 12px", background: "#F1EFE8", borderRadius: 8, border: `0.5px solid ${C.border}` }}>{profile?.name}</div>
-            <div style={{ fontSize: 10, color: C.muted, marginTop: 3 }}>Contact your admin to change your name</div>
+            {isAdmin ? (
+              <input
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                placeholder="Full name"
+                style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `0.5px solid ${C.border}`, fontSize: 14, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box" }}
+              />
+            ) : (
+              <>
+                <div style={{ fontSize: 14, color: C.text, padding: "9px 12px", background: "#F1EFE8", borderRadius: 8, border: `0.5px solid ${C.border}` }}>{profile?.name}</div>
+                <div style={{ fontSize: 10, color: C.muted, marginTop: 3 }}>Contact your admin to change your name</div>
+              </>
+            )}
           </div>
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Email address</div>
@@ -263,6 +311,31 @@ export default function MyProfile({ onBack }) {
           {saving ? "Saving..." : "Save profile"}
         </button>
       </div>
+
+      {/* Add Member bottom sheet — admin only */}
+      {showAddMember && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <div style={{ background: C.card, borderRadius: "20px 20px 0 0", padding: "24px 20px 40px", width: "100%", maxWidth: 480, boxSizing: "border-box" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Add new member</div>
+              <span onClick={() => setShowAddMember(false)} style={{ fontSize: 18, color: C.muted, cursor: "pointer" }}>✕</span>
+            </div>
+            <input type="text" placeholder="Full name *" value={addForm.name}
+              onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
+              style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box", marginBottom: 10 }} />
+            <input type="email" placeholder="Email address (optional)" value={addForm.email}
+              onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))}
+              style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box", marginBottom: 10 }} />
+            <input type="password" placeholder="Temporary password *" value={addForm.password}
+              onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))}
+              style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box", marginBottom: 16 }} />
+            <button onClick={handleAddMember} disabled={addSaving}
+              style={{ width: "100%", padding: 13, border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, color: C.green, background: C.mint, cursor: addSaving ? "not-allowed" : "pointer", opacity: addSaving ? 0.7 : 1 }}>
+              {addSaving ? "Adding..." : "Add member"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
