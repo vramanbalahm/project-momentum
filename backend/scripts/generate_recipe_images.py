@@ -70,8 +70,9 @@ IMAGE_DIR.mkdir(exist_ok=True)
 # ── Standard prompt template ──────────────────────────────────────────────────
 # Consistent style across all recipes
 
-def build_prompt(dish_name, regional_name, sub_region, diet_type, meal_slots):
-    """Build a consistent food photography prompt for the recipe."""
+def build_prompt(dish_name, regional_name, sub_region, diet_type, meal_slots, ingredients=None):
+    """Build a consistent food photography prompt for the recipe.
+    Uses actual ingredients from DB for visual accuracy."""
 
     # Serving vessel by meal type
     if "Side Dish" in (meal_slots or []):
@@ -92,9 +93,18 @@ def build_prompt(dish_name, regional_name, sub_region, diet_type, meal_slots):
     else:
         garnish = "garnished traditionally with curry leaves and a drizzle of ghee or oil"
 
+    # Build ingredient description from top 5 non-optional ingredients
+    ing_desc = ""
+    if ingredients:
+        top_ings = [i for i in ingredients if i][:5]
+        if top_ings:
+            ing_desc = f"Key ingredients: {', '.join(top_ings)}. "
+
     prompt = (
         f"{dish_name}. "
-        f"Professional Tamil Nadu food photography. "
+        f"Authentic Tamil Nadu dish. "
+        f"{ing_desc}"
+        f"Professional food photography. "
         f"Served in a {vessel}. "
         f"Bright, well-lit, daylight studio lighting, high key. "
         f"Vibrant colours, crisp and clear. "
@@ -188,10 +198,19 @@ def get_recipes(args):
             r.sub_region,
             r.diet_type::text as diet_type,
             r.meal_slots,
-            v.hero_image_url
+            v.hero_image_url,
+            COALESCE(
+                array_agg(ic.name_en ORDER BY ri.sort_order)
+                FILTER (WHERE ic.name_en IS NOT NULL AND ri.is_optional = false),
+                ARRAY[]::text[]
+            ) as main_ingredients
         FROM recipe_dna_master r
         LEFT JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
+        LEFT JOIN recipe_ingredients ri ON ri.recipe_id = r.recipe_id
+        LEFT JOIN ingredient_catalog ic ON ic.id = ri.ingredient_id
         {where}
+        GROUP BY r.recipe_id, r.dish_name, r.regional_name, r.sub_region,
+                 r.diet_type, r.meal_slots, v.hero_image_url
         ORDER BY r.diet_type, r.sub_region, r.dish_name
         {limit_clause}
     """, params)
@@ -274,8 +293,9 @@ def main():
             skipped += 1
             continue
 
-        # Build prompt
-        prompt = build_prompt(dish_name, regional, sub_region, diet_type, meal_slots)
+        # Build prompt with ingredients for visual accuracy
+        ingredients = list(recipe.get('main_ingredients') or [])
+        prompt = build_prompt(dish_name, regional, sub_region, diet_type, meal_slots, ingredients)
 
         # Generate image
         saved_path = generate_image(prompt, recipe_id, dish_name)
