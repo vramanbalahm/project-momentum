@@ -1,0 +1,296 @@
+"""
+generate_recipe_images.py — Generate food images for recipes using Gemini Imagen
+Stores images locally in backend/recipe_images/ and updates hero_image_url in DB.
+
+Usage:
+    cd C:\\Users\\SATISH.000\\project-momentum\\backend
+
+    # Generate images for all recipes without images
+    python scripts/generate_recipe_images.py
+
+    # Generate for a specific diet type
+    python scripts/generate_recipe_images.py --diet Veg
+
+    # Generate for a specific sub_region
+    python scripts/generate_recipe_images.py --sub_region "Chettinad"
+
+    # Generate for a specific meal slot
+    python scripts/generate_recipe_images.py --meal Side Dish
+
+    # Limit how many to generate in one run
+    python scripts/generate_recipe_images.py --limit 50
+
+    # Regenerate images even if they already exist
+    python scripts/generate_recipe_images.py --force
+
+    # Dry run — show which recipes would get images
+    python scripts/generate_recipe_images.py --dry-run
+
+Requirements:
+    pip install google-genai psycopg2-binary python-dotenv pillow
+"""
+
+import argparse
+import base64
+import os
+import sys
+import time
+import uuid
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+DATABASE_URL   = os.getenv("DATABASE_URL", "postgresql://postgres:admin123@localhost:5432/food_momentum_db")
+
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# ── Image storage ─────────────────────────────────────────────────────────────
+# Images stored at: backend/recipe_images/{recipe_id}.jpg
+# URL stored in DB: /recipe_images/{recipe_id}.jpg (served as static files)
+
+IMAGE_DIR = Path(__file__).resolve().parent.parent / "recipe_images"
+IMAGE_DIR.mkdir(exist_ok=True)
+
+# ── Standard prompt template ──────────────────────────────────────────────────
+# Consistent style across all recipes
+
+def build_prompt(dish_name, regional_name, sub_region, diet_type, meal_slots):
+    """Build a consistent food photography prompt for the recipe."""
+
+    # Serving vessel by meal type
+    if "Side Dish" in (meal_slots or []):
+        vessel = "small traditional brass katori bowl"
+    elif "Breakfast" in (meal_slots or []) and "Lunch" not in (meal_slots or []):
+        vessel = "traditional South Indian breakfast plate with banana leaf"
+    else:
+        vessel = "traditional brass plate or banana leaf thali"
+
+    # Regional context
+    region_context = f"{sub_region} style, " if sub_region and sub_region not in ("General Tamil Nadu", "") else ""
+
+    # Diet-specific styling
+    if diet_type == "Non-Veg":
+        garnish = "garnished with fresh curry leaves and red chilli"
+    elif diet_type == "Eggitarian":
+        garnish = "garnished with fresh coriander leaves"
+    else:
+        garnish = "garnished traditionally with curry leaves and a drizzle of ghee or oil"
+
+    prompt = (
+        f"Professional food photography of {dish_name}, "
+        f"authentic {region_context}Tamil Nadu cuisine. "
+        f"Beautifully presented in a {vessel}. "
+        f"{garnish.capitalize()}. "
+        f"Warm natural lighting from the side, slightly overhead angle (45 degrees). "
+        f"Vibrant, appetising colours. Rustic wooden or stone background. "
+        f"Sharp focus on the food, soft bokeh background. "
+        f"No text, no watermarks, no people, no hands. "
+        f"Restaurant quality food styling."
+    )
+    return prompt
+
+
+# ── Gemini Imagen call ────────────────────────────────────────────────────────
+
+def generate_image(prompt, recipe_id):
+    """
+    Call Gemini Imagen to generate a food image.
+    Returns path to saved image file, or None on failure.
+    """
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=GEMINI_API_KEY)
+
+    try:
+        response = client.models.generate_images(
+            model="imagen-3.0-generate-002",
+            prompt=prompt,
+            config=types.GenerateImagesConfig(
+                number_of_images=1,
+                aspect_ratio="1:1",          # Square — works well for recipe cards
+                safety_filter_level="block_only_high",
+                person_generation="dont_allow",
+            )
+        )
+
+        if not response.generated_images:
+            print(f"    ✗ No image returned by Imagen")
+            return None
+
+        # Save image to disk
+        image_data = response.generated_images[0].image.image_bytes
+        file_path  = IMAGE_DIR / f"{recipe_id}.jpg"
+        with open(file_path, "wb") as f:
+            f.write(image_data)
+
+        return file_path
+
+    except Exception as e:
+        print(f"    ✗ Imagen API error: {e}")
+        return None
+
+
+# ── DB helpers ────────────────────────────────────────────────────────────────
+
+def get_connection():
+    return psycopg2.connect(DATABASE_URL)
+
+
+def get_recipes(args):
+    """Fetch recipes that need images based on filter args."""
+    conn = get_connection()
+    cur  = conn.cursor(cursor_factory=RealDictCursor)
+
+    conditions = []
+    params     = {}
+
+    if not args.force:
+        conditions.append("(v.hero_image_url IS NULL OR v.hero_image_url = '')")
+
+    if args.diet:
+        conditions.append("r.diet_type = %(diet)s::diet_pref")
+        params["diet"] = args.diet
+
+    if args.sub_region:
+        conditions.append("r.sub_region ILIKE %(sub_region)s")
+        params["sub_region"] = f"%{args.sub_region}%"
+
+    if args.meal:
+        conditions.append("%(meal)s = ANY(r.meal_slots)")
+        params["meal"] = args.meal
+
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    limit_clause = f"LIMIT {args.limit}" if args.limit else ""
+
+    cur.execute(f"""
+        SELECT
+            r.recipe_id,
+            r.dish_name,
+            r.regional_name,
+            r.sub_region,
+            r.diet_type::text as diet_type,
+            r.meal_slots,
+            v.hero_image_url
+        FROM recipe_dna_master r
+        LEFT JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
+        {where}
+        ORDER BY r.diet_type, r.sub_region, r.dish_name
+        {limit_clause}
+    """, params)
+
+    recipes = cur.fetchall()
+    cur.close()
+    conn.close()
+    return recipes
+
+
+def update_image_url(recipe_id, image_url):
+    """Update hero_image_url in recipe_content_vault."""
+    conn = get_connection()
+    cur  = conn.cursor()
+    cur.execute("""
+        UPDATE recipe_content_vault
+        SET hero_image_url = %s
+        WHERE recipe_id = CAST(%s AS uuid)
+    """, (image_url, recipe_id))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate food images for Momentum recipes")
+    parser.add_argument("--diet",       default=None, help="Filter by diet type: Veg | Non-Veg | Vegan | Eggitarian")
+    parser.add_argument("--sub_region", default=None, help="Filter by sub_region (partial match)")
+    parser.add_argument("--meal",       default=None, help="Filter by meal slot: Breakfast | Lunch | Dinner | Side Dish")
+    parser.add_argument("--limit",      type=int, default=None, help="Max number of images to generate in this run")
+    parser.add_argument("--force",      action="store_true", help="Regenerate even if image already exists")
+    parser.add_argument("--dry-run",    action="store_true", help="Show which recipes would get images, don't generate")
+    parser.add_argument("--delay",      type=float, default=1.5, help="Seconds between API calls (default 1.5)")
+    args = parser.parse_args()
+
+    if not GEMINI_API_KEY:
+        print("✗ GEMINI_API_KEY not set in .env")
+        sys.exit(1)
+
+    print(f"\n🌿 Momentum Recipe Image Generator")
+    print(f"   Storage  : {IMAGE_DIR}")
+    if args.diet:       print(f"   Diet     : {args.diet}")
+    if args.sub_region: print(f"   Region   : {args.sub_region}")
+    if args.meal:       print(f"   Meal     : {args.meal}")
+    if args.limit:      print(f"   Limit    : {args.limit}")
+    print(f"   Force    : {args.force}")
+    print(f"   Dry run  : {args.dry_run}\n")
+
+    recipes = get_recipes(args)
+    print(f"✓ Found {len(recipes)} recipes to process\n")
+
+    if not recipes:
+        print("Nothing to do — all matching recipes already have images.")
+        return
+
+    if args.dry_run:
+        for r in recipes:
+            print(f"  · {r['dish_name']} ({r['diet_type']}, {r['sub_region']})")
+        print(f"\n✓ Dry run — {len(recipes)} recipes would get images.")
+        return
+
+    generated = failed = skipped = 0
+
+    for i, recipe in enumerate(recipes, 1):
+        recipe_id   = str(recipe["recipe_id"])
+        dish_name   = recipe["dish_name"]
+        diet_type   = recipe["diet_type"]
+        sub_region  = recipe["sub_region"] or ""
+        regional    = recipe["regional_name"] or dish_name
+        meal_slots  = recipe["meal_slots"] or []
+
+        print(f"[{i}/{len(recipes)}] {dish_name} ({diet_type}, {sub_region or 'General'})")
+
+        # Check if image already exists on disk
+        file_path = IMAGE_DIR / f"{recipe_id}.jpg"
+        if file_path.exists() and not args.force:
+            print(f"    ⟳ Skipped — image already exists on disk")
+            skipped += 1
+            continue
+
+        # Build prompt
+        prompt = build_prompt(dish_name, regional, sub_region, diet_type, meal_slots)
+
+        # Generate image
+        saved_path = generate_image(prompt, recipe_id)
+
+        if saved_path:
+            # Store relative URL in DB (served as static file by FastAPI)
+            image_url = f"/recipe_images/{recipe_id}.jpg"
+            update_image_url(recipe_id, image_url)
+            print(f"    ✓ Saved → {image_url}")
+            generated += 1
+        else:
+            failed += 1
+
+        # Rate limiting — avoid hitting API limits
+        if i < len(recipes):
+            time.sleep(args.delay)
+
+    print(f"\n{'='*50}")
+    print(f"  Generated : {generated}")
+    print(f"  Skipped   : {skipped}")
+    print(f"  Failed    : {failed}")
+    print(f"  Images at : {IMAGE_DIR}")
+    print(f"{'='*50}\n")
+
+
+if __name__ == "__main__":
+    main()

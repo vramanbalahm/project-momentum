@@ -25,6 +25,11 @@ from fastapi.middleware.cors import CORSMiddleware
 # app = FastAPI()
 app = FastAPI(title="Momentum Food Scheduler — MVP")
 
+# Serve recipe images as static files — http://localhost:8000/recipe_images/{recipe_id}.jpg
+RECIPE_IMAGES_DIR = Path(__file__).resolve().parent / "recipe_images"
+RECIPE_IMAGES_DIR.mkdir(exist_ok=True)
+app.mount("/recipe_images", StaticFiles(directory=str(RECIPE_IMAGES_DIR)), name="recipe_images")
+
 # Allow frontend origin to talk to backend
 import os
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
