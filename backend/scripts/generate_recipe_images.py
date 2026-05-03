@@ -174,6 +174,10 @@ def get_recipes(args):
     conditions = []
     params     = {}
 
+    if args.recipe_id:
+        conditions.append("r.recipe_id = %(recipe_id)s::uuid")
+        params["recipe_id"] = args.recipe_id
+
     if not args.force:
         conditions.append("(v.hero_image_url IS NULL OR v.hero_image_url = '')")
 
@@ -249,6 +253,7 @@ def main():
     parser.add_argument("--force",      action="store_true", help="Regenerate even if image already exists")
     parser.add_argument("--dry-run",    action="store_true", help="Show which recipes would get images, don't generate")
     parser.add_argument("--delay",      type=float, default=1.5, help="Seconds between API calls (default 1.5)")
+    parser.add_argument("--recipe_id",  default=None, help="Generate image for a specific recipe_id only")
     args = parser.parse_args()
 
     if not GEMINI_API_KEY:

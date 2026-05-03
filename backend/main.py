@@ -175,6 +175,104 @@ app.include_router(weekly_plan_router)
 from routers.availability import router as availability_router
 app.include_router(availability_router)
 
+# --- RECIPE IMAGE GENERATION ENDPOINT ---
+@app.post("/recipes/{recipe_id}/generate-image")
+async def generate_recipe_image(
+    recipe_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Generate image for a recipe using Gemini Imagen.
+    QA role: max 2 generations per recipe.
+    Platform admin: unlimited.
+    """
+    import subprocess, sys, os
+    from pathlib import Path
+
+    role = current_user["role"]
+    user_id = current_user["user_id"]
+    is_platform_admin = role == "platform_admin"
+
+    # Fetch current generation count
+    row = db.execute(text("""
+        SELECT image_generation_count, hero_image_url
+        FROM recipe_content_vault
+        WHERE recipe_id = CAST(:rid AS uuid)
+    """), {"rid": recipe_id}).fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Recipe not found.")
+
+    gen_count = row.image_generation_count or 0
+
+    # Enforce 2-attempt limit for non-platform-admin
+    if not is_platform_admin and gen_count >= 2:
+        raise HTTPException(
+            status_code=403,
+            detail="Maximum 2 image generations allowed per recipe. Contact platform admin for further changes."
+        )
+
+    # Fetch recipe details for prompt
+    recipe = db.execute(text("""
+        SELECT
+            r.dish_name,
+            r.regional_name,
+            r.sub_region,
+            r.diet_type::text as diet_type,
+            r.meal_slots,
+            COALESCE(
+                array_agg(ic.name_en ORDER BY ri.sort_order)
+                FILTER (WHERE ic.name_en IS NOT NULL AND ri.is_optional = false),
+                ARRAY[]::text[]
+            ) as main_ingredients
+        FROM recipe_dna_master r
+        LEFT JOIN recipe_ingredients ri ON ri.recipe_id = r.recipe_id
+        LEFT JOIN ingredient_catalog ic ON ic.id = ri.ingredient_id
+        WHERE r.recipe_id = CAST(:rid AS uuid)
+        GROUP BY r.recipe_id, r.dish_name, r.regional_name,
+                 r.sub_region, r.diet_type, r.meal_slots
+    """), {"rid": recipe_id}).fetchone()
+
+    if not recipe:
+        raise HTTPException(status_code=404, detail="Recipe details not found.")
+
+    # Run image generation script as subprocess
+    script_path = Path(__file__).resolve().parent / "scripts" / "generate_recipe_images.py"
+    result = subprocess.run(
+        [sys.executable, str(script_path), "--recipe_id", recipe_id, "--force"],
+        capture_output=True, text=True,
+        cwd=str(Path(__file__).resolve().parent)
+    )
+
+    if result.returncode != 0:
+        raise HTTPException(status_code=500, detail=f"Image generation failed: {result.stderr}")
+
+    # Update generation count and metadata
+    db.execute(text("""
+        UPDATE recipe_content_vault
+        SET image_generation_count = COALESCE(image_generation_count, 0) + 1,
+            image_last_generated_at = NOW(),
+            image_generated_by = CAST(:uid AS uuid)
+        WHERE recipe_id = CAST(:rid AS uuid)
+    """), {"uid": user_id, "rid": recipe_id})
+    db.commit()
+
+    # Return updated image URL
+    updated = db.execute(text("""
+        SELECT hero_image_url, image_generation_count
+        FROM recipe_content_vault
+        WHERE recipe_id = CAST(:rid AS uuid)
+    """), {"rid": recipe_id}).fetchone()
+
+    return {
+        "message": "Image generated successfully.",
+        "recipe_id": recipe_id,
+        "hero_image_url": updated.hero_image_url,
+        "generation_count": updated.image_generation_count,
+        "attempts_remaining": max(0, 2 - updated.image_generation_count) if not is_platform_admin else "unlimited"
+    }
+
 # --- DEV ONLY: Reset current week plan ---
 @app.delete("/dev/reset-week")
 async def dev_reset_week(
