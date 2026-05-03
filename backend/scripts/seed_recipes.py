@@ -651,7 +651,7 @@ def main():
 
     # Batch into groups of 4 for Non-Veg (complex recipes with long ingredient lists)
     # and 8 for Veg — controlled by diet type
-    BATCH_SIZE  = 4 if args.diet in ('Non-Veg', 'Eggitarian') else 8
+    BATCH_SIZE  = 4  # Conservative batch size for all diets — prevents JSON truncation
     all_recipes = []
     batches = [BATCH_SIZE] * (args.count // BATCH_SIZE)
     if args.count % BATCH_SIZE:
