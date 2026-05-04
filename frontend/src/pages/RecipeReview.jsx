@@ -142,6 +142,7 @@ export default function RecipeReview({ onBack }) {
         ...prev,
         hero_image_url: res.hero_image_url,
         image_generation_count: res.generation_count,
+        _img_ts: Date.now(), // force image cache bust
       }));
       setSuccess("Image generated! ✓");
       setTimeout(() => setSuccess(null), 3000);
@@ -284,7 +285,7 @@ export default function RecipeReview({ onBack }) {
 
                 {/* Image thumbnail */}
                 {r.hero_image_url ? (
-                  <img src={`http://localhost:8000${r.hero_image_url}`} alt={r.dish_name}
+                  <img src={`http://localhost:8000${r.hero_image_url}?t=${r.image_generation_count || 0}`} alt={r.dish_name}
                     style={{ width: 52, height: 52, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
                 ) : (
                   <div style={{ width: 52, height: 52, borderRadius: 8, background: "#F0EFEC", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🍽</div>
@@ -351,7 +352,7 @@ export default function RecipeReview({ onBack }) {
                 <div style={{ background: C.card, borderRadius: 12, padding: 14, marginBottom: 12, border: `0.5px solid ${C.border}` }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Recipe Image</div>
                   {editRecipe.hero_image_url ? (
-                    <img src={`http://localhost:8000${editRecipe.hero_image_url}`} alt={editRecipe.dish_name}
+                    <img src={`http://localhost:8000${editRecipe.hero_image_url}?t=${editRecipe._img_ts || editRecipe.image_generation_count || 0}`} alt={editRecipe.dish_name}
                       style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 10, marginBottom: 10 }} />
                   ) : (
                     <div style={{ width: "100%", height: 120, borderRadius: 10, background: "#F0EFEC", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10, color: C.muted, fontSize: 13 }}>
