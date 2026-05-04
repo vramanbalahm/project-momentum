@@ -351,7 +351,7 @@ async def update_recipe_review(
             dish_name            = COALESCE(:dish_name, dish_name),
             regional_name        = COALESCE(:regional_name, regional_name),
             sub_region           = COALESCE(:sub_region, sub_region),
-            diet_type            = COALESCE(:diet_type::diet_pref, diet_type),
+            diet_type            = COALESCE(%(diet_type)s::diet_pref, diet_type),
             is_sattvic           = COALESCE(:is_sattvic, is_sattvic),
             is_vegan             = COALESCE(:is_vegan, is_vegan),
             intensity_level      = COALESCE(:intensity_level, intensity_level),
