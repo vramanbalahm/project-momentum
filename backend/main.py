@@ -345,71 +345,85 @@ async def update_recipe_review(
 
     user_id = current_user["user_id"]
 
-    # Update recipe_dna_master fields
-    # diet_type is an enum — build as literal to avoid COALESCE cast issues
-    diet_type = payload.get("diet_type")
-    diet_clause = f"diet_type = '{diet_type}'::diet_pref," if diet_type else ""
+    # ── Update recipe_dna_master ─────────────────────────────────────────────
+    # Build SET clauses dynamically — only update fields that are present in payload
+    # This avoids overwriting existing data with NULL
 
-    db.execute(text(f"""
-        UPDATE recipe_dna_master SET
-            dish_name            = :dish_name,
-            regional_name        = :regional_name,
-            sub_region           = :sub_region,
-            {diet_clause}
-            is_sattvic           = :is_sattvic,
-            is_vegan             = :is_vegan,
-            intensity_level      = :intensity_level,
-            meal_slots           = :meal_slots,
-            is_scalable          = :is_scalable,
-            is_regional_specific = :is_regional_specific,
-            review_status        = :review_status,
-            review_notes         = :review_notes,
-            reviewed_by          = CAST(:reviewed_by AS uuid),
-            reviewed_at          = NOW()
-        WHERE recipe_id = CAST(:recipe_id AS uuid)
-    """), {
-        "dish_name":            payload.get("dish_name"),
-        "regional_name":        payload.get("regional_name"),
-        "sub_region":           payload.get("sub_region"),
-        "is_sattvic":           payload.get("is_sattvic"),
-        "is_vegan":             payload.get("is_vegan"),
-        "intensity_level":      payload.get("intensity_level"),
-        "meal_slots":           payload.get("meal_slots"),
-        "is_scalable":          payload.get("is_scalable"),
-        "is_regional_specific": payload.get("is_regional_specific"),
-        "review_status":        payload.get("review_status"),
-        "review_notes":         payload.get("review_notes"),
-        "reviewed_by":          user_id,
-        "recipe_id":            recipe_id,
-    })
+    set_clauses = []
+    params = {"recipe_id": recipe_id, "reviewed_by": user_id}
 
-    # Update recipe_content_vault fields
-    db.execute(text("""
-        UPDATE recipe_content_vault SET
-            prep_steps    = COALESCE(:prep_steps, prep_steps),
-            youtube_urls  = COALESCE(:youtube_urls, youtube_urls),
-            hero_image_url = COALESCE(:hero_image_url, hero_image_url)
-        WHERE recipe_id = CAST(:recipe_id AS uuid)
-    """), {
-        "prep_steps":   payload.get("prep_steps"),
-        "youtube_urls": payload.get("youtube_urls"),
-        "hero_image_url": payload.get("hero_image_url"),
-        "recipe_id":    recipe_id,
-    })
+    # String fields — update only if provided
+    for field in ["dish_name", "regional_name", "sub_region", "intensity_level",
+                  "review_status", "review_notes"]:
+        if payload.get(field) is not None:
+            set_clauses.append(f"{field} = :{field}")
+            params[field] = payload[field]
 
-    # Update ingredient optional flags if provided
+    # Boolean fields — update only if provided
+    for field in ["is_sattvic", "is_vegan", "is_scalable", "is_regional_specific"]:
+        if payload.get(field) is not None:
+            set_clauses.append(f"{field} = :{field}")
+            params[field] = payload[field]
+
+    # meal_slots — list, cast to text array
+    if payload.get("meal_slots") is not None:
+        set_clauses.append("meal_slots = :meal_slots")
+        params["meal_slots"] = payload["meal_slots"]
+
+    # diet_type — enum, must be cast as literal (cannot use parameter with ::enum)
+    if payload.get("diet_type"):
+        valid_diets = ["Veg", "Non-Veg", "Vegan", "Eggitarian"]
+        if payload["diet_type"] in valid_diets:
+            set_clauses.append(f"diet_type = '{payload['diet_type']}'::diet_pref")
+
+    # Always update reviewed_by and reviewed_at
+    set_clauses.append("reviewed_by = CAST(:reviewed_by AS uuid)")
+    set_clauses.append("reviewed_at = NOW()")
+
+    if set_clauses:
+        db.execute(text(f"""
+            UPDATE recipe_dna_master
+            SET {', '.join(set_clauses)}
+            WHERE recipe_id = CAST(:recipe_id AS uuid)
+        """), params)
+
+    # ── Update recipe_content_vault ───────────────────────────────────────────
+    vault_clauses = []
+    vault_params  = {"recipe_id": recipe_id}
+
+    if payload.get("prep_steps") is not None:
+        vault_clauses.append("prep_steps = :prep_steps")
+        vault_params["prep_steps"] = payload["prep_steps"]
+
+    if payload.get("youtube_urls") is not None:
+        vault_clauses.append("youtube_urls = :youtube_urls")
+        vault_params["youtube_urls"] = payload["youtube_urls"]
+
+    if payload.get("hero_image_url") is not None:
+        vault_clauses.append("hero_image_url = :hero_image_url")
+        vault_params["hero_image_url"] = payload["hero_image_url"]
+
+    if vault_clauses:
+        db.execute(text(f"""
+            UPDATE recipe_content_vault
+            SET {', '.join(vault_clauses)}
+            WHERE recipe_id = CAST(:recipe_id AS uuid)
+        """), vault_params)
+
+    # ── Update ingredient optional flags ──────────────────────────────────────
     if payload.get("ingredients"):
         for ing in payload["ingredients"]:
-            db.execute(text("""
-                UPDATE recipe_ingredients
-                SET is_optional = :is_optional
-                WHERE recipe_id = CAST(:recipe_id AS uuid)
-                  AND ingredient_id = :ingredient_id
-            """), {
-                "is_optional":    ing.get("is_optional", False),
-                "recipe_id":      recipe_id,
-                "ingredient_id":  ing.get("ingredient_id"),
-            })
+            if ing.get("ingredient_id") is not None:
+                db.execute(text("""
+                    UPDATE recipe_ingredients
+                    SET is_optional = :is_optional
+                    WHERE recipe_id = CAST(:recipe_id AS uuid)
+                      AND ingredient_id = :ingredient_id
+                """), {
+                    "is_optional":   ing.get("is_optional", False),
+                    "recipe_id":     recipe_id,
+                    "ingredient_id": ing["ingredient_id"],
+                })
 
     db.commit()
     return {"message": "Recipe updated successfully.", "recipe_id": recipe_id}
