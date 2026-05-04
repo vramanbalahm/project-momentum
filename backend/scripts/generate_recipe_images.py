@@ -1,4 +1,8 @@
 """
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 generate_recipe_images.py - Generate food images for recipes using Gemini Imagen
 Stores images locally in backend/recipe_images/ and updates hero_image_url in DB.
 
@@ -314,7 +318,7 @@ def main():
             safe_name = sanitise_filename(dish_name)
             image_url = f"/recipe_images/{safe_name}__{recipe_id[:8]}.jpg"
             update_image_url(recipe_id, image_url)
-            print(f"    [OK] Saved → {image_url}")
+            print(f"    [OK] Saved -> {image_url}")
             generated += 1
         else:
             failed += 1
