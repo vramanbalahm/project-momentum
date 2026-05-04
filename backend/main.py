@@ -346,20 +346,24 @@ async def update_recipe_review(
     user_id = current_user["user_id"]
 
     # Update recipe_dna_master fields
-    db.execute(text("""
+    # diet_type is an enum — build as literal to avoid COALESCE cast issues
+    diet_type = payload.get("diet_type")
+    diet_clause = f"diet_type = '{diet_type}'::diet_pref," if diet_type else ""
+
+    db.execute(text(f"""
         UPDATE recipe_dna_master SET
-            dish_name            = COALESCE(:dish_name, dish_name),
-            regional_name        = COALESCE(:regional_name, regional_name),
-            sub_region           = COALESCE(:sub_region, sub_region),
-            diet_type            = COALESCE(%(diet_type)s::diet_pref, diet_type),
-            is_sattvic           = COALESCE(:is_sattvic, is_sattvic),
-            is_vegan             = COALESCE(:is_vegan, is_vegan),
-            intensity_level      = COALESCE(:intensity_level, intensity_level),
-            meal_slots           = COALESCE(:meal_slots, meal_slots),
-            is_scalable          = COALESCE(:is_scalable, is_scalable),
-            is_regional_specific = COALESCE(:is_regional_specific, is_regional_specific),
-            review_status        = COALESCE(:review_status, review_status),
-            review_notes         = COALESCE(:review_notes, review_notes),
+            dish_name            = :dish_name,
+            regional_name        = :regional_name,
+            sub_region           = :sub_region,
+            {diet_clause}
+            is_sattvic           = :is_sattvic,
+            is_vegan             = :is_vegan,
+            intensity_level      = :intensity_level,
+            meal_slots           = :meal_slots,
+            is_scalable          = :is_scalable,
+            is_regional_specific = :is_regional_specific,
+            review_status        = :review_status,
+            review_notes         = :review_notes,
             reviewed_by          = CAST(:reviewed_by AS uuid),
             reviewed_at          = NOW()
         WHERE recipe_id = CAST(:recipe_id AS uuid)
@@ -367,7 +371,6 @@ async def update_recipe_review(
         "dish_name":            payload.get("dish_name"),
         "regional_name":        payload.get("regional_name"),
         "sub_region":           payload.get("sub_region"),
-        "diet_type":            payload.get("diet_type"),
         "is_sattvic":           payload.get("is_sattvic"),
         "is_vegan":             payload.get("is_vegan"),
         "intensity_level":      payload.get("intensity_level"),
