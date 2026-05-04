@@ -1,5 +1,5 @@
 """
-generate_recipe_images.py — Generate food images for recipes using Gemini Imagen
+generate_recipe_images.py - Generate food images for recipes using Gemini Imagen
 Stores images locally in backend/recipe_images/ and updates hero_image_url in DB.
 
 Usage:
@@ -23,7 +23,7 @@ Usage:
     # Regenerate images even if they already exist
     python scripts/generate_recipe_images.py --force
 
-    # Dry run — show which recipes would get images
+    # Dry run - show which recipes would get images
     python scripts/generate_recipe_images.py --dry-run
 
 Requirements:
@@ -51,10 +51,10 @@ DATABASE_URL   = os.getenv("DATABASE_URL", "postgresql://postgres:admin123@local
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# ── Image storage ─────────────────────────────────────────────────────────────
+# -- Image storage -------------------------------------------------------------
 
 def sanitise_filename(dish_name):
-    """Convert dish name to a safe filename — lowercase, spaces to underscores."""
+    """Convert dish name to a safe filename - lowercase, spaces to underscores."""
     import re
     name = dish_name.lower().strip()
     name = re.sub(r'[^a-z0-9\s]', '', name)   # remove special chars
@@ -67,7 +67,7 @@ def sanitise_filename(dish_name):
 IMAGE_DIR = Path(__file__).resolve().parent.parent / "recipe_images"
 IMAGE_DIR.mkdir(exist_ok=True)
 
-# ── Standard prompt template ──────────────────────────────────────────────────
+# -- Standard prompt template --------------------------------------------------
 # Consistent style across all recipes
 
 def build_prompt(dish_name, regional_name, sub_region, diet_type, meal_slots, ingredients=None):
@@ -100,7 +100,7 @@ def build_prompt(dish_name, regional_name, sub_region, diet_type, meal_slots, in
         if top_ings:
             ing_desc = f"Key ingredients: {', '.join(top_ings)}. "
 
-    # Include Tamil name if available — helps Imagen identify the dish more accurately
+    # Include Tamil name if available - helps Imagen identify the dish more accurately
     name_part = f"{dish_name} ({regional_name})" if regional_name and regional_name != dish_name else dish_name
 
     prompt = (
@@ -118,7 +118,7 @@ def build_prompt(dish_name, regional_name, sub_region, diet_type, meal_slots, in
     return prompt
 
 
-# ── Gemini Imagen call ────────────────────────────────────────────────────────
+# -- Gemini Imagen call --------------------------------------------------------
 
 def generate_image(prompt, recipe_id, dish_name):
     """
@@ -147,7 +147,7 @@ def generate_image(prompt, recipe_id, dish_name):
                 break
 
         if not image_data:
-            print(f"    ✗ No image in response")
+            print(f"    [FAIL] No image in response")
             return None
 
         # Save image to disk
@@ -159,7 +159,7 @@ def generate_image(prompt, recipe_id, dish_name):
         return file_path
 
     except Exception as e:
-        print(f"    ✗ Imagen API error: {e}")
+        print(f"    [FAIL] Imagen API error: {e}")
         return None
 
 
@@ -243,7 +243,7 @@ def update_image_url(recipe_id, image_url):
     conn.close()
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(description="Generate food images for Momentum recipes")
@@ -258,10 +258,10 @@ def main():
     args = parser.parse_args()
 
     if not GEMINI_API_KEY:
-        print("✗ GEMINI_API_KEY not set in .env")
+        print("[FAIL] GEMINI_API_KEY not set in .env")
         sys.exit(1)
 
-    print(f"\n🌿 Momentum Recipe Image Generator")
+    print(f"\n== Momentum Recipe Image Generator ==")
     print(f"   Storage  : {IMAGE_DIR}")
     if args.diet:       print(f"   Diet     : {args.diet}")
     if args.sub_region: print(f"   Region   : {args.sub_region}")
@@ -271,16 +271,16 @@ def main():
     print(f"   Dry run  : {args.dry_run}\n")
 
     recipes = get_recipes(args)
-    print(f"✓ Found {len(recipes)} recipes to process\n")
+    print(f"[OK] Found {len(recipes)} recipes to process\n")
 
     if not recipes:
-        print("Nothing to do — all matching recipes already have images.")
+        print("Nothing to do - all matching recipes already have images.")
         return
 
     if args.dry_run:
         for r in recipes:
-            print(f"  · {r['dish_name']} ({r['diet_type']}, {r['sub_region']})")
-        print(f"\n✓ Dry run — {len(recipes)} recipes would get images.")
+            print(f"  - {r['dish_name']} ({r['diet_type']}, {r['sub_region']})")
+        print(f"\n[OK] Dry run - {len(recipes)} recipes would get images.")
         return
 
     generated = failed = skipped = 0
@@ -298,7 +298,7 @@ def main():
         # Check if image already exists on disk
         file_path = IMAGE_DIR / f"{sanitise_filename(dish_name)}__{recipe_id[:8]}.jpg"
         if file_path.exists() and not args.force:
-            print(f"    ⟳ Skipped — image already exists on disk")
+            print(f"    [SKIP] Skipped - image already exists on disk")
             skipped += 1
             continue
 
@@ -314,12 +314,12 @@ def main():
             safe_name = sanitise_filename(dish_name)
             image_url = f"/recipe_images/{safe_name}__{recipe_id[:8]}.jpg"
             update_image_url(recipe_id, image_url)
-            print(f"    ✓ Saved → {image_url}")
+            print(f"    [OK] Saved → {image_url}")
             generated += 1
         else:
             failed += 1
 
-        # Rate limiting — avoid hitting API limits
+        # Rate limiting - avoid hitting API limits
         if i < len(recipes):
             time.sleep(args.delay)
 

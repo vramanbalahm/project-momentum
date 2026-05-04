@@ -526,7 +526,7 @@ async def generate_recipe_image(
     script_path = Path(__file__).resolve().parent / "scripts" / "generate_recipe_images.py"
     result = subprocess.run(
         [sys.executable, str(script_path), "--recipe_id", recipe_id, "--force"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8",
         cwd=str(Path(__file__).resolve().parent)
     )
 
