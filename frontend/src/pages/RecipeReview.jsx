@@ -360,7 +360,17 @@ export default function RecipeReview({ onBack }) {
                     </div>
                   )}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>                    <span style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>                      Image generation paused during QA                    </span>                    <span style={{                      fontSize: 11, padding: "6px 12px", borderRadius: 10,                      background: "#F0EFEC", color: C.muted                    }}>                      Disabled                    </span>                  </div>
+                    <span style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>
+                      Image generation paused during QA
+                    </span>
+                    <span style={{
+                      fontSize: 11, padding: "6px 12px", borderRadius: 10,
+                      background: "#F0EFEC", color: C.muted
+                    }}>
+                      Disabled
+                    </span>
+                  </div>
+                </div>
 
                 {/* Basic details */}
                 <EditSection title="Basic Details">
