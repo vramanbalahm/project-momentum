@@ -1,8 +1,13 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
+from pathlib import Path
 import os
 
-DATABASE_URL = os.environ.get(
+# Load .env from backend directory
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
+DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://postgres:admin123@localhost:5432/food_momentum_db"
 )
