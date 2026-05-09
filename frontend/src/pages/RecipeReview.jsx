@@ -334,19 +334,22 @@ export default function RecipeReview({ onBack, onHelp }) {
       {/* ── EDIT SHEET ── */}
       {editOpen && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-          <div style={{ width: "100%", maxWidth: 480, background: C.bg, borderRadius: "20px 20px 0 0", maxHeight: "92vh", overflowY: "auto" }}>
+          <div style={{ width: "100%", maxWidth: 480, background: C.bg, borderRadius: "20px 20px 0 0", maxHeight: "92vh", overflowY: "auto", position: "relative" }}>
 
             {/* Sheet header */}
-            <div style={{ background: C.green, padding: "16px 20px", borderRadius: "20px 20px 0 0", position: "sticky", top: 0, zIndex: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ color: "#FDFCF8", fontSize: 15, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ background: C.green, padding: "14px 16px", borderRadius: "20px 20px 0 0", position: "sticky", top: 0, zIndex: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ color: "#FDFCF8", fontSize: 14, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {editRecipe?.dish_name || "Loading…"}
                 </div>
-                <div onClick={() => setEditOpen(false)} style={{ color: C.mint, fontSize: 20, cursor: "pointer", marginLeft: 12 }}>✕</div>
+                <div onClick={onHelp} style={{ color: C.mint, fontSize: 11, fontWeight: 500, padding: "4px 8px", borderRadius: 6, border: `0.5px solid ${C.mint}`, cursor: "pointer", flexShrink: 0 }}>
+                  ? Help
+                </div>
+                <div onClick={() => setEditOpen(false)} style={{ color: C.mint, fontSize: 18, cursor: "pointer", flexShrink: 0 }}>✕</div>
               </div>
               {editRecipe && (
                 <Badge label={STATUS_LABEL[editRecipe.review_status]}
-                  style={{ ...STATUS_STYLE[editRecipe.review_status], marginTop: 4, display: "inline-block" }} />
+                  style={{ ...STATUS_STYLE[editRecipe.review_status], marginTop: 6, display: "inline-block" }} />
               )}
             </div>
 
