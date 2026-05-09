@@ -92,6 +92,10 @@ export default function RecipeReview({ onBack }) {
     setEditOpen(true);
     try {
       const detail = await apiFetch(`/recipes/${recipe_id}/detail`);
+      // Convert literal \n strings to actual newlines in prep_steps
+      if (detail.prep_steps) {
+        detail.prep_steps = detail.prep_steps.replace(/\\n/g, "\n");
+      }
       setEditRecipe(detail);
     } catch (e) {
       setError(e.message);
