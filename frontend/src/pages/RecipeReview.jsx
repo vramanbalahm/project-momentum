@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 
 const C = {
@@ -391,7 +391,7 @@ export default function RecipeReview({ onBack }) {
 
                 {/* Classification */}
                 <EditSection title="Classification">
-                  <EditField label="Diet type">
+                  <EditField label="Diet type" tooltip="Veg includes dairy. Vegan has no dairy or eggs. Eggitarian includes eggs but no meat. Non-Veg includes meat and seafood.">
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       {DIETS.map(d => (
                         <div key={d} onClick={() => setEditRecipe(p => ({ ...p, diet_type: d }))}
@@ -403,7 +403,7 @@ export default function RecipeReview({ onBack }) {
                       ))}
                     </div>
                   </EditField>
-                  <EditField label="Meal slots">
+                  <EditField label="Meal slots" tooltip="When this dish is typically served. A dish can belong to multiple slots — e.g. Idli works for both Breakfast and Dinner.">
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       {MEAL_SLOTS.map(s => {
                         const active = (editRecipe.meal_slots || []).includes(s);
@@ -424,7 +424,7 @@ export default function RecipeReview({ onBack }) {
                       })}
                     </div>
                   </EditField>
-                  <EditField label="Intensity">
+                  <EditField label="Intensity" tooltip="Light = easy to digest (idli, rasam). Medium = regular meal. Heavy = rich or filling dish (biryani, halwa).">
                     <div style={{ display: "flex", gap: 6 }}>
                       {INTENSITIES.map(i => (
                         <div key={i} onClick={() => setEditRecipe(p => ({ ...p, intensity_level: i }))}
@@ -437,7 +437,7 @@ export default function RecipeReview({ onBack }) {
                       ))}
                     </div>
                   </EditField>
-                  <EditField label="Flags">
+                  <EditField label="Flags" tooltip="Satvik = no onion, garlic or meat — suitable for fasting days. Scalable = ingredients can be adjusted for more or fewer people. Regional specific = unique to a particular sub-region of Tamil Nadu.">
                     <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                       {[["is_sattvic", "Satvik"], ["is_vegan", "Vegan"], ["is_scalable", "Scalable"], ["is_regional_specific", "Regional specific"]].map(([key, label]) => (
                         <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.text, cursor: "pointer" }}>
@@ -451,7 +451,7 @@ export default function RecipeReview({ onBack }) {
                 </EditSection>
 
                 {/* Ingredients */}
-                <EditSection title="Ingredients — tap to toggle optional">
+                <EditSection title="Ingredients — tap to toggle optional" tooltip="Mark ingredients that can be skipped without changing the dish. E.g. onion and garlic are optional in Satvik cooking.">
                   {(editRecipe.ingredients || []).map((ing, idx) => (
                     <div key={ing.ingredient_id || idx}
                       onClick={() => {
@@ -492,7 +492,7 @@ export default function RecipeReview({ onBack }) {
                 </EditSection>
 
                 {/* YouTube URLs */}
-                <EditSection title="YouTube Links (up to 3)">
+                <EditSection title="YouTube Links (up to 3)" tooltip="Paste YouTube video URLs that show how to make this dish. Helps users follow the recipe visually.">
                   {[0, 1, 2].map(i => (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderBottom: i < 2 ? `0.5px solid ${C.border}` : "none" }}>
                       <span style={{ fontSize: 11, color: C.muted, width: 16 }}>{i + 1}</span>
@@ -511,7 +511,7 @@ export default function RecipeReview({ onBack }) {
                 </EditSection>
 
                 {/* Review notes */}
-                <EditSection title="Review Notes">
+                <EditSection title="Review Notes" tooltip="Add notes for the platform admin — e.g. 'image looks wrong', 'ingredients need checking', 'regional classification unclear'.">
                   <div style={{ padding: "10px 14px" }}>
                     <textarea
                       value={editRecipe.review_notes || ""}
@@ -554,21 +554,55 @@ export default function RecipeReview({ onBack }) {
 
 // ── Helper components ──────────────────────────────────────────────────────────
 
-function EditSection({ title, children }) {
+function Tooltip({ text }) {
+  const [show, setShow] = React.useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-flex", alignItems: "center", marginLeft: 5 }}>
+      <span
+        onClick={e => { e.stopPropagation(); setShow(!show); }}
+        style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: 14, height: 14, borderRadius: "50%", fontSize: 9, fontWeight: 700,
+          background: "#E0EDE8", color: "#0F6E56", cursor: "pointer", flexShrink: 0,
+          border: "0.5px solid #9FE1CB"
+        }}>?</span>
+      {show && (
+        <span style={{
+          position: "absolute", bottom: 20, left: 0, zIndex: 200,
+          background: "#1A3A2E", color: "#FDFCF8", fontSize: 11,
+          padding: "8px 10px", borderRadius: 8, width: 200, lineHeight: 1.5,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.3)"
+        }}>
+          {text}
+          <span onClick={e => { e.stopPropagation(); setShow(false); }}
+            style={{ display: "block", marginTop: 6, color: "#9FE1CB", fontSize: 10, cursor: "pointer" }}>
+            Tap to close
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+function EditSection({ title, children, tooltip }) {
   return (
     <div style={{ background: "#FFF9F2", borderRadius: 12, overflow: "hidden", marginBottom: 12, border: "0.5px solid #EDE8E0" }}>
-      <div style={{ fontSize: 10, fontWeight: 600, color: "#888780", textTransform: "uppercase", letterSpacing: "0.05em", padding: "10px 14px 6px", borderBottom: "0.5px solid #EDE8E0" }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: "#888780", textTransform: "uppercase", letterSpacing: "0.05em", padding: "10px 14px 6px", borderBottom: "0.5px solid #EDE8E0", display: "flex", alignItems: "center" }}>
         {title}
+        {tooltip && <Tooltip text={tooltip} />}
       </div>
       {children}
     </div>
   );
 }
 
-function EditField({ label, children }) {
+function EditField({ label, children, tooltip }) {
   return (
     <div style={{ padding: "10px 14px", borderBottom: "0.5px solid #EDE8E0" }}>
-      <div style={{ fontSize: 11, color: "#888780", marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 11, color: "#888780", marginBottom: 6, display: "flex", alignItems: "center" }}>
+        {label}
+        {tooltip && <Tooltip text={tooltip} />}
+      </div>
       {children}
     </div>
   );
