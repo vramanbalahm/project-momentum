@@ -38,7 +38,7 @@ function Badge({ label, style }) {
   );
 }
 
-export default function RecipeReview({ onBack }) {
+export default function RecipeReview({ onBack, onHelp }) {
   const { user, apiFetch } = useAuth();
   const isPlatformAdmin = user?.role === "platform_admin";
 
@@ -195,10 +195,13 @@ export default function RecipeReview({ onBack }) {
       <div style={{ background: C.green, padding: "16px 20px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div onClick={onBack} style={{ color: C.mint, fontSize: 20, cursor: "pointer" }}>←</div>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ color: C.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>MOMENTUM · REVIEW</div>
             <div style={{ color: "#FDFCF8", fontSize: 17, fontWeight: 500, marginTop: 2 }}>Recipe Review</div>
             <div style={{ color: C.teal, fontSize: 11, marginTop: 2 }}>{total} recipes · tap any to review</div>
+          </div>
+          <div onClick={onHelp} style={{ color: C.mint, fontSize: 11, fontWeight: 500, padding: "6px 10px", borderRadius: 8, border: `0.5px solid ${C.mint}`, cursor: "pointer", flexShrink: 0 }}>
+            ? Help
           </div>
         </div>
       </div>

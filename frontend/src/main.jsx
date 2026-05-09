@@ -13,6 +13,7 @@ import OnboardingWizard from './pages/OnboardingWizard.jsx'
 import MyProfile from './pages/MyProfile.jsx'
 import MemberAvailability from './pages/MemberAvailability.jsx'
 import RecipeReview from './pages/RecipeReview.jsx'
+import HelpScreen from './pages/HelpScreen.jsx'
 
 // AuthGate — isolated from App's state so Login/Register inputs never lose focus
 function AuthGate() {
@@ -47,7 +48,10 @@ function AuthGate() {
   if (screen === 'my_profile') return <MyProfile onBack={() => setScreen('dashboard')} />;
   if (screen === 'manage_members') return <ManageMembers onBack={() => setScreen('dashboard')} />;
   if (screen === 'recipe_review') return (
-    <RecipeReview onBack={() => setScreen('dashboard')} />
+    <RecipeReview onBack={() => setScreen('dashboard')} onHelp={() => setScreen('help')} />
+  );
+  if (screen === 'help') return (
+    <HelpScreen onBack={() => setScreen('recipe_review')} />
   );
   if (screen === 'member_availability') return (
     <MemberAvailability
