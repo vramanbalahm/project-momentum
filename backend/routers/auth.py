@@ -780,6 +780,7 @@ class SelfRestrictionItem(BaseModel):
 
 class SaveSelfRestrictionsRequest(BaseModel):
     restrictions: list
+    target_user_id: str = None  # admin can save for another member
 
 @router.post("/my-profile/restrictions", status_code=200)
 async def save_my_restrictions(
@@ -788,11 +789,20 @@ async def save_my_restrictions(
     db: Session = Depends(get_db)
 ):
     """
-    Saves the logged-in user's own allergies and dislikes.
-    Available to ALL users — not just admins.
+    Saves allergies and dislikes for self or another member (admin only).
+    If target_user_id is provided and requester is admin — saves for that member.
+    Otherwise saves for the logged-in user.
     """
-    user_id  = current_user["user_id"]
-    house_id = current_user["house_id"]
+    requester_id   = current_user["user_id"]
+    requester_role = current_user.get("role", "")
+    house_id       = current_user["house_id"]
+
+    # Allow admin to save for another member
+    target = getattr(req, "target_user_id", None)
+    if target and requester_role in ("household_admin", "platform_admin"):
+        user_id = target
+    else:
+        user_id = requester_id
 
     # Delete existing restrictions for this user
     db.execute(text("""

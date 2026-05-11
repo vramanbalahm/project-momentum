@@ -38,7 +38,7 @@ function Badge({ label, style }) {
   );
 }
 
-export default function RecipeReview({ onBack, onHelp }) {
+export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId }) {
   const { user, apiFetch } = useAuth();
   const isPlatformAdmin = user?.role === "platform_admin";
 
@@ -176,6 +176,13 @@ export default function RecipeReview({ onBack, onHelp }) {
       setBulkSaving(false);
     }
   };
+
+  // Reopen edit sheet if returning from Help screen
+  React.useEffect(() => {
+    if (helpReturnRecipeId) {
+      openEdit(helpReturnRecipeId);
+    }
+  }, []);
 
   const toggleSelect = (id) => {
     setSelected(prev => {
@@ -339,7 +346,7 @@ export default function RecipeReview({ onBack, onHelp }) {
                 <div style={{ color: "#FDFCF8", fontSize: 14, fontWeight: 500, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {editRecipe?.dish_name || "Loading…"}
                 </div>
-                <div onClick={onHelp} style={{ color: C.mint, fontSize: 11, fontWeight: 500, padding: "4px 8px", borderRadius: 6, border: `0.5px solid ${C.mint}`, cursor: "pointer", flexShrink: 0 }}>
+                <div onClick={() => onHelp(editRecipe?.recipe_id)} style={{ color: C.mint, fontSize: 11, fontWeight: 500, padding: "4px 8px", borderRadius: 6, border: `0.5px solid ${C.mint}`, cursor: "pointer", flexShrink: 0 }}>
                   ? Help
                 </div>
                 <div onClick={() => setEditOpen(false)} style={{ color: C.mint, fontSize: 18, cursor: "pointer", flexShrink: 0 }}>✕</div>

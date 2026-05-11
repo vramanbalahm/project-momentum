@@ -396,8 +396,10 @@ async def update_recipe_review(
         vault_params["prep_steps"] = payload["prep_steps"]
 
     if payload.get("youtube_urls") is not None:
+        # Filter out empty strings from youtube_urls
+        clean_urls = [u for u in payload["youtube_urls"] if u and u.strip()]
         vault_clauses.append("youtube_urls = :youtube_urls")
-        vault_params["youtube_urls"] = payload["youtube_urls"]
+        vault_params["youtube_urls"] = clean_urls
 
     if payload.get("hero_image_url") is not None:
         vault_clauses.append("hero_image_url = :hero_image_url")

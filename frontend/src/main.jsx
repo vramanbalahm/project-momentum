@@ -20,6 +20,7 @@ function AuthGate() {
   const { isAuthenticated, loading: authLoading, user } = useAuth();
   const [authScreen, setAuthScreen] = useState('login');
   const [screen, setScreen] = useState('dashboard'); // dashboard | weekly_plan | family_profile | manage_members | member_availability | recipe_review
+  const [helpReturnRecipeId, setHelpReturnRecipeId] = useState(null);
 
   if (authLoading) {
     return (
@@ -48,10 +49,10 @@ function AuthGate() {
   if (screen === 'my_profile') return <MyProfile onBack={() => setScreen('dashboard')} />;
   if (screen === 'manage_members') return <ManageMembers onBack={() => setScreen('dashboard')} />;
   if (screen === 'recipe_review') return (
-    <RecipeReview onBack={() => setScreen('dashboard')} onHelp={() => setScreen('help')} />
+    <RecipeReview onBack={() => setScreen('dashboard')} onHelp={(recipeId) => { setHelpReturnRecipeId(recipeId); setScreen('help'); }} helpReturnRecipeId={helpReturnRecipeId} />
   );
   if (screen === 'help') return (
-    <HelpScreen onBack={() => setScreen('recipe_review')} />
+    <HelpScreen onBack={() => { setScreen('recipe_review'); }} returnRecipeId={helpReturnRecipeId} />
   );
   if (screen === 'member_availability') return (
     <MemberAvailability
