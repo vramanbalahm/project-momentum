@@ -23,9 +23,14 @@ export default function Dashboard({ onNavigate }) {
 
   const isAdmin = user?.role === "household_admin" || user?.role === "platform_admin";
   const isReviewer = user?.role === "platform_admin" || user?.role === "reviewer";
+  const isReviewerOnly = user?.role === "reviewer"; // pure reviewer — no household access
 
   // Smart Weekly Plan navigation — admin checks availability first, member goes straight to planner
   const handleWeeklyPlanTap = async () => {
+    if (user?.role === "reviewer") {
+      onNavigate("recipe_review");
+      return;
+    }
     if (!isAdmin) {
       onNavigate("weekly_plan");
       return;
@@ -154,25 +159,29 @@ export default function Dashboard({ onNavigate }) {
                       <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>{user?.name}</div>
                       <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{user?.email}</div>
                       <div style={{ fontSize: 10, color: isAdmin ? "#1A3A2E" : COLORS.muted, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                        {isAdmin ? "Household Admin" : "Member"}
+                        {isAdmin ? "Household Admin" : isReviewer ? "Reviewer" : "Member"}
                       </div>
                     </div>
 
-                    {/* My Profile — available to all */}
-                    <SettingsItem
-                      icon="👤"
-                      label="My Profile"
-                      available={true}
-                      onClick={() => { setMenuOpen(false); onNavigate("my_profile"); }}
-                    />
+                    {/* My Profile — not for reviewer */}
+                    {!isReviewerOnly && (
+                      <SettingsItem
+                        icon="👤"
+                        label="My Profile"
+                        available={true}
+                        onClick={() => { setMenuOpen(false); onNavigate("my_profile"); }}
+                      />
+                    )}
 
-                    {/* Member Availability — available to all */}
-                    <SettingsItem
-                      icon="🗓️"
-                      label="Member Availability"
-                      available={true}
-                      onClick={() => { setMenuOpen(false); onNavigate("member_availability"); }}
-                    />
+                    {/* Member Availability — not for reviewer */}
+                    {!isReviewerOnly && (
+                      <SettingsItem
+                        icon="🗓️"
+                        label="Member Availability"
+                        available={true}
+                        onClick={() => { setMenuOpen(false); onNavigate("member_availability"); }}
+                      />
+                    )}
 
                     {/* Recipe Review — platform admin and reviewer only */}
                     {isReviewer && (
@@ -184,29 +193,35 @@ export default function Dashboard({ onNavigate }) {
                       />
                     )}
 
-                    {/* Change Password — available to all */}
-                    <SettingsItem
-                      icon="🔑"
-                      label="Change Password"
-                      available={true}
-                      onClick={() => { setMenuOpen(false); setShowChangePassword(true); }}
-                    />
+                    {/* Change Password — not for reviewer */}
+                    {!isReviewerOnly && (
+                      <SettingsItem
+                        icon="🔑"
+                        label="Change Password"
+                        available={true}
+                        onClick={() => { setMenuOpen(false); setShowChangePassword(true); }}
+                      />
+                    )}
 
                     {/* Family Profile — admin only */}
-                    <SettingsItem
-                      icon="🏠"
-                      label="Family Profile"
-                      available={isAdmin}
-                      onClick={() => { setMenuOpen(false); onNavigate("family_profile"); }}
-                    />
+                    {!isReviewerOnly && (
+                      <SettingsItem
+                        icon="🏠"
+                        label="Family Profile"
+                        available={isAdmin}
+                        onClick={() => { setMenuOpen(false); onNavigate("family_profile"); }}
+                      />
+                    )}
 
                     {/* Manage Members — admin only */}
-                    <SettingsItem
-                      icon="👥"
-                      label="Manage Members"
-                      available={isAdmin}
-                      onClick={() => { setMenuOpen(false); onNavigate("manage_members"); }}
-                    />
+                    {!isReviewerOnly && (
+                      <SettingsItem
+                        icon="👥"
+                        label="Manage Members"
+                        available={isAdmin}
+                        onClick={() => { setMenuOpen(false); onNavigate("manage_members"); }}
+                      />
+                    )}
                   </div>
                 </>
               )}
