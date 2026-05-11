@@ -265,7 +265,7 @@ export default function Dashboard({ onNavigate }) {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          {tiles.map(tile => (
+          {tiles.filter(tile => !isReviewerOnly).map(tile => (
             <div
               key={tile.id}
               onClick={() => {

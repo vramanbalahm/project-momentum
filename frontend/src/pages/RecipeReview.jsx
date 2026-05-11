@@ -394,7 +394,7 @@ export default function RecipeReview({ onBack, onHelp }) {
 
                 {/* Classification */}
                 <EditSection title="Classification">
-                  <EditField label="Diet type" tooltip="Veg includes dairy. Vegan has no dairy or eggs. Eggitarian includes eggs but no meat. Non-Veg includes meat and seafood.">
+                  <EditField label="Diet type">
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       {DIETS.map(d => (
                         <div key={d} onClick={() => setEditRecipe(p => ({ ...p, diet_type: d }))}
@@ -406,7 +406,7 @@ export default function RecipeReview({ onBack, onHelp }) {
                       ))}
                     </div>
                   </EditField>
-                  <EditField label="Meal slots" tooltip="When this dish is typically served. A dish can belong to multiple slots — e.g. Idli works for both Breakfast and Dinner.">
+                  <EditField label="Meal slots">
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       {MEAL_SLOTS.map(s => {
                         const active = (editRecipe.meal_slots || []).includes(s);
@@ -427,7 +427,7 @@ export default function RecipeReview({ onBack, onHelp }) {
                       })}
                     </div>
                   </EditField>
-                  <EditField label="Intensity" tooltip="Light = easy to digest (idli, rasam). Medium = regular meal. Heavy = rich or filling dish (biryani, halwa).">
+                  <EditField label="Intensity">
                     <div style={{ display: "flex", gap: 6 }}>
                       {INTENSITIES.map(i => (
                         <div key={i} onClick={() => setEditRecipe(p => ({ ...p, intensity_level: i }))}
@@ -440,7 +440,7 @@ export default function RecipeReview({ onBack, onHelp }) {
                       ))}
                     </div>
                   </EditField>
-                  <EditField label="Flags" tooltip="Satvik = no onion, garlic or meat — suitable for fasting days. Scalable = ingredients can be adjusted for more or fewer people. Regional specific = unique to a particular sub-region of Tamil Nadu.">
+                  <EditField label="Flags">
                     <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                       {[["is_sattvic", "Satvik"], ["is_vegan", "Vegan"], ["is_scalable", "Scalable"], ["is_regional_specific", "Regional specific"]].map(([key, label]) => (
                         <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.text, cursor: "pointer" }}>
@@ -454,7 +454,7 @@ export default function RecipeReview({ onBack, onHelp }) {
                 </EditSection>
 
                 {/* Ingredients */}
-                <EditSection title="Ingredients — tap to toggle optional" tooltip="Mark ingredients that can be skipped without changing the dish. E.g. onion and garlic are optional in Satvik cooking.">
+                <EditSection title="Ingredients — tap to toggle optional">
                   {(editRecipe.ingredients || []).map((ing, idx) => (
                     <div key={ing.ingredient_id || idx}
                       onClick={() => {
@@ -487,15 +487,20 @@ export default function RecipeReview({ onBack, onHelp }) {
                   <div style={{ padding: "10px 14px" }}>
                     <textarea
                       value={editRecipe.prep_steps || ""}
-                      onChange={e => setEditRecipe(p => ({ ...p, prep_steps: e.target.value }))}
-                      rows={6}
-                      style={{ ...inputStyle, resize: "vertical", fontFamily: "system-ui", lineHeight: 1.6 }}
+                      onChange={e => {
+                        setEditRecipe(p => ({ ...p, prep_steps: e.target.value }));
+                        e.target.style.height = "auto";
+                        e.target.style.height = e.target.scrollHeight + "px";
+                      }}
+                      onLoad={e => { e.target.style.height = e.target.scrollHeight + "px"; }}
+                      ref={el => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
+                      style={{ ...inputStyle, resize: "none", fontFamily: "system-ui", lineHeight: 1.8, minHeight: 120, overflow: "hidden" }}
                     />
                   </div>
                 </EditSection>
 
                 {/* YouTube URLs */}
-                <EditSection title="YouTube Links (up to 3)" tooltip="Paste YouTube video URLs that show how to make this dish. Helps users follow the recipe visually.">
+                <EditSection title="YouTube Links (up to 3)">
                   {[0, 1, 2].map(i => (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderBottom: i < 2 ? `0.5px solid ${C.border}` : "none" }}>
                       <span style={{ fontSize: 11, color: C.muted, width: 16 }}>{i + 1}</span>
@@ -514,7 +519,7 @@ export default function RecipeReview({ onBack, onHelp }) {
                 </EditSection>
 
                 {/* Review notes */}
-                <EditSection title="Review Notes" tooltip="Add notes for the platform admin — e.g. 'image looks wrong', 'ingredients need checking', 'regional classification unclear'.">
+                <EditSection title="Review Notes">
                   <div style={{ padding: "10px 14px" }}>
                     <textarea
                       value={editRecipe.review_notes || ""}
