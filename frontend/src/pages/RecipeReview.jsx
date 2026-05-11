@@ -318,7 +318,12 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId }) {
                   </div>
                   <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
                     {r.sub_region || "General Tamil Nadu"} · {r.intensity_level}
-                    {r.image_generation_count > 0 && ` · 📷 ${r.image_generation_count}/2`}
+                    {r.image_generation_count > 0 && ` · ${r.image_generation_count}/2 img`}
+                    {r.reviewed_by_name && r.review_status !== "under_review" && (
+                      <span style={{ color: r.review_status === "approved" ? "#085041" : "#712B13" }}>
+                        {` · ${r.review_status === "approved" ? "✓" : "✗"} ${r.reviewed_by_name}`}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

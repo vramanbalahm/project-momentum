@@ -198,11 +198,18 @@ async def get_recipes_for_review(
     if role not in ("platform_admin", "reviewer"):
         raise HTTPException(status_code=403, detail="Recipe review access denied.")
 
+    user_id = current_user["user_id"]
     conditions = []
-    params = {"status": status, "offset": (page - 1) * page_size, "limit": page_size}
+    params = {"status": status, "offset": (page - 1) * page_size, "limit": page_size, "user_id": user_id}
 
     if status != "all":
         conditions.append("r.review_status = :status")
+
+    # For approved/rejected — show only current reviewer's work
+    # For pending — show all (shared pool)
+    # Platform admin sees everything
+    if status in ("approved", "rejected") and role != "platform_admin":
+        conditions.append("r.reviewed_by = CAST(:user_id AS uuid)")
     if diet:
         conditions.append("r.diet_type::text = :diet")
         params["diet"] = diet
@@ -221,10 +228,12 @@ async def get_recipes_for_review(
             r.diet_type::text as diet_type, r.is_sattvic, r.is_vegan,
             r.intensity_level, r.meal_slots, r.review_status,
             r.reviewed_at, r.review_notes,
+            u.name as reviewed_by_name,
             v.hero_image_url, v.image_generation_count,
             COUNT(*) OVER() as total_count
         FROM recipe_dna_master r
         LEFT JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
+        LEFT JOIN users u ON u.user_id = r.reviewed_by
         {where}
         ORDER BY r.sub_region, r.dish_name
         LIMIT :limit OFFSET :offset
@@ -249,6 +258,7 @@ async def get_recipes_for_review(
             "review_status":    r.review_status,
             "reviewed_at":      str(r.reviewed_at) if r.reviewed_at else None,
             "review_notes":     r.review_notes,
+            "reviewed_by_name": r.reviewed_by_name,
             "hero_image_url":   r.hero_image_url,
             "image_generation_count": r.image_generation_count or 0,
         } for r in rows]
