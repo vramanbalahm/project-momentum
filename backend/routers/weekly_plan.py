@@ -93,4 +93,4 @@ def get_previous_week_plan(
     house_id from authenticated user.
     """
     from services.plan_service import fetch_active_plan
-    return fetch_active_plan(db, current_user["house_id"])
+    return fetch_active_plan(db, current_user["house_id"], week_start=week_start_date)

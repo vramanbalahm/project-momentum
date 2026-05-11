@@ -202,6 +202,7 @@ export default function App({ onBack }) {
   // Week navigation — 0 = current week, negative = past weeks, positive blocked for MVP
   const [weekOffset, setWeekOffset] = useState(0);
   const [showCopyConfirm, setShowCopyConfirm] = useState(false);
+  const skipNextLoad = React.useRef(false); // prevents loadWeekPlan overwriting copied blueprint
   const [hasNextWeekData, setHasNextWeekData] = useState(false);
   // Swap/Copy mode state — decoupled, can be feature-gated later
   const [swapMode, setSwapMode] = useState(null); // null | 'swap' | 'copy'
@@ -255,6 +256,7 @@ export default function App({ onBack }) {
         }
       });
     });
+    skipNextLoad.current = true; // prevent loadWeekPlan from overwriting copied blueprint
     setWeekOffset(0);
     setBlueprint(copied);
     setIsAudited(false);
@@ -274,6 +276,7 @@ export default function App({ onBack }) {
   // weekOffset === 0 reloads current week (fixes returning from past week showing stale data)
   useEffect(() => {
     if (!HH_ID) return; // wait until user is loaded — avoids /get-plan/undefined call
+    if (skipNextLoad.current) { skipNextLoad.current = false; return; } // skip when copying
     const loadWeekPlan = async () => {
       setIsLoading(true);
       try {
