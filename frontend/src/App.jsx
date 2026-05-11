@@ -256,15 +256,18 @@ export default function App({ onBack }) {
         }
       });
     });
-    skipNextLoad.current = true; // prevent loadWeekPlan from overwriting copied blueprint
-    setWeekOffset(0);
+    // Set blueprint FIRST before changing weekOffset
+    // This prevents the useEffect from overwriting the copied data
     setBlueprint(copied);
     setIsAudited(false);
     setIsSaved(false);
     setIsDirty(true);
     setShowCopyConfirm(false);
-    setSelectedDay(DAYS[0]); // Jump to Monday of current week
+    setSelectedDay(DAYS[0]);
     setViewMode('day');
+    // Set weekOffset last — useEffect will fire but blueprint is already set
+    skipNextLoad.current = true;
+    setWeekOffset(0);
   };
 
   // DnD sensors for day view card reordering
