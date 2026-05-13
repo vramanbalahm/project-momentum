@@ -13,11 +13,12 @@ const C = {
 const MEAL_SLOTS   = ["Breakfast", "Lunch", "Dinner", "Side Dish"];
 const DIETS        = ["Veg", "Non-Veg", "Vegan", "Eggitarian"];
 const INTENSITIES  = ["Light", "Medium", "Heavy"];
-const STATUSES     = ["under_review", "approved", "rejected"];
+const STATUSES     = ["under_review", "saved", "approved", "rejected"];
 
-const STATUS_LABEL = { under_review: "Pending", approved: "Approved", rejected: "Rejected" };
+const STATUS_LABEL = { under_review: "Pending", saved: "Saved", approved: "Approved", rejected: "Rejected" };
 const STATUS_STYLE = {
   under_review: { bg: "#FAEEDA", color: "#633806" },
+  saved:        { bg: "#EAF0FB", color: "#1A3A6E" },
   approved:     { bg: "#E1F5EE", color: "#085041" },
   rejected:     { bg: "#FAECE7", color: "#712B13" },
 };
@@ -118,6 +119,7 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId }) {
       });
       setSuccess(status === "approved" ? "Recipe approved! ✓" :
                  status === "rejected" ? "Recipe rejected." :
+                 status === "saved"    ? "Recipe saved. ✓" :
                  "Changes saved.");
       setTimeout(() => setSuccess(null), 3000);
       setEditOpen(false);
@@ -320,8 +322,8 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId }) {
                     {r.sub_region || "General Tamil Nadu"} · {r.intensity_level}
                     {r.image_generation_count > 0 && ` · ${r.image_generation_count}/2 img`}
                     {r.reviewed_by_name && r.review_status !== "under_review" && (
-                      <span style={{ color: r.review_status === "approved" ? "#085041" : "#712B13" }}>
-                        {` · ${r.review_status === "approved" ? "✓" : "✗"} ${r.reviewed_by_name}`}
+                      <span style={{ color: r.review_status === "approved" ? "#085041" : r.review_status === "saved" ? "#1A3A6E" : "#712B13" }}>
+                        {` · ${r.review_status === "approved" ? "✓" : r.review_status === "saved" ? "◌" : "✗"} ${r.reviewed_by_name}`}
                       </span>
                     )}
                   </div>
@@ -549,9 +551,9 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId }) {
             {/* Action buttons */}
             {editRecipe && !editLoading && (
               <div style={{ position: "sticky", bottom: 0, background: C.card, borderTop: `0.5px solid ${C.border}`, padding: "12px 16px" }}>
-                <button onClick={() => saveEdit(null)} disabled={editSaving}
-                  style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: "#0F6E56", color: "#FDFCF8", fontSize: 13, fontWeight: 500, cursor: "pointer", marginBottom: 8, opacity: editSaving ? 0.7 : 1 }}>
-                  {editSaving ? "Saving…" : "Save changes"}
+                <button onClick={() => saveEdit("saved")} disabled={editSaving}
+                  style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: "#1A3A6E", color: "#FDFCF8", fontSize: 13, fontWeight: 500, cursor: "pointer", marginBottom: 8, opacity: editSaving ? 0.7 : 1 }}>
+                  {editSaving ? "Saving…" : "Save ✓"}
                 </button>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={() => saveEdit("rejected")} disabled={editSaving}
