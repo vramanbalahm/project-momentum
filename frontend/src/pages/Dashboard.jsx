@@ -98,6 +98,14 @@ export default function Dashboard({ onNavigate }) {
       available: isAdmin,
     },
     {
+      id: "household_settings",
+      icon: "⚙️",
+      label: "Household Settings",
+      desc: isAdmin ? "Satvik, lunar & events" : "Admin access only",
+      color: "#FAEEDA",
+      available: isAdmin,
+    },
+    {
       id: "coming_soon_1",
       icon: "🛒",
       label: "Market Prices",
@@ -220,6 +228,16 @@ export default function Dashboard({ onNavigate }) {
                         label="Manage Members"
                         available={isAdmin}
                         onClick={() => { setMenuOpen(false); onNavigate("manage_members"); }}
+                      />
+                    )}
+
+                    {/* Household Settings — admin only */}
+                    {!isReviewerOnly && (
+                      <SettingsItem
+                        icon="⚙️"
+                        label="Household Settings"
+                        available={isAdmin}
+                        onClick={() => { setMenuOpen(false); onNavigate("household_settings"); }}
                       />
                     )}
                   </div>

@@ -1,0 +1,137 @@
+import { useState } from "react";
+import SatvikEditor from "../components/SatvikEditor.jsx";
+import LunarEditor  from "../components/LunarEditor.jsx";
+import EventEditor  from "../components/EventEditor.jsx";
+import { C } from "../components/householdShared.jsx";
+
+// HouseholdSettings — admin-only screen accessible from Dashboard.
+// Acts as a menu; each item navigates to the corresponding editor.
+// Editors are the same components used in OnboardingWizard — no duplication.
+
+const MENU_ITEMS = [
+  {
+    id:    "satvik",
+    icon:  "🕉️",
+    label: "Satvik definition",
+    desc:  "Ingredients avoided on Satvik days",
+    color: "#E1F5EE",
+  },
+  {
+    id:    "lunar",
+    icon:  "🌙",
+    label: "Lunar calendar",
+    desc:  "Panchangam your household follows",
+    color: "#EEEDFE",
+  },
+  {
+    id:    "events",
+    icon:  "🎂",
+    label: "Events & special days",
+    desc:  "Birthdays, anniversaries, rituals",
+    color: "#FAEEDA",
+  },
+];
+
+export default function HouseholdSettings({ onBack }) {
+  const [activeEditor, setActiveEditor] = useState(null); // null | "satvik" | "lunar" | "events"
+
+  // ── Editor screens ────────────────────────────────────────────────────────
+  if (activeEditor === "satvik") {
+    return (
+      <EditorShell title="Satvik definition" onBack={() => setActiveEditor(null)}>
+        <SatvikEditor
+          onDone={() => setActiveEditor(null)}
+          nextLabel="Save"
+        />
+      </EditorShell>
+    );
+  }
+
+  if (activeEditor === "lunar") {
+    return (
+      <EditorShell title="Lunar calendar" onBack={() => setActiveEditor(null)}>
+        <LunarEditor
+          onDone={() => setActiveEditor(null)}
+          nextLabel="Save"
+        />
+      </EditorShell>
+    );
+  }
+
+  if (activeEditor === "events") {
+    return (
+      <EditorShell title="Events & special days" onBack={() => setActiveEditor(null)}>
+        <EventEditor
+          onDone={() => setActiveEditor(null)}
+          nextLabel="Save"
+        />
+      </EditorShell>
+    );
+  }
+
+  // ── Menu screen ───────────────────────────────────────────────────────────
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "system-ui, sans-serif", maxWidth: 480, margin: "0 auto" }}>
+
+      {/* Header */}
+      <div style={{ background: C.green, padding: "16px 20px 20px" }}>
+        <div style={{ color: "#9FE1CB", fontSize: 12, cursor: "pointer", marginBottom: 6 }} onClick={onBack}>
+          ← Dashboard
+        </div>
+        <div style={{ color: "#FDFCF8", fontSize: 18, fontWeight: 500 }}>Household Settings</div>
+        <div style={{ color: "#5DCAA5", fontSize: 11, marginTop: 2 }}>Configure your household preferences</div>
+      </div>
+
+      {/* Menu items */}
+      <div style={{ padding: "24px 20px" }}>
+        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>
+          Settings
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {MENU_ITEMS.map(item => (
+            <div
+              key={item.id}
+              onClick={() => setActiveEditor(item.id)}
+              style={{
+                background: "#FFF9F2", borderRadius: 16, padding: "16px",
+                border: `0.5px solid ${C.border}`, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 14,
+                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+              }}
+            >
+              <div style={{
+                width: 44, height: 44, borderRadius: 12,
+                background: item.color, display: "flex",
+                alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0
+              }}>
+                {item.icon}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{item.label}</div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{item.desc}</div>
+              </div>
+              <div style={{ color: C.muted, fontSize: 18 }}>›</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Shell wrapper for each editor — provides header with back nav
+function EditorShell({ title, onBack, children }) {
+  return (
+    <div style={{ minHeight: "100vh", background: "#1A3A2E", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif", padding: "24px 0" }}>
+      <div style={{ width: "100%", maxWidth: 400, padding: "0 16px" }}>
+        <div style={{ background: C.card, borderRadius: 20, padding: "20px 18px", position: "relative" }}>
+          <div onClick={onBack} style={{ fontSize: 12, color: C.muted, cursor: "pointer", marginBottom: 12 }}>
+            ← Back to settings
+          </div>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}

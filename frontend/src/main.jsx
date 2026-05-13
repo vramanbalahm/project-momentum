@@ -14,6 +14,7 @@ import MyProfile from './pages/MyProfile.jsx'
 import MemberAvailability from './pages/MemberAvailability.jsx'
 import RecipeReview from './pages/RecipeReview.jsx'
 import HelpScreen from './pages/HelpScreen.jsx'
+import HouseholdSettings from './pages/HouseholdSettings.jsx'
 
 // AuthGate — isolated from App's state so Login/Register inputs never lose focus
 function AuthGate() {
@@ -54,6 +55,7 @@ function AuthGate() {
   if (screen === 'help') return (
     <HelpScreen onBack={() => { setScreen('recipe_review'); }} returnRecipeId={helpReturnRecipeId} />
   );
+  if (screen === 'household_settings') return <HouseholdSettings onBack={() => setScreen('dashboard')} />;
   if (screen === 'member_availability') return (
     <MemberAvailability
       onBack={() => setScreen('dashboard')}

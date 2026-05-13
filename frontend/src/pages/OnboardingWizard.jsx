@@ -1,102 +1,15 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import IngredientSelector, { satvikToValue, valueToSatvik, restrictionsToValue, valueToRestrictions } from "../components/IngredientSelector";
+import IngredientSelector, { restrictionsToValue, valueToRestrictions } from "../components/IngredientSelector";
+import SatvikEditor from "../components/SatvikEditor.jsx";
+import LunarEditor from "../components/LunarEditor.jsx";
+import EventEditor from "../components/EventEditor.jsx";
+
+import { C, DIET_PREFS, AGE_GROUPS, GENDERS, DIET_IMAGES, EVENT_ICONS, Field, HelpTip, Toggle, Chip, Avatar, NavButtons } from "../components/householdShared.jsx";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
-// ── Colours ──────────────────────────────────────────────────────────────────
-const C = {
-  green:    "#1A3A2E",
-  mint:     "#9FE1CB",
-  teal:     "#5DCAA5",
-  deepTeal: "#0F6E56",
-  card:     "#FFF9F2",
-  bg:       "#F7F4EE",
-  border:   "#EDE8E0",
-  text:     "#2C2C2A",
-  muted:    "#888780",
-  error:    "#FAECE7",
-  errorText:"#712B13",
-  feast:    { bg: "#FAEEDA", text: "#633806" },
-  satvik:   { bg: "#E1F5EE", text: "#0F6E56" },
-};
-
-const DIET_PREFS = ["Veg", "Non-Veg", "Vegan", "Eggitarian"];
-const AGE_GROUPS = [
-  { value: "Child",  label: "Child",  sub: "0–12 yrs",  emoji: "👶" },
-  { value: "Teen",   label: "Teen",   sub: "13–17 yrs", emoji: "🧒" },
-  { value: "Adult",  label: "Adult",  sub: "18–59 yrs", emoji: "🧑" },
-  { value: "Senior", label: "Senior", sub: "60+ yrs",   emoji: "👴" },
-];
-
-const GENDERS = [
-  { value: "Male",               emoji: "👨" },
-  { value: "Female",             emoji: "👩" },
-  { value: "Transgender",        emoji: "🏳️" },
-  { value: "Prefer not to say",  emoji: "🤐" },
-];
-
-const DIET_IMAGES = {
-  "Veg":        "https://cdn-icons-png.flaticon.com/512/2153/2153788.png",
-  "Non-Veg":    "https://cdn-icons-png.flaticon.com/512/857/857681.png",
-  "Vegan":      "https://cdn-icons-png.flaticon.com/512/2153/2153786.png",
-  "Eggitarian": "https://cdn-icons-png.flaticon.com/512/837/837560.png",
-};
-
-const EVENT_ICONS = [
-  "🎂", "🎉", "🎊", "💍", "🙏", "⭐", "🌸", "🕉️",
-  "👶", "🎓", "🏠", "❤️", "🌙", "🔔", "🪔", "🌺"
-];
-
 const STEP_LABELS = ["Welcome", "Members", "Satvik", "Calendar", "Events", "Done"];
-
-// ── Small reusable components ─────────────────────────────────────────────────
-const Field = ({ label, hint, children }) => (
-  <div style={{ marginBottom: 14 }}>
-    <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, marginBottom: 3 }}>{label}</div>
-    {hint && <div style={{ fontSize: 10, color: "#B4B2A9", marginBottom: 5, lineHeight: 1.4 }}>{hint}</div>}
-    {children}
-  </div>
-);
-
-const HelpTip = ({ text, visible, onToggle }) => (
-  <span style={{ display: "inline-flex", marginLeft: 4 }}>
-    <span onClick={onToggle} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: `0.5px solid ${C.border}`, fontSize: 10, color: C.muted, cursor: "pointer" }}>?</span>
-    {visible && (
-      <div style={{ position: "absolute", zIndex: 20, background: C.card, border: `0.5px solid ${C.teal}`, borderRadius: 8, padding: "8px 10px", fontSize: 11, color: C.muted, lineHeight: 1.5, maxWidth: 240, marginTop: 20, boxShadow: "0 4px 16px rgba(0,0,0,0.08)" }}>
-        {text}
-      </div>
-    )}
-  </span>
-);
-
-const Toggle = ({ value, onChange }) => (
-  <div onClick={() => onChange(!value)} style={{ width: 30, height: 17, borderRadius: 9, background: value ? C.teal : C.border, position: "relative", cursor: "pointer", flexShrink: 0, transition: "background 0.2s" }}>
-    <div style={{ width: 13, height: 13, borderRadius: "50%", background: "white", position: "absolute", top: 2, left: value ? 15 : 2, transition: "left 0.2s" }} />
-  </div>
-);
-
-const Chip = ({ label, active, onClick }) => (
-  <button onClick={onClick} style={{ padding: "7px 10px", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", background: active ? C.green : "transparent", color: active ? C.mint : C.muted, border: active ? "none" : `0.5px solid ${C.border}`, transition: "all 0.15s" }}>
-    {label}
-  </button>
-);
-
-const Avatar = ({ name, bg = "#E1F5EE", color = C.deepTeal }) => (
-  <div style={{ width: 32, height: 32, borderRadius: "50%", background: bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 500, color, flexShrink: 0 }}>
-    {(name || "?")[0].toUpperCase()}
-  </div>
-);
-
-const NavButtons = ({ onBack, onNext, onSkip, nextLabel = "Save & continue", loading }) => (
-  <div style={{ display: "flex", gap: 8, marginTop: "auto", paddingTop: 12 }}>
-    {onBack && <button onClick={onBack} style={{ flex: 1, padding: 10, border: `0.5px solid ${C.border}`, borderRadius: 10, fontSize: 12, color: C.muted, background: "transparent", cursor: "pointer" }}>Back</button>}
-    {onSkip && <button onClick={onSkip} style={{ flex: 1, padding: 10, border: `0.5px dashed ${C.border}`, borderRadius: 10, fontSize: 12, color: C.muted, background: "transparent", cursor: "pointer" }}>Skip</button>}
-    <button onClick={onNext} disabled={loading} style={{ flex: 2, padding: 10, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, color: C.green, background: C.mint, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1 }}>
-      {loading ? "Saving..." : nextLabel}
-    </button>
-  </div>
-);
 
 // ── Main Wizard ───────────────────────────────────────────────────────────────
 export default function OnboardingWizard({ onComplete }) {
@@ -116,17 +29,14 @@ export default function OnboardingWizard({ onComplete }) {
   const [copyTo, setCopyTo]     = useState({});
 
   // Step 3 — Satvik state
-  const [satvikValue, setSatvikValue] = useState({});
+  // satvikValue moved to SatvikEditor component
 
   // Step 4 — Panchangam state
   const [panchangamId, setPanchangamId] = useState(null);
 
   // Step 5 — Events state
   const [events, setEvents]     = useState([]);
-  const [newEvent, setNewEvent] = useState({ event_name: "", event_date: "", event_type: "Personal", is_sattvic_required: false, recurring_annual: true, icon: "🎂" });
-  const [addingEvent, setAddingEvent] = useState(false);
-  const [ingSearch, setIngSearch] = useState("");
-  const [ingResults, setIngResults] = useState([]);
+  // newEvent/addingEvent/ingSearch/ingResults moved to EventEditor component
 
   const toggleHelp = (key) => setHelp(h => ({ ...h, [key]: !h[key] }));
 
@@ -145,12 +55,7 @@ export default function OnboardingWizard({ onComplete }) {
           phone_number:       m.phone_number || null,
           restrictions: m.restrictions || [],
         })));
-        // Pre-fill Satvik
-        setSatvikValue(satvikToValue(d.satvik));
-        // Pre-fill Panchangam
-        if (d.panchangam_selected) setPanchangamId(d.panchangam_selected.id);
-        // Pre-fill events
-        setEvents(d.events.filter(e => e.source === "USER"));
+        // Satvik/Panchangam/Events pre-fill moved into editor components
 
       } catch (e) {
         setError("Failed to load setup data. Please restart.");
@@ -199,51 +104,7 @@ export default function OnboardingWizard({ onComplete }) {
     finally { setSaving(false); }
   };
 
-  const saveSatvik = async () => {
-    setSaving(true);
-    try {
-      await apiFetch("/onboarding/satvik", {
-        method: "POST",
-        body: JSON.stringify({ restrictions: valueToSatvik(satvikValue) }),
-      });
-      setCompletedSteps(s => [...new Set([...s, 2])]);
-      setStep(3);
-    } catch (e) { setError(e.message); }
-    finally { setSaving(false); }
-  };
-
-  const savePanchangam = async () => {
-    setSaving(true);
-    try {
-      await apiFetch("/onboarding/panchangam", {
-        method: "POST",
-        body: JSON.stringify({ panchangam_type_id: panchangamId }),
-      });
-      setStep(4);
-    } catch (e) { setError(e.message); }
-    finally { setSaving(false); }
-  };
-
-  const saveEvents = async () => {
-    setSaving(true);
-    try {
-      if (events.length > 0) {
-        await apiFetch("/onboarding/events", {
-          method: "POST",
-          body: JSON.stringify({ events: events.map(e => ({
-            event_name:          e.event_name,
-            event_date:          e.event_date,
-            event_type:          e.event_type,
-            is_sattvic_required: e.is_sattvic_required,
-            recurring_annual:    e.recurring_annual,
-          }))})
-        });
-      }
-      setCompletedSteps(s => [...new Set([...s, 4])]);
-      setStep(5);
-    } catch (e) { setError(e.message); }
-    finally { setSaving(false); }
-  };
+  // saveSatvik/savePanchangam/saveEvents moved into editor components
 
   const confirmOnboarding = async () => {
     setSaving(true);
@@ -496,140 +357,31 @@ export default function OnboardingWizard({ onComplete }) {
             </div>
           )}
 
-          {/* ── STEP 2: Satvik ───────────────────────────────────────────── */}
+          {/* ── STEP 2: Satvik ──────────────────────────────────────────── */}
           {step === 2 && (
-            <div style={{ display: "flex", flexDirection: "column", minHeight: 480 }}>
-              <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
-                <div style={{ fontSize: 17, fontWeight: 500, color: C.text }}>Satvik definition</div>
-                <HelpTip text="Select ingredients your household AVOIDS on Satvik days. e.g. most Tamil Brahmin households avoid onion and garlic. These rules apply on all Satvik-tagged days." visible={help.satvik} onToggle={() => toggleHelp("satvik")} />
-              </div>
-              <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Toggle ingredients your household <strong>AVOIDS</strong> on Satvik days.</div>
-              <IngredientSelector
-                mode="satvik"
-                value={satvikValue}
-                onChange={setSatvikValue}
-                showImages={true}
-                maxHeight="320px"
-              />
-              <NavButtons onBack={() => setStep(1)} onSkip={() => setStep(3)} onNext={saveSatvik} loading={saving} />
-            </div>
+            <SatvikEditor
+              onBack={() => setStep(1)}
+              onSkip={() => setStep(3)}
+              onDone={() => { setCompletedSteps(s => [...new Set([...s, 2])]); setStep(3); }}
+            />
           )}
 
-          {/* ── STEP 3: Lunar Calendar ───────────────────────────────────── */}
+          {/* ── STEP 3: Lunar Calendar ────────────────────────────────────── */}
           {step === 3 && (
-            <div style={{ display: "flex", flexDirection: "column", minHeight: 480 }}>
-              <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
-                <div style={{ fontSize: 17, fontWeight: 500, color: C.text }}>Lunar calendar</div>
-                <HelpTip text="Select which Panchangam your household follows. We'll use this to suggest Satvik meals on the correct days automatically." visible={help.lunar} onToggle={() => toggleHelp("lunar")} />
-              </div>
-              <div style={{ fontSize: 12, color: C.muted, marginBottom: 14 }}>Which Panchangam does your household follow?</div>
-              <div style={{ flex: 1, overflowY: "auto", maxHeight: 360 }}>
-                {(data?.panchangam_types || []).map(pt => (
-                  <div key={pt.id} onClick={() => setPanchangamId(pt.id === panchangamId ? null : pt.id)}
-                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", marginBottom: 8, background: panchangamId === pt.id ? "#E1F5EE" : "#F7F4EE", border: `0.5px solid ${panchangamId === pt.id ? C.teal : C.border}`, borderRadius: 12, cursor: "pointer", transition: "all 0.15s" }}>
-                    <div style={{ fontSize: 22, width: 32, textAlign: "center", flexShrink: 0 }}>
-                      {["🌙", "🌑", "⭐", "🌿", "🌊", "🎋", "☀️", "🌸", "🕉️", "🌺"][data.panchangam_types.indexOf(pt) % 10]}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: panchangamId === pt.id ? C.deepTeal : C.text }}>{pt.display_name}</div>
-                      <div style={{ fontSize: 11, color: C.muted }}>{pt.language} · {pt.region}</div>
-                    </div>
-                    {panchangamId === pt.id && <div style={{ width: 18, height: 18, borderRadius: "50%", background: C.teal, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "white" }}>✓</div>}
-                  </div>
-                ))}
-                <div onClick={() => setPanchangamId(null)}
-                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: panchangamId === null ? "#E1F5EE" : "#F7F4EE", border: `0.5px solid ${panchangamId === null ? C.teal : C.border}`, borderRadius: 12, cursor: "pointer" }}>
-                  <div style={{ fontSize: 22, width: 32, textAlign: "center" }}>🚫</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: panchangamId === null ? C.deepTeal : C.text }}>We don't follow a Panchangam</div>
-                    <div style={{ fontSize: 11, color: C.muted }}>Skip lunar calendar — plan freely</div>
-                  </div>
-                  {panchangamId === null && <div style={{ width: 18, height: 18, borderRadius: "50%", background: C.teal, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "white" }}>✓</div>}
-                </div>
-              </div>
-              <NavButtons onBack={() => setStep(2)} onSkip={() => setStep(4)} onNext={savePanchangam} loading={saving} />
-            </div>
+            <LunarEditor
+              onBack={() => setStep(2)}
+              onSkip={() => setStep(4)}
+              onDone={() => setStep(4)}
+            />
           )}
 
-          {/* ── STEP 4: Events ───────────────────────────────────────────── */}
+          {/* ── STEP 4: Events ──────────────────────────────────────────── */}
           {step === 4 && (
-            <div style={{ display: "flex", flexDirection: "column", minHeight: 480 }}>
-              <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
-                <div style={{ fontSize: 17, fontWeight: 500, color: C.text }}>Events & special days</div>
-                <HelpTip text="Add birthdays, anniversaries or any special day. Feast = we suggest celebratory dishes. Satvik = Satvik rules apply. Our system learns from these every year." visible={help.events} onToggle={() => toggleHelp("events")} />
-              </div>
-              <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>We'll suggest the right meals automatically on these days.</div>
-              <div style={{ flex: 1, overflowY: "auto", maxHeight: 300 }}>
-                {events.length === 0 && !addingEvent && (
-                  <div style={{ textAlign: "center", padding: "20px 0", fontSize: 13, color: C.muted }}>No events added yet</div>
-                )}
-                {events.map((e, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 0", borderBottom: `0.5px solid ${C.border}` }}>
-                    <div style={{ fontSize: 18, width: 24, textAlign: "center", flexShrink: 0 }}>{e.icon || (e.is_sattvic_required ? "🙏" : "🎉")}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, color: C.text }}>{e.event_name}</div>
-                      <div style={{ fontSize: 11, color: C.muted }}>{e.event_date}{e.recurring_annual ? " — every year" : ""}</div>
-                    </div>
-                    <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 10, ...(e.is_sattvic_required ? C.satvik : C.feast) }}>
-                      {e.is_sattvic_required ? "Satvik" : "Feast"}
-                    </span>
-                    <span onClick={() => setEvents(ev => ev.filter((_, j) => j !== i))} style={{ fontSize: 13, color: "#E24B4A", cursor: "pointer" }}>✕</span>
-                  </div>
-                ))}
-
-                {/* Add event form */}
-                {addingEvent && (
-                  <div style={{ ...cardStyle, marginTop: 8 }}>
-                    <Field label="Event name">
-                      <input value={newEvent.event_name} onChange={e => setNewEvent(n => ({ ...n, event_name: e.target.value }))} placeholder="e.g. Bala's Birthday" style={inputStyle} />
-                    </Field>
-                    <Field label="Date (DD-MM)" hint="Day and month only — e.g. 15-03 for 15th March">
-                      <input value={newEvent.event_date} onChange={e => setNewEvent(n => ({ ...n, event_date: e.target.value }))} placeholder="e.g. 15-03" style={inputStyle} />
-                    </Field>
-                    <Field label="Type">
-                      <div style={{ display: "flex", gap: 6 }}>
-                        {["Personal", "Social", "Ritual"].map(t => (
-                          <Chip key={t} label={t} active={newEvent.event_type === t} onClick={() => setNewEvent(n => ({ ...n, event_type: t }))} />
-                        ))}
-                      </div>
-                    </Field>
-                    <Field label="Icon">
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {EVENT_ICONS.map(icon => (
-                          <button key={icon} onClick={() => setNewEvent(n => ({ ...n, icon }))}
-                            style={{ width: 34, height: 34, borderRadius: 8, fontSize: 18, border: `0.5px solid ${newEvent.icon === icon ? C.teal : C.border}`, background: newEvent.icon === icon ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
-                            {icon}
-                          </button>
-                        ))}
-                      </div>
-                    </Field>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
-                      <span style={{ fontSize: 13, color: C.text }}>Satvik day</span>
-                      <Toggle value={newEvent.is_sattvic_required} onChange={v => setNewEvent(n => ({ ...n, is_sattvic_required: v }))} />
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
-                      <span style={{ fontSize: 13, color: C.text }}>Repeats annually</span>
-                      <Toggle value={newEvent.recurring_annual} onChange={v => setNewEvent(n => ({ ...n, recurring_annual: v }))} />
-                    </div>
-                    <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                      <button onClick={() => setAddingEvent(false)} style={{ flex: 1, padding: 9, border: `0.5px solid ${C.border}`, borderRadius: 8, fontSize: 12, color: C.muted, background: "transparent", cursor: "pointer" }}>Cancel</button>
-                      <button onClick={() => {
-                        if (!newEvent.event_name || !newEvent.event_date) return;
-                        setEvents(ev => [...ev, { ...newEvent }]);
-                        setNewEvent({ event_name: "", event_date: "", event_type: "Personal", is_sattvic_required: false, recurring_annual: true, icon: "🎂" });
-                        setAddingEvent(false);
-                      }} style={{ flex: 2, padding: 9, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, color: C.green, background: C.mint, cursor: "pointer" }}>Add event</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              {!addingEvent && (
-                <div onClick={() => setAddingEvent(true)} style={{ fontSize: 12, color: C.deepTeal, border: `0.5px dashed ${C.teal}`, borderRadius: 8, padding: 8, textAlign: "center", marginTop: 8, cursor: "pointer" }}>
-                  + Add an event
-                </div>
-              )}
-              <NavButtons onBack={() => setStep(3)} onSkip={() => setStep(5)} onNext={saveEvents} loading={saving} />
-            </div>
+            <EventEditor
+              onBack={() => setStep(3)}
+              onSkip={() => setStep(5)}
+              onDone={() => { setCompletedSteps(s => [...new Set([...s, 4])]); setStep(5); }}
+            />
           )}
 
           {/* ── STEP 5: Done ─────────────────────────────────────────────── */}
