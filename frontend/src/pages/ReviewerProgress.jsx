@@ -13,10 +13,10 @@ const C = {
 };
 
 const STATUS_MAP = {
-  pending:  { tab: "under_review", color: "#633806" },
-  saved:    { tab: "saved",        color: "#1A3A6E" },
-  approved: { tab: "approved",     color: "#085041" },
-  rejected: { tab: "rejected",     color: "#712B13" },
+  pending:  { tab: "under_review", color: "#0C447C", bg: "#E6F1FB", labelColor: "#185FA5" },
+  saved:    { tab: "saved",        color: "#633806", bg: "#FAEEDA", labelColor: "#854F0B" },
+  approved: { tab: "approved",     color: "#085041", bg: "#E1F5EE", labelColor: "#0F6E56" },
+  rejected: { tab: "rejected",     color: "#712B13", bg: "#FAECE7", labelColor: "#993C1D" },
 };
 
 const ProgressBar = ({ value, max, color = C.teal }) => {
@@ -95,13 +95,13 @@ export default function ReviewerProgress({ onBack, onNavigate }) {
               <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>
                 Vault overview — {data.totals.total} recipes
               </div>
-              <div style={{ display: "flex", justifyContent: "space-around", marginBottom: 14 }}>
-                {Object.entries(STATUS_MAP).map(([key, { tab, color }]) => (
+              <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                {Object.entries(STATUS_MAP).map(([key, { tab, color, bg, labelColor }]) => (
                   <div key={key} onClick={() => goToTab(key)}
-                    style={{ textAlign: "center", flex: 1, cursor: "pointer", padding: "4px 0", borderRadius: 8 }}>
-                    <div style={{ fontSize: 15, fontWeight: 500, color }}>{data.totals[key]}</div>
-                    <div style={{ fontSize: 9, color: C.muted, marginTop: 1, textTransform: "capitalize" }}>{key}</div>
-                    <div style={{ fontSize: 8, color: C.teal, marginTop: 2 }}>tap →</div>
+                    style={{ flex: 1, cursor: "pointer", background: bg, borderRadius: 8, padding: "8px 6px", textAlign: "center" }}>
+                    <div style={{ fontSize: 17, fontWeight: 500, color }}>{data.totals[key]}</div>
+                    <div style={{ fontSize: 9, color: labelColor, marginTop: 2, textTransform: "capitalize" }}>{key}</div>
+                    <div style={{ fontSize: 8, color: labelColor, marginTop: 1, opacity: 0.7 }}>tap →</div>
                   </div>
                 ))}
               </div>
@@ -148,11 +148,11 @@ export default function ReviewerProgress({ onBack, onNavigate }) {
                     }
                   </div>
 
-                  <div style={{ display: "flex", justifyContent: "space-around", marginBottom: 12 }}>
-                    {Object.entries(STATUS_MAP).map(([key, { color }]) => (
-                      <div key={key} style={{ textAlign: "center", flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 500, color }}>{r[key]}</div>
-                        <div style={{ fontSize: 9, color: C.muted, marginTop: 1, textTransform: "capitalize" }}>{key}</div>
+                  <div style={{ display: "flex", gap: 5, marginBottom: 10 }}>
+                    {Object.entries(STATUS_MAP).map(([key, { color, bg, labelColor }]) => (
+                      <div key={key} style={{ flex: 1, background: bg, borderRadius: 6, padding: "5px 4px", textAlign: "center" }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color }}>{r[key]}</div>
+                        <div style={{ fontSize: 8, color: labelColor, marginTop: 1, textTransform: "capitalize" }}>{key}</div>
                       </div>
                     ))}
                   </div>
