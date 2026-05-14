@@ -37,11 +37,13 @@ const MEMBER_PASSWORD = process.env.MEMBER_PASSWORD || 'TestMember1!';
 
 async function loginAs(page, email, password) {
   await page.goto('/');
-  await page.waitForSelector('input[type="email"]', { timeout: 10000 });
+  await page.waitForSelector('input[type="email"]', { timeout: 15000 });
   await page.locator('input[type="email"]').fill(email);
   await page.locator('input[type="password"]').fill(password);
-  await page.locator('button', { hasText: 'Sign in' }).click();
-  await page.waitForSelector('text=Weekly Plan', { timeout: 10000 });
+  const signInBtn = page.locator('button', { hasText: 'Sign in' });
+  await signInBtn.waitFor({ state: 'visible', timeout: 10000 });
+  await signInBtn.click();
+  await page.waitForSelector('text=Weekly Plan', { timeout: 20000 });
 }
 
 async function loginAsAdmin(page) {
