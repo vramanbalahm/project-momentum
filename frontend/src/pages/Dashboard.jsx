@@ -150,6 +150,7 @@ export default function Dashboard({ onNavigate }) {
             {/* Settings icon — opens dropdown */}
             <div style={{ position: "relative" }}>
               <div
+                data-testid="settings-menu-btn"
                 onClick={() => setMenuOpen(!menuOpen)}
                 title="Settings"
                 style={{
@@ -252,6 +253,7 @@ export default function Dashboard({ onNavigate }) {
                         icon="⚙️"
                         label="Household Settings"
                         available={isAdmin}
+                        testId="dropdown-household-settings"
                         onClick={() => { setMenuOpen(false); onNavigate("household_settings"); }}
                       />
                     )}
@@ -350,9 +352,10 @@ export default function Dashboard({ onNavigate }) {
   );
 }
 
-function SettingsItem({ icon, label, available, onClick }) {
+function SettingsItem({ icon, label, available, onClick, testId }) {
   return (
     <div
+      data-testid={testId}
       onClick={available ? onClick : undefined}
       style={{
         padding: "12px 16px", display: "flex", alignItems: "center", gap: 10,

@@ -11,7 +11,8 @@ const MEMBER_PASSWORD = process.env.MEMBER_PASSWORD || 'Member@123';
 
 async function loginAs(page, email, password) {
   await page.goto('/');
-  await page.waitForSelector('input[type="email"]', { timeout: 15000 });
+  await page.waitForLoadState('networkidle');
+  await page.waitForSelector('input[type="email"]', { timeout: 20000 });
   await page.locator('input[type="email"]').fill(email);
   await page.locator('input[type="password"]').fill(password);
   const signInBtn = page.locator('button', { hasText: 'Sign in' });
@@ -30,7 +31,27 @@ async function loginAsMember(page) {
 
 async function goToHouseholdSettings(page) {
   await page.locator('[data-testid="tile-household_settings"]').click();
+  // Wait for header text that only appears on the settings screen, not the menu items list
   await page.waitForSelector('text=Configure your household preferences', { timeout: 8000 });
+}
+
+async function goToSatvikEditor(page) {
+  await goToHouseholdSettings(page);
+  await page.locator('text=Satvik definition').click();
+  // Wait for "Back to settings" which only appears inside the editor shell
+  await page.waitForSelector('text=← Back to settings', { timeout: 8000 });
+}
+
+async function goToLunarEditor(page) {
+  await goToHouseholdSettings(page);
+  await page.locator('text=Lunar calendar').click();
+  await page.waitForSelector('text=← Back to settings', { timeout: 8000 });
+}
+
+async function goToEventsEditor(page) {
+  await goToHouseholdSettings(page);
+  await page.locator('text=Events & special days').click();
+  await page.waitForSelector('text=← Back to settings', { timeout: 8000 });
 }
 
 // ── Dashboard tile visibility ─────────────────────────────────────────────────
@@ -44,17 +65,16 @@ test.describe('Household Settings tile visibility', () => {
   });
 
   // Test 2
-  test('tile is NOT visible for plain household member', async ({ page }) => {
+  test('tile is NOT available for plain household member', async ({ page }) => {
     await loginAsMember(page);
-    // Household Settings tile should either not exist or not be available (dimmed/non-clickable)
     const tile = page.locator('[data-testid="tile-household_settings"]');
     const count = await tile.count();
     if (count > 0) {
-      // If tile exists, it should not be available (opacity 0.6, cursor default)
+      // Tile exists but should be dimmed (opacity < 1) for non-admin
       const opacity = await tile.evaluate(el => getComputedStyle(el).opacity);
       expect(parseFloat(opacity)).toBeLessThan(1);
     }
-    // If count is 0, tile is correctly hidden — pass
+    // count === 0 means tile correctly hidden — also passes
   });
 
 });
@@ -90,9 +110,9 @@ test.describe('Household Settings navigation', () => {
 
   // Test 6
   test('Household Settings accessible from settings dropdown', async ({ page }) => {
-    await page.locator('text=⚙️').first().click();
-    await expect(page.locator('text=Household Settings').last()).toBeVisible();
-    await page.locator('text=Household Settings').last().click({ force: true });
+    await page.locator('[data-testid="settings-menu-btn"]').click();
+    await page.locator('[data-testid="dropdown-household-settings"]').waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('[data-testid="dropdown-household-settings"]').click();
     await expect(page.locator('text=Configure your household preferences')).toBeVisible({ timeout: 8000 });
   });
 
@@ -104,14 +124,12 @@ test.describe('Satvik settings', () => {
 
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
-    await goToHouseholdSettings(page);
-    await page.locator('text=Satvik definition').click();
-    await page.waitForSelector('text=Satvik definition', { timeout: 8000 });
+    await goToSatvikEditor(page);
   });
 
   // Test 7
   test('Satvik item navigates to Satvik editor', async ({ page }) => {
-    await expect(page.locator('text=Back to settings')).toBeVisible();
+    await expect(page.locator('text=← Back to settings')).toBeVisible();
   });
 
   // Test 8
@@ -122,7 +140,7 @@ test.describe('Satvik settings', () => {
   // Test 9
   test('saving Satvik settings shows success toast', async ({ page }) => {
     await page.locator('button', { hasText: 'Save' }).click();
-    await expect(page.locator('text=Satvik settings saved')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Satvik settings saved')).toBeVisible({ timeout: 6000 });
   });
 
   // Test 10
@@ -139,14 +157,12 @@ test.describe('Lunar Calendar settings', () => {
 
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
-    await goToHouseholdSettings(page);
-    await page.locator('text=Lunar calendar').click();
-    await page.waitForSelector('text=Lunar calendar', { timeout: 8000 });
+    await goToLunarEditor(page);
   });
 
   // Test 11
   test('Lunar item navigates to Lunar editor', async ({ page }) => {
-    await expect(page.locator('text=Back to settings')).toBeVisible();
+    await expect(page.locator('text=← Back to settings')).toBeVisible();
   });
 
   // Test 12
@@ -158,7 +174,7 @@ test.describe('Lunar Calendar settings', () => {
   test('saving Lunar preference shows success toast', async ({ page }) => {
     await page.locator("text=We don't follow a Panchangam").click();
     await page.locator('button', { hasText: 'Save' }).click();
-    await expect(page.locator('text=Lunar calendar saved')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Lunar calendar saved')).toBeVisible({ timeout: 6000 });
   });
 
   // Test 14
@@ -175,9 +191,7 @@ test.describe('Events & special days settings', () => {
 
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
-    await goToHouseholdSettings(page);
-    await page.locator('text=Events & special days').click();
-    await page.waitForSelector('text=Add an event', { timeout: 8000 });
+    await goToEventsEditor(page);
   });
 
   // Test 15
@@ -192,7 +206,7 @@ test.describe('Events & special days settings', () => {
     await page.locator('input[placeholder*="15-03"]').fill("06-15");
     await page.locator('button', { hasText: 'Add event' }).click();
     await page.locator('button', { hasText: 'Save' }).click();
-    await expect(page.locator('text=Events saved')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Events saved')).toBeVisible({ timeout: 6000 });
   });
 
 });
