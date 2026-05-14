@@ -27,10 +27,7 @@ export default function Dashboard({ onNavigate }) {
 
   // Smart Weekly Plan navigation — admin checks availability first, member goes straight to planner
   const handleWeeklyPlanTap = async () => {
-    if (user?.role === "reviewer") {
-      onNavigate("recipe_review");
-      return;
-    }
+    // reviewers now navigate via Recipe Review tile
     if (!isAdmin) {
       onNavigate("weekly_plan");
       return;
@@ -104,6 +101,15 @@ export default function Dashboard({ onNavigate }) {
       desc: isAdmin ? "Satvik, lunar & events" : "Admin access only",
       color: "#FAEEDA",
       available: isAdmin,
+    },
+    {
+      id: "recipe_review",
+      icon: "📋",
+      label: "Recipe Review",
+      desc: "Review and approve recipes",
+      color: "#E1F5EE",
+      available: true,
+      hidden: !isReviewer,
     },
     {
       id: "reviewer_progress",
@@ -292,7 +298,7 @@ export default function Dashboard({ onNavigate }) {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          {tiles.filter(tile => !isReviewerOnly && !tile.hidden).map(tile => (
+          {tiles.filter(tile => !tile.hidden && (isReviewerOnly ? tile.id === "recipe_review" : true)).map(tile => (
             <div
               key={tile.id}
               onClick={() => {
