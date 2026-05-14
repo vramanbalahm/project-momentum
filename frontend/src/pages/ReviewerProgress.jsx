@@ -104,6 +104,14 @@ export default function ReviewerProgress({ onBack, onNavigate }) {
               />
             </div>
 
+            {/* Open Recipe Review */}
+            <div
+              onClick={() => onNavigate("recipe_review")}
+              style={{ background: C.green, color: C.mint, borderRadius: 12, padding: "12px 16px", textAlign: "center", fontSize: 13, fontWeight: 500, cursor: "pointer", marginBottom: 16 }}
+            >
+              Open Recipe Review →
+            </div>
+
             {/* ── Reviewer tabs ── */}
             <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 14 }}>
               {["all", ...data.reviewers.map(r => r.name)].map(tab => (
@@ -153,15 +161,7 @@ export default function ReviewerProgress({ onBack, onNavigate }) {
 
                   <ProgressBar value={r.approved + r.rejected} max={data.totals.total} color={C.mint} />
 
-                  {/* View in Recipe Review — only if they have work */}
-                  {!notStarted && (
-                    <div
-                      onClick={() => onNavigate("recipe_review")}
-                      style={{ marginTop: 12, padding: "8px", borderRadius: 8, background: C.green, color: C.mint, fontSize: 12, fontWeight: 500, textAlign: "center", cursor: "pointer" }}
-                    >
-                      View {r.name}'s approved recipes →
-                    </div>
-                  )}
+
                 </div>
               );
             })}
