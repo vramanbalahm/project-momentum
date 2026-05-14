@@ -44,7 +44,7 @@ export default function SatvikEditor({ onBack, onSkip, onDone, nextLabel = "Save
         body: JSON.stringify({ restrictions: valueToSatvik(satvikValue) }),
       });
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 2000);
+      setTimeout(() => setSuccess(false), 4000);
       if (onDone) onDone();
     } catch (e) {
       setError(e.message || "Failed to save. Please try again.");

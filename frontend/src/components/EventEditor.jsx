@@ -68,7 +68,7 @@ export default function EventEditor({ onBack, onSkip, onDone, nextLabel = "Save 
         });
       }
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 2000);
+      setTimeout(() => setSuccess(false), 4000);
       if (onDone) onDone();
     } catch (e) {
       setError(e.message || "Failed to save. Please try again.");

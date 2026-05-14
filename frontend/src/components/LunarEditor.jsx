@@ -47,7 +47,7 @@ export default function LunarEditor({ onBack, onSkip, onDone, nextLabel = "Save 
         body: JSON.stringify({ panchangam_type_id: panchangamId }),
       });
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 2000);
+      setTimeout(() => setSuccess(false), 4000);
       if (onDone) onDone();
     } catch (e) {
       setError(e.message || "Failed to save. Please try again.");
