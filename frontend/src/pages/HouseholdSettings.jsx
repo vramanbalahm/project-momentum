@@ -38,9 +38,9 @@ export default function HouseholdSettings({ onBack }) {
   // ── Editor screens ────────────────────────────────────────────────────────
   if (activeEditor === "satvik") {
     return (
-      <EditorShell title="Satvik definition" onBack={() => setActiveEditor(null)}>
+      <EditorShell title="Satvik definition" testId="editor-satvik" onBack={() => setActiveEditor(null)}>
         <SatvikEditor
-          onDone={() => setActiveEditor(null)}
+          onDone={null}
           nextLabel="Save"
         />
       </EditorShell>
@@ -49,9 +49,9 @@ export default function HouseholdSettings({ onBack }) {
 
   if (activeEditor === "lunar") {
     return (
-      <EditorShell title="Lunar calendar" onBack={() => setActiveEditor(null)}>
+      <EditorShell title="Lunar calendar" testId="editor-lunar" onBack={() => setActiveEditor(null)}>
         <LunarEditor
-          onDone={() => setActiveEditor(null)}
+          onDone={null}
           nextLabel="Save"
         />
       </EditorShell>
@@ -60,9 +60,9 @@ export default function HouseholdSettings({ onBack }) {
 
   if (activeEditor === "events") {
     return (
-      <EditorShell title="Events & special days" onBack={() => setActiveEditor(null)}>
+      <EditorShell title="Events & special days" testId="editor-events" onBack={() => setActiveEditor(null)}>
         <EventEditor
-          onDone={() => setActiveEditor(null)}
+          onDone={null}
           nextLabel="Save"
         />
       </EditorShell>
@@ -121,9 +121,9 @@ export default function HouseholdSettings({ onBack }) {
 }
 
 // Shell wrapper for each editor — provides header with back nav
-function EditorShell({ title, onBack, children }) {
+function EditorShell({ title, onBack, children, testId }) {
   return (
-    <div style={{ minHeight: "100vh", background: "#1A3A2E", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif", padding: "24px 0" }}>
+    <div data-testid={testId} style={{ minHeight: "100vh", background: "#1A3A2E", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif", padding: "24px 0" }}>
       <div style={{ width: "100%", maxWidth: 400, padding: "0 16px" }}>
         <div style={{ background: C.card, borderRadius: 20, padding: "20px 18px", position: "relative" }}>
           <div onClick={onBack} style={{ fontSize: 12, color: C.muted, cursor: "pointer", marginBottom: 12 }}>

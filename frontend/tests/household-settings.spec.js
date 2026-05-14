@@ -38,20 +38,19 @@ async function goToHouseholdSettings(page) {
 async function goToSatvikEditor(page) {
   await goToHouseholdSettings(page);
   await page.locator('text=Satvik definition').click();
-  // Wait for "Back to settings" which only appears inside the editor shell
-  await page.waitForSelector('text=← Back to settings', { timeout: 8000 });
+  await page.waitForSelector('[data-testid="editor-satvik"]', { timeout: 8000 });
 }
 
 async function goToLunarEditor(page) {
   await goToHouseholdSettings(page);
   await page.locator('text=Lunar calendar').click();
-  await page.waitForSelector('text=← Back to settings', { timeout: 8000 });
+  await page.waitForSelector('[data-testid="editor-lunar"]', { timeout: 8000 });
 }
 
 async function goToEventsEditor(page) {
   await goToHouseholdSettings(page);
   await page.locator('text=Events & special days').click();
-  await page.waitForSelector('text=← Back to settings', { timeout: 8000 });
+  await page.waitForSelector('[data-testid="editor-events"]', { timeout: 8000 });
 }
 
 // ── Dashboard tile visibility ─────────────────────────────────────────────────
@@ -129,7 +128,7 @@ test.describe('Satvik settings', () => {
 
   // Test 7
   test('Satvik item navigates to Satvik editor', async ({ page }) => {
-    await expect(page.locator('text=← Back to settings')).toBeVisible();
+    await expect(page.locator('[data-testid="editor-satvik"]')).toBeVisible();
   });
 
   // Test 8
@@ -162,7 +161,7 @@ test.describe('Lunar Calendar settings', () => {
 
   // Test 11
   test('Lunar item navigates to Lunar editor', async ({ page }) => {
-    await expect(page.locator('text=← Back to settings')).toBeVisible();
+    await expect(page.locator('[data-testid="editor-lunar"]')).toBeVisible();
   });
 
   // Test 12
