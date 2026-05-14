@@ -472,6 +472,96 @@ async def bulk_approve_recipes(
     return {"message": f"{count} recipes approved.", "count": count}
 
 
+# --- REVIEWER PROGRESS ENDPOINT ---
+@app.get("/recipes/reviewer-progress")
+async def reviewer_progress(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Platform admin only.
+    Returns per-reviewer counts across all review statuses,
+    plus overall vault totals.
+    """
+    if current_user["role"] != "platform_admin":
+        raise HTTPException(status_code=403, detail="Platform admin only.")
+
+    rows = db.execute(text("""
+        SELECT
+            u.name                                              AS reviewer_name,
+            u.email                                             AS reviewer_email,
+            COUNT(*) FILTER (WHERE r.review_status = 'under_review') AS pending,
+            COUNT(*) FILTER (WHERE r.review_status = 'saved')         AS saved,
+            COUNT(*) FILTER (WHERE r.review_status = 'approved')      AS approved,
+            COUNT(*) FILTER (WHERE r.review_status = 'rejected')      AS rejected,
+            COUNT(*) FILTER (WHERE r.review_status != 'under_review') AS total_done
+        FROM recipe_dna_master r
+        JOIN users u ON u.user_id = r.reviewed_by
+        WHERE u.role IN ('reviewer', 'platform_admin')
+        GROUP BY u.user_id, u.name, u.email
+        ORDER BY total_done DESC
+    """)).fetchall()
+
+    totals = db.execute(text("""
+        SELECT
+            COUNT(*) FILTER (WHERE review_status = 'under_review') AS pending,
+            COUNT(*) FILTER (WHERE review_status = 'saved')         AS saved,
+            COUNT(*) FILTER (WHERE review_status = 'approved')      AS approved,
+            COUNT(*) FILTER (WHERE review_status = 'rejected')      AS rejected,
+            COUNT(*)                                                 AS total
+        FROM recipe_dna_master
+    """)).fetchone()
+
+    return {
+        "reviewers": [
+            {
+                "name":        r.reviewer_name,
+                "email":       r.reviewer_email,
+                "pending":     r.pending,
+                "saved":       r.saved,
+                "approved":    r.approved,
+                "rejected":    r.rejected,
+                "total_done":  r.total_done,
+            }
+            for r in rows
+        ],
+        "totals": {
+            "pending":  totals.pending,
+            "saved":    totals.saved,
+            "approved": totals.approved,
+            "rejected": totals.rejected,
+            "total":    totals.total,
+        }
+    }
+
+
+# --- MARK AS PENDING ENDPOINT ---
+@app.post("/recipes/{recipe_id}/mark-pending")
+async def mark_recipe_pending(
+    recipe_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Platform admin only.
+    Resets a recipe back to under_review so reviewers can pick it up again.
+    Clears reviewed_by and reviewed_at.
+    """
+    if current_user["role"] != "platform_admin":
+        raise HTTPException(status_code=403, detail="Platform admin only.")
+
+    db.execute(text("""
+        UPDATE recipe_dna_master
+        SET review_status = 'under_review',
+            reviewed_by   = NULL,
+            reviewed_at   = NULL,
+            review_notes  = NULL
+        WHERE recipe_id = CAST(:recipe_id AS uuid)
+    """), {"recipe_id": recipe_id})
+    db.commit()
+    return {"message": "Recipe reset to pending.", "recipe_id": recipe_id}
+
+
 # --- RECIPE IMAGE GENERATION ENDPOINT ---
 @app.post("/recipes/{recipe_id}/generate-image")
 async def generate_recipe_image(

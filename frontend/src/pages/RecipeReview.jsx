@@ -159,6 +159,19 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId }) {
     }
   };
 
+  // ── Mark as Pending (platform admin only) ──────────────────────
+  const markPending = async (recipeId) => {
+    try {
+      await apiFetch(`/recipes/${recipeId}/mark-pending`, { method: "POST" });
+      setSuccess("Recipe reset to Pending. ✓");
+      setTimeout(() => setSuccess(null), 3000);
+      setEditOpen(false);
+      loadRecipes(1);
+    } catch (e) {
+      setError(e.message || "Failed to reset recipe.");
+    }
+  };
+
   // ── Bulk approve ──────────────────────────────────────────
   const bulkApprove = async () => {
     if (selected.size === 0) return;
@@ -565,6 +578,12 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId }) {
                     Approve ✓
                   </button>
                 </div>
+                {isPlatformAdmin && editRecipe && (
+                  <button onClick={() => markPending(editRecipe.recipe_id)} disabled={editSaving}
+                    style={{ width: "100%", marginTop: 8, padding: 10, borderRadius: 12, border: `0.5px solid #EDE8E0`, background: "transparent", color: "#888780", fontSize: 12, cursor: "pointer" }}>
+                    ↩ Mark as Pending
+                  </button>
+                )}
               </div>
             )}
           </div>

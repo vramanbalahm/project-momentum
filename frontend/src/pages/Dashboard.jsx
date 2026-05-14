@@ -106,6 +106,15 @@ export default function Dashboard({ onNavigate }) {
       available: isAdmin,
     },
     {
+      id: "reviewer_progress",
+      icon: "📊",
+      label: "Review Progress",
+      desc: user?.role === "platform_admin" ? "Reviewer stats & progress" : "",
+      color: "#E6F1FB",
+      available: user?.role === "platform_admin",
+      hidden: user?.role !== "platform_admin",
+    },
+    {
       id: "coming_soon_1",
       icon: "🛒",
       label: "Market Prices",
@@ -283,7 +292,7 @@ export default function Dashboard({ onNavigate }) {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          {tiles.filter(tile => !isReviewerOnly).map(tile => (
+          {tiles.filter(tile => !isReviewerOnly && !tile.hidden).map(tile => (
             <div
               key={tile.id}
               onClick={() => {
