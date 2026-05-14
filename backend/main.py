@@ -488,18 +488,19 @@ async def reviewer_progress(
 
     rows = db.execute(text("""
         SELECT
-            u.name                                              AS reviewer_name,
-            u.email                                             AS reviewer_email,
-            COUNT(*) FILTER (WHERE r.review_status = 'under_review') AS pending,
-            COUNT(*) FILTER (WHERE r.review_status = 'saved')         AS saved,
-            COUNT(*) FILTER (WHERE r.review_status = 'approved')      AS approved,
-            COUNT(*) FILTER (WHERE r.review_status = 'rejected')      AS rejected,
-            COUNT(*) FILTER (WHERE r.review_status != 'under_review') AS total_done
-        FROM recipe_dna_master r
-        JOIN users u ON u.user_id = r.reviewed_by
+            u.name                                                        AS reviewer_name,
+            u.email                                                       AS reviewer_email,
+            COUNT(*) FILTER (WHERE r.review_status = 'under_review')     AS pending,
+            COUNT(*) FILTER (WHERE r.review_status = 'saved')            AS saved,
+            COUNT(*) FILTER (WHERE r.review_status = 'approved')         AS approved,
+            COUNT(*) FILTER (WHERE r.review_status = 'rejected')         AS rejected,
+            COUNT(*) FILTER (WHERE r.review_status != 'under_review'
+                             AND r.review_status IS NOT NULL)             AS total_done
+        FROM users u
+        LEFT JOIN recipe_dna_master r ON r.reviewed_by = u.user_id
         WHERE u.role IN ('reviewer', 'platform_admin')
         GROUP BY u.user_id, u.name, u.email
-        ORDER BY total_done DESC
+        ORDER BY total_done DESC, u.name ASC
     """)).fetchall()
 
     totals = db.execute(text("""
