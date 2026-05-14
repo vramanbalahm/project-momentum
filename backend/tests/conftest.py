@@ -95,6 +95,10 @@ def admin_user(client, db):
     # Teardown — delete users first (FK), then household
     db.execute(text("DELETE FROM refresh_tokens WHERE house_id = CAST(:hid AS uuid)"), {"hid": me["house_id"]})
     db.execute(text("DELETE FROM profile_audit_log WHERE house_id = CAST(:hid AS uuid)"), {"hid": me["house_id"]})
+    db.execute(text("DELETE FROM satvik_restrictions WHERE house_id = CAST(:hid AS uuid)"), {"hid": me["house_id"]})
+    db.execute(text("DELETE FROM event_master WHERE house_id = CAST(:hid AS uuid)"), {"hid": me["house_id"]})
+    db.execute(text("DELETE FROM member_preferences WHERE house_id = CAST(:hid AS uuid)"), {"hid": me["house_id"]})
+    db.execute(text("DELETE FROM member_restrictions WHERE house_id = CAST(:hid AS uuid)"), {"hid": me["house_id"]})
     db.execute(text("DELETE FROM users WHERE house_id = CAST(:hid AS uuid)"), {"hid": me["house_id"]})
     db.execute(text("DELETE FROM household_master WHERE household_id = CAST(:hid AS uuid)"), {"hid": me["house_id"]})
     db.commit()
