@@ -187,12 +187,14 @@ async def get_recipes_for_review(
     sub_region: str = None,
     page: int = 1,
     page_size: int = 20,
+    filter_reviewer_id: str = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
     """
     Returns paginated recipe list for review screen.
     Accessible to platform_admin and reviewer roles only.
+    filter_reviewer_id: platform_admin only — filter by a specific reviewer's user_id.
     """
     role = current_user["role"]
     if role not in ("platform_admin", "reviewer"):
@@ -210,6 +212,9 @@ async def get_recipes_for_review(
     # Platform admin sees everything
     if status in ("approved", "rejected") and role != "platform_admin":
         conditions.append("r.reviewed_by = CAST(:user_id AS uuid)")
+    if filter_reviewer_id and role == "platform_admin":
+        conditions.append("r.reviewed_by = CAST(:filter_reviewer_id AS uuid)")
+        params["filter_reviewer_id"] = filter_reviewer_id
     if diet:
         conditions.append("r.diet_type::text = :diet")
         params["diet"] = diet
@@ -488,6 +493,7 @@ async def reviewer_progress(
 
     rows = db.execute(text("""
         SELECT
+            u.user_id,
             u.name                                                        AS reviewer_name,
             u.email                                                       AS reviewer_email,
             COUNT(*) FILTER (WHERE r.review_status = 'under_review')     AS pending,
@@ -516,6 +522,7 @@ async def reviewer_progress(
     return {
         "reviewers": [
             {
+                "user_id":     str(r.user_id),
                 "name":        r.reviewer_name,
                 "email":       r.reviewer_email,
                 "pending":     r.pending,

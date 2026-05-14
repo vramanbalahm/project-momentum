@@ -12,20 +12,19 @@ const C = {
   muted:  "#888780",
 };
 
-const StatusBadge = ({ count, color, label }) => (
-  <div style={{ textAlign: "center", flex: 1 }}>
-    <div style={{ fontSize: 15, fontWeight: 500, color }}>{count}</div>
-    <div style={{ fontSize: 9, color: C.muted, marginTop: 1 }}>{label}</div>
-  </div>
-);
+const STATUS_MAP = {
+  pending:  { tab: "under_review", color: "#633806" },
+  saved:    { tab: "saved",        color: "#1A3A6E" },
+  approved: { tab: "approved",     color: "#085041" },
+  rejected: { tab: "rejected",     color: "#712B13" },
+};
 
 const ProgressBar = ({ value, max, color = C.teal }) => {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.muted, marginBottom: 4 }}>
-        <span>Progress</span>
-        <span>{pct}%</span>
+        <span>Progress</span><span>{pct}%</span>
       </div>
       <div style={{ height: 6, background: C.border, borderRadius: 6, overflow: "hidden" }}>
         <div style={{ height: "100%", background: color, borderRadius: 6, width: `${pct}%`, transition: "width 0.4s" }} />
@@ -36,10 +35,9 @@ const ProgressBar = ({ value, max, color = C.teal }) => {
 
 export default function ReviewerProgress({ onBack, onNavigate }) {
   const { apiFetch } = useAuth();
-  const [data, setData]         = useState(null);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState(null);
-  const [activeTab, setActiveTab] = useState("all");
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
 
   useEffect(() => { load(); }, []);
 
@@ -56,9 +54,15 @@ export default function ReviewerProgress({ onBack, onNavigate }) {
     }
   };
 
-  const visibleReviewers = data
-    ? (activeTab === "all" ? data.reviewers : data.reviewers.filter(r => r.name === activeTab))
-    : [];
+  // Navigate to RecipeReview with tab pre-selected (all reviewers)
+  const goToTab = (statusKey) => {
+    onNavigate({ initialTab: STATUS_MAP[statusKey].tab });
+  };
+
+  // Navigate to RecipeReview filtered to a specific reviewer + approved tab
+  const goToReviewer = (reviewer) => {
+    onNavigate({ initialTab: "approved", filterReviewerId: reviewer.user_id });
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "system-ui, sans-serif", maxWidth: 480, margin: "0 auto" }}>
@@ -86,16 +90,20 @@ export default function ReviewerProgress({ onBack, onNavigate }) {
 
         {data && (
           <>
-            {/* ── Vault overview ── */}
-            <div style={{ background: C.card, borderRadius: 16, padding: "14px 16px", border: `0.5px solid ${C.border}`, marginBottom: 16 }}>
+            {/* ── Vault overview — stats are clickable ── */}
+            <div style={{ background: C.card, borderRadius: 16, padding: "14px 16px", border: `0.5px solid ${C.border}`, marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>
                 Vault overview — {data.totals.total} recipes
               </div>
               <div style={{ display: "flex", justifyContent: "space-around", marginBottom: 14 }}>
-                <StatusBadge count={data.totals.pending}  color="#633806" label="Pending"  />
-                <StatusBadge count={data.totals.saved}    color="#1A3A6E" label="Saved"    />
-                <StatusBadge count={data.totals.approved} color="#085041" label="Approved" />
-                <StatusBadge count={data.totals.rejected} color="#712B13" label="Rejected" />
+                {Object.entries(STATUS_MAP).map(([key, { tab, color }]) => (
+                  <div key={key} onClick={() => goToTab(key)}
+                    style={{ textAlign: "center", flex: 1, cursor: "pointer", padding: "4px 0", borderRadius: 8 }}>
+                    <div style={{ fontSize: 15, fontWeight: 500, color }}>{data.totals[key]}</div>
+                    <div style={{ fontSize: 9, color: C.muted, marginTop: 1, textTransform: "capitalize" }}>{key}</div>
+                    <div style={{ fontSize: 8, color: C.teal, marginTop: 2 }}>tap →</div>
+                  </div>
+                ))}
               </div>
               <ProgressBar
                 value={data.totals.approved + data.totals.rejected}
@@ -104,43 +112,31 @@ export default function ReviewerProgress({ onBack, onNavigate }) {
               />
             </div>
 
-            {/* Open Recipe Review */}
+            {/* Open Recipe Review button */}
             <div
-              onClick={() => onNavigate("recipe_review")}
-              style={{ background: C.green, color: C.mint, borderRadius: 12, padding: "12px 16px", textAlign: "center", fontSize: 13, fontWeight: 500, cursor: "pointer", marginBottom: 16 }}
+              onClick={() => onNavigate({ initialTab: "under_review" })}
+              style={{ background: C.green, color: C.mint, borderRadius: 12, padding: "12px 16px", textAlign: "center", fontSize: 13, fontWeight: 500, cursor: "pointer", marginBottom: 20 }}
             >
               Open Recipe Review →
             </div>
 
-            {/* ── Reviewer tabs ── */}
-            <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 14 }}>
-              {["all", ...data.reviewers.map(r => r.name)].map(tab => (
-                <div
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  style={{
-                    padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 500,
-                    cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
-                    background: activeTab === tab ? C.green : "transparent",
-                    color: activeTab === tab ? C.mint : C.muted,
-                    border: `0.5px solid ${activeTab === tab ? C.green : C.border}`,
-                    transition: "all 0.15s",
-                  }}
-                >
-                  {tab === "all" ? "All reviewers" : tab}
-                </div>
-              ))}
+            {/* ── Reviewer cards — each clickable ── */}
+            <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>
+              Reviewer breakdown
             </div>
 
-            {/* ── Reviewer cards ── */}
-            {visibleReviewers.map((r, i) => {
+            {data.reviewers.map((r, i) => {
               const notStarted = r.total_done === 0;
               return (
-                <div key={i} style={{
-                  background: C.card, borderRadius: 14, padding: "14px 16px",
-                  border: `0.5px solid ${C.border}`, marginBottom: 12,
-                  opacity: notStarted ? 0.55 : 1,
-                }}>
+                <div key={i}
+                  onClick={() => !notStarted && goToReviewer(r)}
+                  style={{
+                    background: C.card, borderRadius: 14, padding: "14px 16px",
+                    border: `0.5px solid ${C.border}`, marginBottom: 12,
+                    opacity: notStarted ? 0.55 : 1,
+                    cursor: notStarted ? "default" : "pointer",
+                  }}
+                >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{r.name}</div>
@@ -148,20 +144,20 @@ export default function ReviewerProgress({ onBack, onNavigate }) {
                     </div>
                     {notStarted
                       ? <span style={{ fontSize: 10, background: "#F0EFEC", color: C.muted, padding: "3px 8px", borderRadius: 10 }}>Not started</span>
-                      : <span style={{ fontSize: 12, fontWeight: 500, color: C.green }}>{r.total_done} done</span>
+                      : <span style={{ fontSize: 12, fontWeight: 500, color: C.green }}>{r.total_done} done ›</span>
                     }
                   </div>
 
                   <div style={{ display: "flex", justifyContent: "space-around", marginBottom: 12 }}>
-                    <StatusBadge count={r.pending}  color="#633806" label="Pending"  />
-                    <StatusBadge count={r.saved}    color="#1A3A6E" label="Saved"    />
-                    <StatusBadge count={r.approved} color="#085041" label="Approved" />
-                    <StatusBadge count={r.rejected} color="#712B13" label="Rejected" />
+                    {Object.entries(STATUS_MAP).map(([key, { color }]) => (
+                      <div key={key} style={{ textAlign: "center", flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 500, color }}>{r[key]}</div>
+                        <div style={{ fontSize: 9, color: C.muted, marginTop: 1, textTransform: "capitalize" }}>{key}</div>
+                      </div>
+                    ))}
                   </div>
 
                   <ProgressBar value={r.approved + r.rejected} max={data.totals.total} color={C.mint} />
-
-
                 </div>
               );
             })}

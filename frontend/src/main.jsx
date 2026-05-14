@@ -21,7 +21,8 @@ import ReviewerProgress from './pages/ReviewerProgress.jsx'
 function AuthGate() {
   const { isAuthenticated, loading: authLoading, user } = useAuth();
   const [authScreen, setAuthScreen] = useState('login');
-  const [screen, setScreen] = useState('dashboard'); // dashboard | weekly_plan | family_profile | manage_members | member_availability | recipe_review
+  const [screen, setScreen] = useState('dashboard');
+  const [reviewerNavParams, setReviewerNavParams] = useState({}); // dashboard | weekly_plan | family_profile | manage_members | member_availability | recipe_review
   const [helpReturnRecipeId, setHelpReturnRecipeId] = useState(null);
 
   if (authLoading) {
@@ -51,13 +52,13 @@ function AuthGate() {
   if (screen === 'my_profile') return <MyProfile onBack={() => setScreen('dashboard')} />;
   if (screen === 'manage_members') return <ManageMembers onBack={() => setScreen('dashboard')} />;
   if (screen === 'recipe_review') return (
-    <RecipeReview onBack={() => setScreen('dashboard')} onHelp={(recipeId) => { setHelpReturnRecipeId(recipeId); setScreen('help'); }} helpReturnRecipeId={helpReturnRecipeId} />
+    <RecipeReview onBack={() => { setReviewerNavParams({}); setScreen('dashboard'); }} onHelp={(recipeId) => { setHelpReturnRecipeId(recipeId); setScreen('help'); }} helpReturnRecipeId={helpReturnRecipeId} initialTab={reviewerNavParams.initialTab || 'under_review'} filterReviewerId={reviewerNavParams.filterReviewerId || null} />
   );
   if (screen === 'help') return (
     <HelpScreen onBack={() => { setScreen('recipe_review'); }} returnRecipeId={helpReturnRecipeId} />
   );
   if (screen === 'household_settings') return <HouseholdSettings onBack={() => setScreen('dashboard')} />;
-  if (screen === 'reviewer_progress') return <ReviewerProgress onBack={() => setScreen('dashboard')} onNavigate={setScreen} />;
+  if (screen === 'reviewer_progress') return <ReviewerProgress onBack={() => setScreen('dashboard')} onNavigate={(params) => { setReviewerNavParams(params); setScreen('recipe_review'); }} />;
   if (screen === 'member_availability') return (
     <MemberAvailability
       onBack={() => setScreen('dashboard')}

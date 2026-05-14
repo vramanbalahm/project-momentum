@@ -39,12 +39,12 @@ function Badge({ label, style }) {
   );
 }
 
-export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId }) {
+export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initialTab = "under_review", filterReviewerId = null }) {
   const { user, apiFetch } = useAuth();
   const isPlatformAdmin = user?.role === "platform_admin";
 
   // ── List state ────────────────────────────────────────────
-  const [activeTab,   setActiveTab]   = useState("under_review");
+  const [activeTab,   setActiveTab]   = useState(initialTab);
   const [dietFilter,  setDietFilter]  = useState(null);
   const [slotFilter,  setSlotFilter]  = useState(null);
   const [recipes,     setRecipes]     = useState([]);
@@ -69,7 +69,8 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId }) {
     setError(null);
     try {
       const params = new URLSearchParams({
-        status: activeTab, page: pg, page_size: 20
+        status: activeTab, page: pg, page_size: 20,
+        ...(filterReviewerId ? { filter_reviewer_id: filterReviewerId } : {})
       });
       if (dietFilter) params.append("diet", dietFilter);
       if (slotFilter) params.append("meal_slot", slotFilter);
