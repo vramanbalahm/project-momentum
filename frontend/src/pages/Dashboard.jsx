@@ -301,6 +301,7 @@ export default function Dashboard({ onNavigate }) {
           {tiles.filter(tile => !tile.hidden && (isReviewerOnly ? tile.id === "recipe_review" : true)).map(tile => (
             <div
               key={tile.id}
+              data-testid={`tile-${tile.id}`}
               onClick={() => {
               if (!tile.available) return;
               if (tile.id === "weekly_plan") { handleWeeklyPlanTap(); return; }
