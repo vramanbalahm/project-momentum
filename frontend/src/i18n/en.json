@@ -357,9 +357,9 @@
     "preferNotToSay": "Prefer not to say"
   },
   "eventType": {
-    "personal": "Personal",
-    "social": "Social",
-    "ritual": "Ritual"
+    "Personal": "Personal",
+    "Social": "Social",
+    "Ritual": "Ritual"
   },
   "reviewProgress": {
     "title": "Review Progress",

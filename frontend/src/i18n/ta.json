@@ -357,9 +357,9 @@
     "preferNotToSay": "சொல்ல விரும்பவில்லை"
   },
   "eventType": {
-    "personal": "தனிப்பட்ட",
-    "social": "சமூக",
-    "ritual": "சடங்கு"
+    "Personal": "தனிப்பட்ட",
+    "Social": "சமூக",
+    "Ritual": "சடங்கு"
   },
   "reviewProgress": {
     "title": "மதிப்பாய்வு முன்னேற்றம்",

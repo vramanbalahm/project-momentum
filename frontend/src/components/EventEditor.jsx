@@ -144,7 +144,7 @@ export default function EventEditor({ onBack, onSkip, onDone, nextLabel }) {
             <Field label="Type">
               <div style={{ display: "flex", gap: 6 }}>
                 {["Personal", "Social", "Ritual"].map(evtType => (
-                  <Chip key={evtType} label={evtType} active={newEvent.event_type === evtType} onClick={() => setNewEvent(n => ({ ...n, event_type: evtType }))} />
+                  <Chip key={evtType} label={t(`eventType.${evtType}`)} active={newEvent.event_type === evtType} onClick={() => setNewEvent(n => ({ ...n, event_type: evtType }))} />
                 ))}
               </div>
             </Field>
