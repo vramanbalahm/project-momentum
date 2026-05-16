@@ -55,8 +55,7 @@ export const Field = ({ label, hint, children }) => (
     {hint && <div style={{ fontSize: 10, color: "#B4B2A9", marginBottom: 5, lineHeight: 1.4 }}>{hint}</div>}
     {children}
   </div>
-  );
-};
+);
 
 export const HelpTip = ({ text, visible, onToggle }) => (
   <span style={{ display: "inline-flex", marginLeft: 4 }}>
