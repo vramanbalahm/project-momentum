@@ -1,4 +1,5 @@
 // householdShared.jsx
+import { useTranslation } from 'react-i18next';
 // Shared constants and micro-components used by:
 //   - OnboardingWizard.jsx
 //   - SatvikEditor.jsx, LunarEditor.jsx, EventEditor.jsx
@@ -54,7 +55,8 @@ export const Field = ({ label, hint, children }) => (
     {hint && <div style={{ fontSize: 10, color: "#B4B2A9", marginBottom: 5, lineHeight: 1.4 }}>{hint}</div>}
     {children}
   </div>
-);
+  );
+};
 
 export const HelpTip = ({ text, visible, onToggle }) => (
   <span style={{ display: "inline-flex", marginLeft: 4 }}>
@@ -85,12 +87,16 @@ export const Avatar = ({ name, bg = "#E1F5EE", color = C.deepTeal }) => (
   </div>
 );
 
-export const NavButtons = ({ onBack, onNext, onSkip, nextLabel = "Save & continue", loading }) => (
+export const NavButtons = ({ onBack, onNext, onSkip, nextLabel, loading }) => {
+  const { t } = useTranslation();
+  const label = nextLabel || t("onboarding.members.saveAndContinue");
+  return (
   <div style={{ display: "flex", gap: 8, marginTop: "auto", paddingTop: 12 }}>
-    {onBack && <button onClick={onBack} style={{ flex: 1, padding: 10, border: `0.5px solid ${C.border}`, borderRadius: 10, fontSize: 12, color: C.muted, background: "transparent", cursor: "pointer" }}>Back</button>}
-    {onSkip && <button onClick={onSkip} style={{ flex: 1, padding: 10, border: `0.5px dashed ${C.border}`, borderRadius: 10, fontSize: 12, color: C.muted, background: "transparent", cursor: "pointer" }}>Skip</button>}
+    {onBack && <button onClick={onBack} style={{ flex: 1, padding: 10, border: `0.5px solid ${C.border}`, borderRadius: 10, fontSize: 12, color: C.muted, background: "transparent", cursor: "pointer" }}>{t("common.back")}</button>}
+    {onSkip && <button onClick={onSkip} style={{ flex: 1, padding: 10, border: `0.5px dashed ${C.border}`, borderRadius: 10, fontSize: 12, color: C.muted, background: "transparent", cursor: "pointer" }}>{t("common.skip")}</button>}
     <button onClick={onNext} disabled={loading} style={{ flex: 2, padding: 10, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, color: C.green, background: C.mint, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1 }}>
-      {loading ? "Saving..." : nextLabel}
+      {loading ? t("common.saving") : label}
     </button>
   </div>
-);
+  );
+};

@@ -183,12 +183,12 @@ export default function OnboardingWizard({ onComplete }) {
                 <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{t("onboarding.welcome.subtitle")}</div>
               </div>
               <div style={{ background: "#E1F5EE", border: `0.5px solid ${C.teal}`, borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: C.deepTeal, marginBottom: 8 }}>Why this setup matters</div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: C.deepTeal, marginBottom: 8 }}>{t("onboarding.welcome.whyMatters")}</div>
                 {[
-                  ["🎯", "Recipes recommended based on who's home and what they enjoy"],
-                  ["🌙", "Satvik and lunar calendar ensure right meals on right days"],
-                  ["🎂", "Special events automatically get the right meal suggestions"],
-                  ["✨", "The more you share, the smarter your planner gets each week"],
+                  ["🎯", t("onboarding.welcome.point1")],
+                  ["🌙", t("onboarding.welcome.point2")],
+                  ["🎂", t("onboarding.welcome.point3")],
+                  ["✨", t("onboarding.welcome.point3")],
                 ].map(([icon, text]) => (
                   <div key={text} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                     <span style={{ fontSize: 14, flexShrink: 0 }}>{icon}</span>
@@ -197,8 +197,8 @@ export default function OnboardingWizard({ onComplete }) {
                 ))}
               </div>
               <div style={cardStyle}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: C.text, marginBottom: 8 }}>What we'll set up</div>
-                {["Member profiles & preferences", "Satvik definition", "Lunar calendar", "Events & special days"].map((item, i) => (
+                <div style={{ fontSize: 12, fontWeight: 500, color: C.text, marginBottom: 8 }}>{t("onboarding.welcome.whatSetup")}</div>
+                {[t("onboarding.members.title"), t("onboarding.satvik.title"), t("onboarding.lunar.title"), t("onboarding.events.title")].map((item, i) => (
                   <div key={item} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < 3 ? `0.5px solid ${C.border}` : "none" }}>
                     <div style={{ width: 20, height: 20, borderRadius: "50%", border: `0.5px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: C.muted, background: "#F7F4EE", flexShrink: 0 }}>{i + 1}</div>
                     <span style={{ fontSize: 13, color: C.text }}>{item}</span>
@@ -397,10 +397,10 @@ export default function OnboardingWizard({ onComplete }) {
               </div>
               <div style={cardStyle}>
                 {[
-                  ["Member profiles", completedSteps.includes(1) || data?.wizard_status?.members_done],
-                  ["Satvik definition", completedSteps.includes(2) || data?.wizard_status?.satvik_done],
-                  ["Lunar calendar", !!panchangamId],
-                  ["Events & special days", completedSteps.includes(4) || data?.wizard_status?.events_done],
+                  [t("onboarding.members.title"), completedSteps.includes(1) || data?.wizard_status?.members_done],
+                  [t("onboarding.satvik.title"), completedSteps.includes(2) || data?.wizard_status?.satvik_done],
+                  [t("onboarding.lunar.title"), !!panchangamId],
+                  [t("onboarding.events.title"), completedSteps.includes(4) || data?.wizard_status?.events_done],
                 ].map(([label, done]) => (
                   <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `0.5px solid ${C.border}` }}>
                     <div style={{ width: 20, height: 20, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, flexShrink: 0, background: done ? "#1D9E75" : "#F7F4EE", color: done ? "white" : C.muted, border: done ? "none" : `0.5px solid ${C.border}` }}>

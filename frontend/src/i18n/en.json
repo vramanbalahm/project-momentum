@@ -150,7 +150,10 @@
       "point1": "Add your family members and their food preferences",
       "point2": "Set your Satvik rules and lunar calendar",
       "point3": "Add birthdays and special events",
-      "getStarted": "Get started"
+      "getStarted": "Get started",
+      "whyMatters": "Why this setup matters",
+      "whatSetup": "What we'll set up",
+      "point4": "The more you share, the smarter your planner gets each week"
     },
     "members": {
       "title": "Member profiles",
