@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import ChangePassword from "./ChangePassword";
 
@@ -17,6 +18,7 @@ const COLORS = {
 
 export default function Dashboard({ onNavigate }) {
   const { user, logout } = useAuth();
+  const { t, i18n } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
@@ -144,8 +146,28 @@ export default function Dashboard({ onNavigate }) {
             <div style={{ color: "#5DCAA5", fontSize: 11, marginTop: 2 }}>{user?.house_name}</div>
           </div>
 
-          {/* ── Top right — logout + settings icons ── */}
+          {/* ── Top right — language toggle + settings icons ── */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+
+            {/* Language toggle — EN / தமிழ் */}
+            <div
+              onClick={() => {
+                const next = i18n.language === "en" ? "ta" : "en";
+                i18n.changeLanguage(next);
+                localStorage.setItem("momentum_language", next);
+              }}
+              title={i18n.language === "en" ? "Switch to Tamil" : "Switch to English"}
+              style={{
+                height: 38, padding: "0 10px", borderRadius: 10,
+                background: "rgba(159,225,203,0.12)",
+                border: "0.5px solid rgba(159,225,203,0.25)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 12, fontWeight: 500, cursor: "pointer",
+                color: "#9FE1CB", userSelect: "none", letterSpacing: "0.02em"
+              }}
+            >
+              {i18n.language === "en" ? "EN" : "தமிழ்"}
+            </div>
 
             {/* Settings icon — opens dropdown */}
             <div style={{ position: "relative" }}>
