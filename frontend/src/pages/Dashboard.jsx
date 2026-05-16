@@ -67,48 +67,48 @@ export default function Dashboard({ onNavigate }) {
     {
       id: "weekly_plan",
       icon: "📅",
-      label: "Weekly Plan",
-      desc: "Plan your week's meals",
+      label: t("dashboard.tiles.weeklyPlan"),
+      desc: t("dashboard.tiles.weeklyPlanDesc"),
       color: "#E1F5EE",
       available: true,
     },
     {
       id: "member_availability",
       icon: "🗓️",
-      label: "Availability",
-      desc: "Who's home this week",
+      label: t("dashboard.tiles.availability"),
+      desc: t("dashboard.tiles.availabilityDesc"),
       color: "#FFF3DC",
       available: true,
     },
     {
       id: "family_profile",
       icon: "🏠",
-      label: "Family Profile",
-      desc: isAdmin ? "Update household settings" : "Admin access only",
+      label: t("dashboard.tiles.familyProfile"),
+      desc: isAdmin ? t("dashboard.tiles.familyProfileDesc") : t("dashboard.menu.adminOnly"),
       color: "#E6F1FB",
       available: isAdmin,
     },
     {
       id: "manage_members",
       icon: "👥",
-      label: "Manage Members",
-      desc: isAdmin ? "Add, promote or manage members" : "Admin access only",
+      label: t("dashboard.tiles.members"),
+      desc: isAdmin ? t("dashboard.tiles.membersDesc") : t("dashboard.menu.adminOnly"),
       color: "#EEEDFE",
       available: isAdmin,
     },
     {
       id: "household_settings",
       icon: "⚙️",
-      label: "Household Settings",
-      desc: isAdmin ? "Satvik, lunar & events" : "Admin access only",
+      label: t("dashboard.tiles.householdSettings"),
+      desc: isAdmin ? t("dashboard.tiles.householdSettingsDesc") : t("dashboard.menu.adminOnly"),
       color: "#FAEEDA",
       available: isAdmin,
     },
     {
       id: "recipe_review",
       icon: "📋",
-      label: "Recipe Review",
-      desc: "Review and approve recipes",
+      label: t("dashboard.tiles.recipeReview"),
+      desc: t("dashboard.tiles.recipeReviewDesc"),
       color: "#E1F5EE",
       available: true,
       hidden: !isReviewer,
@@ -116,8 +116,8 @@ export default function Dashboard({ onNavigate }) {
     {
       id: "reviewer_progress",
       icon: "📊",
-      label: "Review Progress",
-      desc: user?.role === "platform_admin" ? "Reviewer stats & progress" : "",
+      label: t("dashboard.tiles.reviewProgress"),
+      desc: user?.role === "platform_admin" ? t("dashboard.tiles.reviewProgressDesc") : "",
       color: "#E6F1FB",
       available: user?.role === "platform_admin",
       hidden: user?.role !== "platform_admin",
@@ -141,7 +141,7 @@ export default function Dashboard({ onNavigate }) {
           <div>
             <div style={{ color: COLORS.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>MOMENTUM</div>
             <div style={{ color: "#FDFCF8", fontSize: 18, fontWeight: 500, marginTop: 2 }}>
-              Good {getGreeting()}, {user?.name?.split(" ")[0] || "there"} 👋
+              {t(`common.greeting_${getGreeting()}`, { name: user?.name?.split(" ")[0] || "" })} 👋
             </div>
             <div style={{ color: "#5DCAA5", fontSize: 11, marginTop: 2 }}>{user?.house_name}</div>
           </div>
@@ -213,7 +213,7 @@ export default function Dashboard({ onNavigate }) {
                     {!isReviewerOnly && (
                       <SettingsItem
                         icon="👤"
-                        label="My Profile"
+                        label={t("dashboard.menu.myProfile")}
                         available={true}
                         onClick={() => { setMenuOpen(false); onNavigate("my_profile"); }}
                       />
@@ -223,7 +223,7 @@ export default function Dashboard({ onNavigate }) {
                     {!isReviewerOnly && (
                       <SettingsItem
                         icon="🗓️"
-                        label="Member Availability"
+                        label={t("dashboard.menu.memberAvailability")}
                         available={true}
                         onClick={() => { setMenuOpen(false); onNavigate("member_availability"); }}
                       />
@@ -233,7 +233,7 @@ export default function Dashboard({ onNavigate }) {
                     {isReviewer && (
                       <SettingsItem
                         icon="📋"
-                        label="Recipe Review"
+                        label={t("dashboard.menu.recipeReview")}
                         available={true}
                         onClick={() => { setMenuOpen(false); onNavigate("recipe_review"); }}
                       />
@@ -243,7 +243,7 @@ export default function Dashboard({ onNavigate }) {
                     {!isReviewerOnly && (
                       <SettingsItem
                         icon="🔑"
-                        label="Change Password"
+                        label={t("dashboard.menu.changePassword")}
                         available={true}
                         onClick={() => { setMenuOpen(false); setShowChangePassword(true); }}
                       />
@@ -253,7 +253,7 @@ export default function Dashboard({ onNavigate }) {
                     {!isReviewerOnly && (
                       <SettingsItem
                         icon="🏠"
-                        label="Family Profile"
+                        label={t("dashboard.menu.familyProfile")}
                         available={isAdmin}
                         onClick={() => { setMenuOpen(false); onNavigate("family_profile"); }}
                       />
@@ -263,7 +263,7 @@ export default function Dashboard({ onNavigate }) {
                     {!isReviewerOnly && (
                       <SettingsItem
                         icon="👥"
-                        label="Manage Members"
+                        label={t("dashboard.menu.manageMembers")}
                         available={isAdmin}
                         onClick={() => { setMenuOpen(false); onNavigate("manage_members"); }}
                       />
@@ -273,7 +273,7 @@ export default function Dashboard({ onNavigate }) {
                     {!isReviewerOnly && (
                       <SettingsItem
                         icon="⚙️"
-                        label="Household Settings"
+                        label={t("dashboard.menu.householdSettings")}
                         available={isAdmin}
                         testId="dropdown-household-settings"
                         onClick={() => { setMenuOpen(false); onNavigate("household_settings"); }}
@@ -318,7 +318,7 @@ export default function Dashboard({ onNavigate }) {
       {/* ── Tiles grid ── */}
       <div style={{ padding: "24px 20px" }}>
         <div style={{ fontSize: 11, color: COLORS.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>
-          What would you like to do?
+          {t("dashboard.greeting")}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -356,7 +356,7 @@ export default function Dashboard({ onNavigate }) {
                 {tile.desc}
               </div>
               {!tile.available && tile.id !== "coming_soon_1" && (
-                <div style={{ marginTop: 8, fontSize: 10, color: "#C4A882", fontWeight: 500 }}>🔒 Admin only</div>
+                <div style={{ marginTop: 8, fontSize: 10, color: "#C4A882", fontWeight: 500 }}>🔒 {t("dashboard.menu.adminOnly")}</div>
               )}
               {tile.id === "coming_soon_1" && (
                 <div style={{ marginTop: 8, fontSize: 10, color: COLORS.muted, fontWeight: 500 }}>⏳ Coming soon</div>
@@ -391,7 +391,7 @@ function SettingsItem({ icon, label, available, onClick, testId }) {
     >
       <span style={{ fontSize: 16 }}>{icon}</span>
       <span style={{ flex: 1 }}>{label}</span>
-      {!available && <span style={{ fontSize: 10, color: "#C4A882", fontWeight: 500 }}>🔒 Admin</span>}
+      {!available && <span style={{ fontSize: 10, color: "#C4A882", fontWeight: 500 }}>🔒 {t("dashboard.menu.adminOnly")}</span>}
     </div>
   );
 }

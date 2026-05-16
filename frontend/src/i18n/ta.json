@@ -29,7 +29,10 @@
     "previous": "முந்தைய",
     "today": "இன்று",
     "week": "வாரம்",
-    "tapToFilter": "தட்டு →"
+    "tapToFilter": "தட்டு →",
+    "greeting_morning": "காலை வணக்கம், {{name}}",
+    "greeting_afternoon": "மதிய வணக்கம், {{name}}",
+    "greeting_evening": "மாலை வணக்கம், {{name}}"
   },
   "language": {
     "select": "மொழி",
