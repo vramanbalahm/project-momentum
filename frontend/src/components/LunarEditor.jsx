@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useTranslation } from "react-i18next";
 import { C, HelpTip, NavButtons } from "./householdShared.jsx";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
@@ -14,8 +15,9 @@ const PANCHANG_ICONS = ["🌙","🌑","⭐","🌿","🌊","🎋","☀️","🌸"
 //   onDone    — called after successful save
 //   nextLabel — label for the primary action button (default: "Save & continue")
 
-export default function LunarEditor({ onBack, onSkip, onDone, nextLabel = "Save & continue" }) {
+export default function LunarEditor({ onBack, onSkip, onDone, nextLabel }) {
   const { apiFetch } = useAuth();
+  const { t } = useTranslation();
   const [panchangamTypes, setPanchangamTypes] = useState([]);
   const [panchangamId, setPanchangamId]       = useState(null);
   const [loading, setLoading]                 = useState(true);
@@ -31,7 +33,7 @@ export default function LunarEditor({ onBack, onSkip, onDone, nextLabel = "Save 
         setPanchangamTypes(d.panchangam_types || []);
         if (d.panchangam_selected) setPanchangamId(d.panchangam_selected.id);
       } catch {
-        setError("Failed to load lunar calendar settings.");
+        setError(t("common.error"));
       } finally {
         setLoading(false);
       }
@@ -50,7 +52,7 @@ export default function LunarEditor({ onBack, onSkip, onDone, nextLabel = "Save 
       setTimeout(() => setSuccess(false), 4000);
       if (onDone) onDone();
     } catch (e) {
-      setError(e.message || "Failed to save. Please try again.");
+      setError(e.message || t("common.error"));
     } finally {
       setSaving(false);
     }
@@ -59,7 +61,7 @@ export default function LunarEditor({ onBack, onSkip, onDone, nextLabel = "Save 
   if (loading) {
     return (
       <div style={{ padding: "32px 0", textAlign: "center", color: C.muted, fontSize: 13 }}>
-        Loading lunar calendar settings...
+        {t("common.loading")}
       </div>
     );
   }
@@ -67,7 +69,7 @@ export default function LunarEditor({ onBack, onSkip, onDone, nextLabel = "Save 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: 480 }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
-        <div style={{ fontSize: 17, fontWeight: 500, color: C.text }}>Lunar calendar</div>
+        <div style={{ fontSize: 17, fontWeight: 500, color: C.text }}>{t("lunarEditor.title")}</div>
         <HelpTip
           text="Select which Panchangam your household follows. We'll use this to suggest Satvik meals on the correct days automatically."
           visible={help.lunar}
@@ -75,7 +77,7 @@ export default function LunarEditor({ onBack, onSkip, onDone, nextLabel = "Save 
         />
       </div>
       <div style={{ fontSize: 12, color: C.muted, marginBottom: 14 }}>
-        Which Panchangam does your household follow?
+        {t("lunarEditor.subtitle")}
       </div>
 
       {error && (
@@ -86,7 +88,7 @@ export default function LunarEditor({ onBack, onSkip, onDone, nextLabel = "Save 
 
       {success && (
         <div style={{ background: C.satvik.bg, border: `0.5px solid ${C.teal}`, borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontSize: 12, color: C.satvik.text }}>
-          Lunar calendar saved ✓
+          {t("lunarEditor.saved")}
         </div>
       )}
 
@@ -116,8 +118,8 @@ export default function LunarEditor({ onBack, onSkip, onDone, nextLabel = "Save 
         >
           <div style={{ fontSize: 22, width: 32, textAlign: "center" }}>🚫</div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: panchangamId === null ? C.deepTeal : C.text }}>We don't follow a Panchangam</div>
-            <div style={{ fontSize: 11, color: C.muted }}>Skip lunar calendar — plan freely</div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: panchangamId === null ? C.deepTeal : C.text }}>{t("lunarEditor.noFollow")}</div>
+            <div style={{ fontSize: 11, color: C.muted }}>{t("lunarEditor.noFollowDesc")}</div>
           </div>
           {panchangamId === null && (
             <div style={{ width: 18, height: 18, borderRadius: "50%", background: C.teal, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "white" }}>✓</div>
