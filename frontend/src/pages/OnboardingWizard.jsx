@@ -188,7 +188,7 @@ export default function OnboardingWizard({ onComplete }) {
                   ["🎯", t("onboarding.welcome.point1")],
                   ["🌙", t("onboarding.welcome.point2")],
                   ["🎂", t("onboarding.welcome.point3")],
-                  ["✨", t("onboarding.welcome.point3")],
+                  ["✨", t("onboarding.welcome.point4")],
                 ].map(([icon, text]) => (
                   <div key={text} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                     <span style={{ fontSize: 14, flexShrink: 0 }}>{icon}</span>

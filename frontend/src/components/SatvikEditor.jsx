@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import IngredientSelector, { satvikToValue, valueToSatvik } from "./IngredientSelector";
 import { C, HelpTip, NavButtons } from "./householdShared.jsx";
+import { useTranslation } from "react-i18next";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
@@ -13,8 +14,9 @@ const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 //   onDone   — called after successful save (replaces onNext in standalone mode)
 //   nextLabel — label for the primary action button (default: "Save & continue")
 
-export default function SatvikEditor({ onBack, onSkip, onDone, nextLabel = "Save & continue" }) {
+export default function SatvikEditor({ onBack, onSkip, onDone, nextLabel }) {
   const { apiFetch } = useAuth();
+  const { t } = useTranslation();
   const [satvikValue, setSatvikValue] = useState({});
   const [loading, setLoading]         = useState(true);
   const [saving, setSaving]           = useState(false);
