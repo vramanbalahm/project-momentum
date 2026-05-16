@@ -135,16 +135,16 @@ export default function EventEditor({ onBack, onSkip, onDone, nextLabel }) {
         {/* Add event form */}
         {addingEvent && (
           <div style={{ ...cardStyle, marginTop: 8 }}>
-            <Field label=t("eventEditor.eventName")>
+            <Field label={t("eventEditor.eventName")}>
               <input value={newEvent.event_name} onChange={e => setNewEvent(n => ({ ...n, event_name: e.target.value }))} placeholder="e.g. Bala's Birthday" style={inputStyle} />
             </Field>
-            <Field label=t("eventEditor.eventDate") hint=t("eventEditor.eventDateHint")>
+            <Field label={t("eventEditor.eventDate")} hint={t("eventEditor.eventDateHint")}>
               <input value={newEvent.event_date} onChange={e => setNewEvent(n => ({ ...n, event_date: e.target.value }))} placeholder="e.g. 15-03" style={inputStyle} />
             </Field>
             <Field label="Type">
               <div style={{ display: "flex", gap: 6 }}>
-                {["Personal", "Social", "Ritual"].map(t => (
-                  <Chip key={t} label={t} active={newEvent.event_type === t} onClick={() => setNewEvent(n => ({ ...n, event_type: t }))} />
+                {["Personal", "Social", "Ritual"].map(evtType => (
+                  <Chip key={evtType} label={evtType} active={newEvent.event_type === evtType} onClick={() => setNewEvent(n => ({ ...n, event_type: evtType }))} />
                 ))}
               </div>
             </Field>
