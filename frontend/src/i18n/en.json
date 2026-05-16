@@ -1,0 +1,374 @@
+{
+  "app": {
+    "name": "Momentum",
+    "tagline": "Your weekly meal planner"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "continue": "Continue",
+    "skip": "Skip",
+    "edit": "Edit",
+    "delete": "Delete",
+    "add": "Add",
+    "close": "Close",
+    "loading": "Loading...",
+    "saving": "Saving...",
+    "error": "Something went wrong. Please try again.",
+    "success": "Saved successfully.",
+    "required": "Required",
+    "optional": "Optional",
+    "yes": "Yes",
+    "no": "No",
+    "confirm": "Confirm",
+    "search": "Search",
+    "select": "Select",
+    "done": "Done",
+    "next": "Next",
+    "previous": "Previous",
+    "today": "Today",
+    "week": "Week",
+    "tapToFilter": "tap →"
+  },
+  "language": {
+    "select": "Language",
+    "english": "English",
+    "tamil": "தமிழ்",
+    "toggle": "EN"
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "email": "Email",
+      "emailPlaceholder": "you@example.com",
+      "password": "Password",
+      "passwordPlaceholder": "••••••••",
+      "signIn": "Sign in",
+      "signingIn": "Signing in...",
+      "newHousehold": "New household?",
+      "createAccount": "Create account",
+      "errorEmpty": "Please enter email and password."
+    },
+    "register": {
+      "title": "New household signup",
+      "tagline": "Create your household",
+      "yourName": "Your name *",
+      "namePlaceholder": "Bala",
+      "email": "Email *",
+      "password": "Password *",
+      "passwordPlaceholder": "Min 8 characters",
+      "confirmPassword": "Confirm password *",
+      "confirmPasswordPlaceholder": "Repeat password",
+      "householdDetails": "Household details",
+      "householdName": "Household name *",
+      "householdNamePlaceholder": "e.g. Bala Family",
+      "dietaryPreference": "Dietary preference",
+      "householdAllergies": "Household allergies",
+      "householdAllergiesHint": "Ingredients the household avoids — affects meal suggestions",
+      "householdAllergiesPlaceholder": "e.g. Peanuts, Shellfish, Gluten",
+      "cuisineRegion": "Home cuisine region",
+      "state": "State",
+      "stateHint": "Helps us personalise recipes to your family's culinary roots — e.g. Chettinad, Udupi, Malabar",
+      "selectState": "— Select state —",
+      "region": "Region",
+      "selectRegion": "— Select region —",
+      "subRegion": "Sub-region / Cuisine style",
+      "selectSubRegion": "— Select sub-region —",
+      "currentLocation": "Current location",
+      "locationStateHint": "Used to fetch local mandi prices for your area",
+      "cityTown": "City / Town",
+      "selectCity": "— Select city —",
+      "sendCode": "Continue",
+      "sendingCode": "Sending code...",
+      "alreadyHaveAccount": "Already have an account?",
+      "signIn": "Sign in",
+      "errorFillFields": "Please fill in all required fields.",
+      "errorPasswordMatch": "Passwords do not match.",
+      "errorPasswordRequirements": "Password must have:",
+      "passwordMin8": "at least 8 characters",
+      "passwordUppercase": "1 uppercase letter",
+      "passwordNumber": "1 number",
+      "passwordSpecial": "1 special character (@$!%*?&)",
+      "passwordNoSpaces": "no spaces"
+    },
+    "otp": {
+      "title": "Verify your email",
+      "subtitle": "We sent a code to",
+      "enterCode": "Enter the 6-digit code",
+      "verify": "Verify",
+      "verifying": "Verifying...",
+      "resend": "Resend code",
+      "back": "Back"
+    }
+  },
+  "dashboard": {
+    "greeting": "What would you like to do",
+    "tiles": {
+      "weeklyPlan": "Weekly Plan",
+      "weeklyPlanDesc": "Plan your week",
+      "availability": "Availability",
+      "availabilityDesc": "Who's home",
+      "familyProfile": "Family Profile",
+      "familyProfileDesc": "Household info",
+      "members": "Manage Members",
+      "membersDesc": "Add or edit members",
+      "householdSettings": "Household Settings",
+      "householdSettingsDesc": "Satvik, lunar & events",
+      "reviewProgress": "Review Progress",
+      "reviewProgressDesc": "Reviewer stats & progress",
+      "recipeReview": "Recipe Review",
+      "recipeReviewDesc": "Review and approve recipes"
+    },
+    "menu": {
+      "myProfile": "My Profile",
+      "familyProfile": "Family Profile",
+      "memberAvailability": "Member Availability",
+      "manageMembers": "Manage Members",
+      "recipeReview": "Recipe Review",
+      "householdSettings": "Household Settings",
+      "changePassword": "Change Password",
+      "signOut": "Sign out",
+      "adminOnly": "Admin access only"
+    }
+  },
+  "onboarding": {
+    "steps": {
+      "welcome": "Welcome",
+      "members": "Members",
+      "satvik": "Satvik",
+      "calendar": "Calendar",
+      "events": "Events",
+      "done": "Done"
+    },
+    "welcome": {
+      "title": "Welcome to Momentum",
+      "subtitle": "Let's set up your household in a few simple steps.",
+      "point1": "Add your family members and their food preferences",
+      "point2": "Set your Satvik rules and lunar calendar",
+      "point3": "Add birthdays and special events",
+      "getStarted": "Get started"
+    },
+    "members": {
+      "title": "Member profiles",
+      "subtitle": "Set individual preferences for each member.",
+      "addMember": "+ Add member",
+      "copyFrom": "Copy preference from:",
+      "diet": "Diet",
+      "ageGroup": "Age group",
+      "gender": "Gender",
+      "phone": "Phone",
+      "phonePlaceholder": "Mobile number (optional)",
+      "allergies": "Allergies",
+      "dislikes": "Dislikes",
+      "saveMember": "Save member",
+      "saveAndContinue": "Save & continue"
+    },
+    "satvik": {
+      "title": "Satvik definition",
+      "subtitle": "Toggle ingredients your household AVOIDS on Satvik days.",
+      "helpText": "Select ingredients your household AVOIDS on Satvik days. e.g. most Tamil Brahmin households avoid onion and garlic. These rules apply on all Satvik-tagged days."
+    },
+    "lunar": {
+      "title": "Lunar calendar",
+      "subtitle": "Which Panchangam does your household follow?",
+      "noFollow": "We don't follow a Panchangam",
+      "noFollowDesc": "Skip lunar calendar — plan freely",
+      "helpText": "Select which Panchangam your household follows. We'll use this to suggest Satvik meals on the correct days automatically."
+    },
+    "events": {
+      "title": "Events & special days",
+      "subtitle": "We'll suggest the right meals automatically on these days.",
+      "addEvent": "+ Add an event",
+      "eventName": "Event name",
+      "eventNamePlaceholder": "e.g. Bala's Birthday",
+      "eventDate": "Date (DD-MM)",
+      "eventDateHint": "Day and month only — e.g. 15-03 for 15th March",
+      "eventDatePlaceholder": "e.g. 15-03",
+      "eventType": "Type",
+      "eventIcon": "Icon",
+      "satvikDay": "Satvik day",
+      "repeatsAnnually": "Repeats annually",
+      "addEventBtn": "Add event",
+      "noEvents": "No events added yet",
+      "helpText": "Add birthdays, anniversaries or any special day. Feast = we suggest celebratory dishes. Satvik = Satvik rules apply. Our system learns from these every year.",
+      "feast": "Feast",
+      "satvik": "Satvik"
+    },
+    "done": {
+      "title": "You're all set!",
+      "subtitle": "Your household is ready. Let's start planning your meals.",
+      "goToDashboard": "Go to dashboard"
+    }
+  },
+  "weeklyPlan": {
+    "title": "Weekly Plan",
+    "breakfast": "Breakfast",
+    "lunch": "Lunch",
+    "dinner": "Dinner",
+    "addMeal": "+ Add",
+    "noMeal": "No meal planned",
+    "copyToCurrentWeek": "Copy to current week",
+    "copyConfirm": "Copy this week's plan to current week?",
+    "readOnly": "Past week — read only",
+    "emptyWeek": "No meals planned for this week",
+    "generatePlan": "Generate plan",
+    "today": "Today",
+    "swapMeal": "Swap meal",
+    "removeMeal": "Remove"
+  },
+  "myProfile": {
+    "title": "My Profile",
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "diet": "Dietary preference",
+    "ageGroup": "Age group",
+    "gender": "Gender",
+    "changePassword": "Change password",
+    "save": "Save changes",
+    "saved": "Profile saved ✓"
+  },
+  "familyProfile": {
+    "title": "Family Profile",
+    "householdName": "Household name",
+    "region": "Cuisine region",
+    "city": "Current city",
+    "diet": "Household diet",
+    "language": "Preferred language",
+    "languageHint": "This sets the language used throughout the app",
+    "save": "Save changes",
+    "saved": "Profile saved ✓"
+  },
+  "manageMembers": {
+    "title": "Manage Members",
+    "addMember": "+ Add member",
+    "editMember": "Edit member",
+    "name": "Name",
+    "email": "Email",
+    "emailOptional": "Email (optional)",
+    "phone": "Phone",
+    "diet": "Diet",
+    "ageGroup": "Age group",
+    "gender": "Gender",
+    "allergies": "Allergies",
+    "dislikes": "Dislikes",
+    "save": "Save",
+    "delete": "Delete member",
+    "confirmDelete": "Remove this member from your household?",
+    "adminBadge": "Admin",
+    "youBadge": "You"
+  },
+  "memberAvailability": {
+    "title": "Member Availability",
+    "subtitle": "Who's home this week?",
+    "save": "Save availability",
+    "saved": "Availability saved ✓",
+    "allHome": "All home",
+    "noneHome": "None home"
+  },
+  "householdSettings": {
+    "title": "Household Settings",
+    "subtitle": "Configure your household preferences",
+    "settings": "Settings",
+    "satvik": {
+      "label": "Satvik definition",
+      "desc": "Ingredients avoided on Satvik days"
+    },
+    "lunar": {
+      "label": "Lunar calendar",
+      "desc": "Panchangam your household follows"
+    },
+    "events": {
+      "label": "Events & special days",
+      "desc": "Birthdays, anniversaries, rituals"
+    },
+    "backToSettings": "← Back to settings",
+    "backToDashboard": "← Dashboard"
+  },
+  "satvikEditor": {
+    "title": "Satvik definition",
+    "subtitle": "Toggle ingredients your household AVOIDS on Satvik days.",
+    "saved": "Satvik settings saved ✓",
+    "save": "Save"
+  },
+  "lunarEditor": {
+    "title": "Lunar calendar",
+    "subtitle": "Which Panchangam does your household follow?",
+    "saved": "Lunar calendar saved ✓",
+    "save": "Save",
+    "noFollow": "We don't follow a Panchangam",
+    "noFollowDesc": "Skip lunar calendar — plan freely"
+  },
+  "eventEditor": {
+    "title": "Events & special days",
+    "subtitle": "We'll suggest the right meals automatically on these days.",
+    "saved": "Events saved ✓",
+    "save": "Save",
+    "addEvent": "+ Add an event",
+    "noEvents": "No events added yet",
+    "eventName": "Event name",
+    "eventNamePlaceholder": "e.g. Bala's Birthday",
+    "eventDate": "Date (DD-MM)",
+    "eventDateHint": "Day and month only — e.g. 15-03 for 15th March",
+    "eventDatePlaceholder": "e.g. 15-03",
+    "eventType": "Type",
+    "eventIcon": "Icon",
+    "satvikDay": "Satvik day",
+    "repeatsAnnually": "Repeats annually",
+    "addEventBtn": "Add event",
+    "cancel": "Cancel"
+  },
+  "changePassword": {
+    "title": "Change Password",
+    "current": "Current password",
+    "new": "New password",
+    "confirm": "Confirm new password",
+    "save": "Update password",
+    "saved": "Password updated ✓",
+    "errorMatch": "Passwords do not match."
+  },
+  "diet": {
+    "veg": "Veg",
+    "nonVeg": "Non-Veg",
+    "vegan": "Vegan",
+    "eggitarian": "Eggitarian"
+  },
+  "ageGroup": {
+    "child": "Child",
+    "childSub": "0–12 yrs",
+    "teen": "Teen",
+    "teenSub": "13–17 yrs",
+    "adult": "Adult",
+    "adultSub": "18–59 yrs",
+    "senior": "Senior",
+    "seniorSub": "60+ yrs"
+  },
+  "gender": {
+    "male": "Male",
+    "female": "Female",
+    "transgender": "Transgender",
+    "preferNotToSay": "Prefer not to say"
+  },
+  "eventType": {
+    "personal": "Personal",
+    "social": "Social",
+    "ritual": "Ritual"
+  },
+  "reviewProgress": {
+    "title": "Review Progress",
+    "subtitle": "Platform admin view",
+    "vaultOverview": "Vault overview",
+    "recipes": "recipes",
+    "progress": "Progress",
+    "pending": "Pending",
+    "saved": "Saved",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "reviewerBreakdown": "Reviewer breakdown",
+    "notStarted": "Not started",
+    "done": "done",
+    "openRecipeReview": "Open Recipe Review →",
+    "backToDashboard": "← Dashboard"
+  }
+}
