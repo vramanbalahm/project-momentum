@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useTranslation } from "react-i18next";
 
 export default function Login({ onSwitchToRegister }) {
   const { login } = useAuth();
-  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
@@ -12,7 +10,7 @@ export default function Login({ onSwitchToRegister }) {
 
   const handleLogin = async () => {
     setError(null);
-    if (!email || !password) { setError(t("auth.login.errorEmpty")); return; }
+    if (!email || !password) { setError("Please enter email and password."); return; }
     setLoading(true);
     try {
       await login(email, password);
@@ -30,13 +28,13 @@ export default function Login({ onSwitchToRegister }) {
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>🌿</div>
-          <div style={{ color: "#FDFCF8", fontSize: 24, fontWeight: 500 }}>{t("app.name")}</div>
-          <div style={{ color: "#5DCAA5", fontSize: 13, marginTop: 4 }}>{t("app.tagline")}</div>
+          <div style={{ color: "#FDFCF8", fontSize: 24, fontWeight: 500 }}>Momentum</div>
+          <div style={{ color: "#5DCAA5", fontSize: 13, marginTop: 4 }}>Your weekly meal planner</div>
         </div>
 
         {/* Card */}
         <div style={{ background: "#FFF9F2", borderRadius: 20, padding: "28px 24px" }}>
-          <div style={{ fontSize: 18, fontWeight: 500, color: "#2C2C2A", marginBottom: 20 }}>{t("auth.login.title")}</div>
+          <div style={{ fontSize: 18, fontWeight: 500, color: "#2C2C2A", marginBottom: 20 }}>Sign in</div>
 
           {error && (
             <div style={{ background: "#FAECE7", border: "0.5px solid #F5C4B3", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#712B13" }}>
@@ -45,23 +43,23 @@ export default function Login({ onSwitchToRegister }) {
           )}
 
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, color: "#888780", fontWeight: 500, marginBottom: 5 }}>{t("auth.login.email")}</div>
+            <div style={{ fontSize: 11, color: "#888780", fontWeight: 500, marginBottom: 5 }}>Email</div>
             <input
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder={t("auth.login.emailPlaceholder")}
+              placeholder="you@example.com"
               style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "0.5px solid #EDE8E0", fontSize: 14, color: "#2C2C2A", background: "#F1EFE8", outline: "none", boxSizing: "border-box" }}
             />
           </div>
 
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, color: "#888780", fontWeight: 500, marginBottom: 5 }}>{t("auth.login.password")}</div>
+            <div style={{ fontSize: 11, color: "#888780", fontWeight: 500, marginBottom: 5 }}>Password</div>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder={t("auth.login.passwordPlaceholder")}
+              placeholder="••••••••"
               onKeyDown={e => e.key === "Enter" && handleLogin()}
               style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "0.5px solid #EDE8E0", fontSize: 14, color: "#2C2C2A", background: "#F1EFE8", outline: "none", boxSizing: "border-box" }}
             />
@@ -72,13 +70,13 @@ export default function Login({ onSwitchToRegister }) {
             disabled={loading}
             style={{ width: "100%", background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 12, padding: "13px", fontSize: 14, fontWeight: 500, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1 }}
           >
-            {loading ? t("auth.login.signingIn") : t("auth.login.signIn")}
+            {loading ? "Signing in..." : "Sign in"}
           </button>
 
           <div style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: "#888780" }}>
-            {t("auth.login.newHousehold")}{" "}
+            New household?{" "}
             <span onClick={onSwitchToRegister} style={{ color: "#0F6E56", fontWeight: 500, cursor: "pointer" }}>
-              {t("auth.login.createAccount")}
+              Create account
             </span>
           </div>
         </div>
