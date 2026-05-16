@@ -376,5 +376,13 @@
     "done": "முடிந்தது",
     "openRecipeReview": "சமையல் மதிப்பாய்வு திற →",
     "backToDashboard": "← முகப்பு"
+  },
+  "ingredientSelector": {
+    "searchSatvik": "தவிர்க்க வேண்டிய பொருட்களை தேடு...",
+    "searchRestriction": "தேடு — எ.கா. வேர்க்கடலை, வெங்காயம்...",
+    "markedToAvoid": "தவிர்க்க குறிக்கப்பட்டவை:",
+    "currentlySelected": "தேர்ந்தெடுக்கப்பட்டவை:",
+    "enableAll": "அனைத்தும் சேர்",
+    "disableAll": "அனைத்தும் நீக்கு"
   }
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useTranslation } from "react-i18next";
 
 const C = {
   green: "#1A3A2E", mint: "#9FE1CB", teal: "#5DCAA5", deepTeal: "#0F6E56",
@@ -50,6 +51,7 @@ export default function IngredientSelector({
   showImages = true,
   maxHeight = "360px",
 }) {
+  const { t } = useTranslation();
   const { apiFetch } = useAuth();
   const [grouped, setGrouped]   = useState({});
   const [search, setSearch]     = useState("");
@@ -150,7 +152,7 @@ export default function IngredientSelector({
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder={mode === "satvik" ? "Search ingredients to avoid..." : "Search — e.g. peanuts, onion, wheat..."}
+          placeholder={mode === "satvik" ? t("ingredientSelector.searchSatvik") : t("ingredientSelector.searchRestriction")}
           style={{ border: "none", background: "transparent", fontSize: 13, color: C.text, outline: "none", flex: 1, width: "100%" }}
         />
         {search && (
@@ -162,7 +164,7 @@ export default function IngredientSelector({
       {Object.keys(value).length > 0 && (
         <div style={{ marginBottom: 10 }}>
           <div style={{ fontSize: 11, color: "#888780", marginBottom: 6, fontWeight: 500 }}>
-            {mode === "restriction" ? "Currently selected:" : "Marked to avoid:"}
+            {mode === "restriction" ? t("ingredientSelector.currentlySelected") : t("ingredientSelector.markedToAvoid")}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
             {Object.entries(value).map(([id, flags]) => {
@@ -217,9 +219,9 @@ export default function IngredientSelector({
                 {mode === "satvik" && (
                   <>
                     <span onClick={() => enableAllSatvik(cat)}
-                      style={{ fontSize: 11, color: C.deepTeal, cursor: "pointer" }}>Enable all</span>
+                      style={{ fontSize: 11, color: C.deepTeal, cursor: "pointer" }}>{t("ingredientSelector.enableAll")}</span>
                     <span onClick={() => disableAllSatvik(cat)}
-                      style={{ fontSize: 11, color: "#E24B4A", cursor: "pointer" }}>Disable all</span>
+                      style={{ fontSize: 11, color: "#E24B4A", cursor: "pointer" }}>{t("ingredientSelector.disableAll")}</span>
                   </>
                 )}
               </div>

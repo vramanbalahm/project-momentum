@@ -376,5 +376,13 @@
     "done": "done",
     "openRecipeReview": "Open Recipe Review →",
     "backToDashboard": "← Dashboard"
+  },
+  "ingredientSelector": {
+    "searchSatvik": "Search ingredients to avoid...",
+    "searchRestriction": "Search — e.g. peanuts, onion, wheat...",
+    "markedToAvoid": "Marked to avoid:",
+    "currentlySelected": "Currently selected:",
+    "enableAll": "Enable all",
+    "disableAll": "Disable all"
   }
 }
