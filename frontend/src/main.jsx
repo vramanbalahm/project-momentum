@@ -1,5 +1,6 @@
 import './index.css'
 import './i18n/i18n.js'
+import i18n from './i18n/i18n.js'
 import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AuthProvider } from './context/AuthContext'
@@ -43,6 +44,14 @@ function AuthGate() {
 
   // Authenticated — always reset authScreen to login so logout never lands on register
   if (authScreen !== 'login') setAuthScreen('login');
+
+  // Set language from household preference on login
+  if (user?.preferred_language && user.preferred_language !== i18n.language) {
+    const saved = localStorage.getItem('momentum_language');
+    if (!saved) {
+      i18n.changeLanguage(user.preferred_language);
+    }
+  }
 
   // Authenticated — show onboarding wizard if not yet completed
   if (!user?.onboarding_done) return <OnboardingWizard onComplete={() => window.location.reload()} />;

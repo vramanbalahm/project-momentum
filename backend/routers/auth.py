@@ -258,7 +258,7 @@ async def me(current_user: dict = Depends(get_current_user),
     house = db.execute(text("""
         SELECT house_name, dietary_preference, primary_region,
                current_city, subscription_tier, onboarding_done,
-               household_allergies, cuisine_sub_region_id
+               household_allergies, cuisine_sub_region_id, preferred_language
         FROM household_master
         WHERE household_id = CAST(:hid AS uuid)
     """), {"hid": current_user["house_id"]}).fetchone()
@@ -296,6 +296,7 @@ async def me(current_user: dict = Depends(get_current_user),
         "onboarding_done":       house.onboarding_done if house else False,
         "household_allergies":   house.household_allergies if house else None,
         "cuisine_sub_region_id": house.cuisine_sub_region_id if house else None,
+        "preferred_language":    house.preferred_language if house else "en",
         "cuisine_state":         cuisine_state,
         "cuisine_region":        cuisine_region,
         "city_state":            city_state,
