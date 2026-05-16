@@ -166,7 +166,7 @@ export default function Dashboard({ onNavigate }) {
                 color: "#9FE1CB", userSelect: "none", letterSpacing: "0.02em"
               }}
             >
-              {i18n.language === "en" ? "EN" : "தமிழ்"}
+              {i18n.language === "en" ? "தமிழ்" : "EN"}
             </div>
 
             {/* Settings icon — opens dropdown */}
