@@ -6,14 +6,17 @@ import LunarEditor from "../components/LunarEditor.jsx";
 import EventEditor from "../components/EventEditor.jsx";
 
 import { C, DIET_PREFS, AGE_GROUPS, GENDERS, DIET_IMAGES, EVENT_ICONS, Field, HelpTip, Toggle, Chip, Avatar, NavButtons } from "../components/householdShared.jsx";
+import { useTranslation } from "react-i18next";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
-const STEP_LABELS = ["Welcome", "Members", "Satvik", "Calendar", "Events", "Done"];
+const STEP_LABEL_KEYS = ["welcome", "members", "satvik", "calendar", "events", "done"];
 
 // ── Main Wizard ───────────────────────────────────────────────────────────────
 export default function OnboardingWizard({ onComplete }) {
   const { apiFetch, user } = useAuth();
+  const { t } = useTranslation();
+  const STEP_LABELS = STEP_LABEL_KEYS.map(k => t(`onboarding.steps.${k}`));
   const [step, setStep]         = useState(0);
   const [data, setData]         = useState(null);
   const [loading, setLoading]   = useState(true);
