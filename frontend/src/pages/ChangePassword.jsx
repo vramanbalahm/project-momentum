@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useTranslation } from "react-i18next";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
@@ -11,6 +12,7 @@ const inputStyle = {
 
 export default function ChangePassword({ onClose }) {
   const { apiFetch } = useAuth();
+  const { t } = useTranslation();
   const [form, setForm] = useState({ current_password: "", new_password: "", confirm_password: "" });
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
@@ -21,13 +23,13 @@ export default function ChangePassword({ onClose }) {
   const handleSubmit = async () => {
     setError(null);
     if (!form.current_password || !form.new_password || !form.confirm_password) {
-      setError("Please fill in all fields."); return;
+      setError(t("changePassword.errorFillAll")); return;
     }
     if (form.new_password !== form.confirm_password) {
-      setError("New passwords do not match."); return;
+      setError(t("changePassword.errorMatch")); return;
     }
     if (form.new_password.length < 8) {
-      setError("New password must be at least 8 characters."); return;
+      setError(t("changePassword.errorMin8")); return;
     }
     setLoading(true);
     try {
@@ -53,16 +55,16 @@ export default function ChangePassword({ onClose }) {
         borderRadius: "24px 24px 0 0", padding: "28px 24px 40px"
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <div style={{ fontSize: 17, fontWeight: 600, color: "#2C2C2A" }}>Change Password</div>
+          <div style={{ fontSize: 17, fontWeight: 600, color: "#2C2C2A" }}>{t("changePassword.title")}</div>
           <span onClick={onClose} style={{ fontSize: 20, cursor: "pointer", color: "#888780" }}>✕</span>
         </div>
 
         {success ? (
           <div style={{ textAlign: "center", padding: "20px 0" }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>✅</div>
-            <div style={{ fontSize: 15, fontWeight: 500, color: "#2C2C2A" }}>Password changed!</div>
-            <div style={{ fontSize: 13, color: "#888780", marginTop: 6 }}>Your password has been updated successfully.</div>
-            <button onClick={onClose} style={{ marginTop: 20, background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 12, padding: "12px 32px", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>Done</button>
+            <div style={{ fontSize: 15, fontWeight: 500, color: "#2C2C2A" }}>{t("changePassword.successTitle")}</div>
+            <div style={{ fontSize: 13, color: "#888780", marginTop: 6 }}>{t("changePassword.successDesc")}</div>
+            <button onClick={onClose} style={{ marginTop: 20, background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 12, padding: "12px 32px", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>{t("changePassword.done")}</button>
           </div>
         ) : (
           <>
@@ -72,19 +74,19 @@ export default function ChangePassword({ onClose }) {
               </div>
             )}
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, color: "#888780", fontWeight: 500, marginBottom: 5 }}>Current password</div>
+              <div style={{ fontSize: 11, color: "#888780", fontWeight: 500, marginBottom: 5 }}>{t("changePassword.current")}</div>
               <input type="password" value={form.current_password} onChange={e => set("current_password", e.target.value)} placeholder="••••••••" style={inputStyle} />
             </div>
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, color: "#888780", fontWeight: 500, marginBottom: 5 }}>New password</div>
-              <input type="password" value={form.new_password} onChange={e => set("new_password", e.target.value)} placeholder="Min 8 characters" style={inputStyle} />
+              <div style={{ fontSize: 11, color: "#888780", fontWeight: 500, marginBottom: 5 }}>{t("changePassword.new")}</div>
+              <input type="password" value={form.new_password} onChange={e => set("new_password", e.target.value)} placeholder={t("changePassword.newPlaceholder")} style={inputStyle} />
             </div>
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 11, color: "#888780", fontWeight: 500, marginBottom: 5 }}>Confirm new password</div>
-              <input type="password" value={form.confirm_password} onChange={e => set("confirm_password", e.target.value)} placeholder="Repeat new password" style={inputStyle} onKeyDown={e => e.key === "Enter" && handleSubmit()} />
+              <div style={{ fontSize: 11, color: "#888780", fontWeight: 500, marginBottom: 5 }}>{t("changePassword.confirm")}</div>
+              <input type="password" value={form.confirm_password} onChange={e => set("confirm_password", e.target.value)} placeholder={t("changePassword.confirmPlaceholder")} style={inputStyle} onKeyDown={e => e.key === "Enter" && handleSubmit()} />
             </div>
             <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 12, padding: "13px", fontSize: 14, fontWeight: 500, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1 }}>
-              {loading ? "Updating..." : "Update password"}
+              {loading ? t("changePassword.updating") : t("changePassword.update")}
             </button>
           </>
         )}

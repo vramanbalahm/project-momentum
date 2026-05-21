@@ -451,10 +451,17 @@
     "title": "Change Password",
     "current": "Current password",
     "new": "New password",
+    "newPlaceholder": "Min 8 characters",
     "confirm": "Confirm new password",
-    "save": "Update password",
-    "saved": "Password updated ✓",
-    "errorMatch": "Passwords do not match."
+    "confirmPlaceholder": "Repeat new password",
+    "update": "Update password",
+    "updating": "Updating...",
+    "successTitle": "Password changed!",
+    "successDesc": "Your password has been updated successfully.",
+    "done": "Done",
+    "errorFillAll": "Please fill in all fields.",
+    "errorMatch": "New passwords do not match.",
+    "errorMin8": "New password must be at least 8 characters."
   },
   "diet": {
     "veg": "Veg",
