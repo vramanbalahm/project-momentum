@@ -427,5 +427,13 @@
     "currentlySelected": "Currently selected:",
     "enableAll": "Enable all",
     "disableAll": "Disable all"
+  },
+  "swapCopy": {
+    "swap": "Swap",
+    "copy": "Copy",
+    "swapTap1": "⇄ Swap — tap 1st card",
+    "swapTap2": "⇄ Swap — tap 2nd card",
+    "copyTapSrc": "⧉ Copy — tap source card",
+    "copyTapDst": "⧉ Copy — tap destination"
   }
 }
