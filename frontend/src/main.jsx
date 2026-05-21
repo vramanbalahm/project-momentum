@@ -72,7 +72,7 @@ function AuthGate() {
   if (screen === 'member_availability') return (
     <MemberAvailability
       onBack={() => setScreen('dashboard')}
-      onProceed={() => setScreen('weekly_plan')}
+      onProceed={() => setScreen('dashboard')}
     />
   );
 

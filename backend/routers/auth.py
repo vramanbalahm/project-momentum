@@ -422,6 +422,7 @@ class ProfileUpdateRequest(BaseModel):
     dietary_preference: str = None
     cuisine_sub_region_id: int = None
     household_allergies: str = None  # comma-separated list
+    preferred_language: str = None
 
 @router.put("/profile", status_code=200)
 async def update_profile(
@@ -457,6 +458,8 @@ async def update_profile(
     track("dietary_preference",    req.dietary_preference,    current.dietary_preference)
     track("cuisine_sub_region_id", req.cuisine_sub_region_id, current.cuisine_sub_region_id)
     track("household_allergies",   req.household_allergies,   current.household_allergies)
+    if req.preferred_language is not None:
+        updates["preferred_language"] = req.preferred_language
 
     if not updates:
         return {"message": "No changes detected."}

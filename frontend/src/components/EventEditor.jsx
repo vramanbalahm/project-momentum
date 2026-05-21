@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useTranslation } from "react-i18next";
 import { C, HelpTip, NavButtons, Toggle, Chip, Field, EVENT_ICONS } from "./householdShared.jsx";
 
 // EventEditor — reusable component for Events & Special Days.
@@ -15,8 +16,9 @@ const EMPTY_EVENT = {
   is_sattvic_required: false, recurring_annual: true, icon: "🎂"
 };
 
-export default function EventEditor({ onBack, onSkip, onDone, nextLabel = "Save & continue" }) {
+export default function EventEditor({ onBack, onSkip, onDone, nextLabel }) {
   const { apiFetch } = useAuth();
+  const { t } = useTranslation();
   const [events, setEvents]         = useState([]);
   const [newEvent, setNewEvent]     = useState(EMPTY_EVENT);
   const [addingEvent, setAddingEvent] = useState(false);
@@ -42,7 +44,7 @@ export default function EventEditor({ onBack, onSkip, onDone, nextLabel = "Save 
         const d = await apiFetch("/onboarding/data");
         setEvents((d.events || []).filter(e => e.source === "USER"));
       } catch {
-        setError("Failed to load events.");
+        setError(t("common.error"));
       } finally {
         setLoading(false);
       }
@@ -71,7 +73,7 @@ export default function EventEditor({ onBack, onSkip, onDone, nextLabel = "Save 
       setTimeout(() => setSuccess(false), 4000);
       if (onDone) onDone();
     } catch (e) {
-      setError(e.message || "Failed to save. Please try again.");
+      setError(e.message || t("common.error"));
     } finally {
       setSaving(false);
     }
@@ -80,7 +82,7 @@ export default function EventEditor({ onBack, onSkip, onDone, nextLabel = "Save 
   if (loading) {
     return (
       <div style={{ padding: "32px 0", textAlign: "center", color: C.muted, fontSize: 13 }}>
-        Loading events...
+        {t("common.loading")}
       </div>
     );
   }
@@ -88,7 +90,7 @@ export default function EventEditor({ onBack, onSkip, onDone, nextLabel = "Save 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: 480 }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
-        <div style={{ fontSize: 17, fontWeight: 500, color: C.text }}>Events & special days</div>
+        <div style={{ fontSize: 17, fontWeight: 500, color: C.text }}>{t("eventEditor.title")}</div>
         <HelpTip
           text="Add birthdays, anniversaries or any special day. Feast = we suggest celebratory dishes. Satvik = Satvik rules apply. Our system learns from these every year."
           visible={help.events}
@@ -96,7 +98,7 @@ export default function EventEditor({ onBack, onSkip, onDone, nextLabel = "Save 
         />
       </div>
       <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
-        We'll suggest the right meals automatically on these days.
+        {t("eventEditor.subtitle")}
       </div>
 
       {error && (
@@ -107,13 +109,13 @@ export default function EventEditor({ onBack, onSkip, onDone, nextLabel = "Save 
 
       {success && (
         <div style={{ background: C.satvik.bg, border: `0.5px solid ${C.teal}`, borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontSize: 12, color: C.satvik.text }}>
-          Events saved ✓
+          {t("eventEditor.saved")}
         </div>
       )}
 
       <div style={{ flex: 1, overflowY: "auto", maxHeight: 300 }}>
         {events.length === 0 && !addingEvent && (
-          <div style={{ textAlign: "center", padding: "20px 0", fontSize: 13, color: C.muted }}>No events added yet</div>
+          <div style={{ textAlign: "center", padding: "20px 0", fontSize: 13, color: C.muted }}>{t("eventEditor.noEvents")}</div>
         )}
 
         {events.map((e, i) => (
@@ -133,16 +135,16 @@ export default function EventEditor({ onBack, onSkip, onDone, nextLabel = "Save 
         {/* Add event form */}
         {addingEvent && (
           <div style={{ ...cardStyle, marginTop: 8 }}>
-            <Field label="Event name">
+            <Field label={t("eventEditor.eventName")}>
               <input value={newEvent.event_name} onChange={e => setNewEvent(n => ({ ...n, event_name: e.target.value }))} placeholder="e.g. Bala's Birthday" style={inputStyle} />
             </Field>
-            <Field label="Date (DD-MM)" hint="Day and month only — e.g. 15-03 for 15th March">
+            <Field label={t("eventEditor.eventDate")} hint={t("eventEditor.eventDateHint")}>
               <input value={newEvent.event_date} onChange={e => setNewEvent(n => ({ ...n, event_date: e.target.value }))} placeholder="e.g. 15-03" style={inputStyle} />
             </Field>
             <Field label="Type">
               <div style={{ display: "flex", gap: 6 }}>
-                {["Personal", "Social", "Ritual"].map(t => (
-                  <Chip key={t} label={t} active={newEvent.event_type === t} onClick={() => setNewEvent(n => ({ ...n, event_type: t }))} />
+                {["Personal", "Social", "Ritual"].map(evtType => (
+                  <Chip key={evtType} label={t(`eventType.${evtType}`)} active={newEvent.event_type === evtType} onClick={() => setNewEvent(n => ({ ...n, event_type: evtType }))} />
                 ))}
               </div>
             </Field>
@@ -157,17 +159,17 @@ export default function EventEditor({ onBack, onSkip, onDone, nextLabel = "Save 
               </div>
             </Field>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
-              <span style={{ fontSize: 13, color: C.text }}>Satvik day</span>
+              <span style={{ fontSize: 13, color: C.text }}>{t("eventEditor.satvikDay")}</span>
               <Toggle value={newEvent.is_sattvic_required} onChange={v => setNewEvent(n => ({ ...n, is_sattvic_required: v }))} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
-              <span style={{ fontSize: 13, color: C.text }}>Repeats annually</span>
+              <span style={{ fontSize: 13, color: C.text }}>{t("eventEditor.repeatsAnnually")}</span>
               <Toggle value={newEvent.recurring_annual} onChange={v => setNewEvent(n => ({ ...n, recurring_annual: v }))} />
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
               <button onClick={() => { setAddingEvent(false); setNewEvent(EMPTY_EVENT); }}
                 style={{ flex: 1, padding: 9, border: `0.5px solid ${C.border}`, borderRadius: 8, fontSize: 12, color: C.muted, background: "transparent", cursor: "pointer" }}>
-                Cancel
+                {t("common.cancel")}
               </button>
               <button onClick={() => {
                 if (!newEvent.event_name || !newEvent.event_date) return;
@@ -175,7 +177,7 @@ export default function EventEditor({ onBack, onSkip, onDone, nextLabel = "Save 
                 setNewEvent(EMPTY_EVENT);
                 setAddingEvent(false);
               }} style={{ flex: 2, padding: 9, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, color: C.green, background: C.mint, cursor: "pointer" }}>
-                Add event
+                {t("eventEditor.addEventBtn")}
               </button>
             </div>
           </div>
@@ -185,7 +187,7 @@ export default function EventEditor({ onBack, onSkip, onDone, nextLabel = "Save 
       {!addingEvent && (
         <div onClick={() => setAddingEvent(true)}
           style={{ fontSize: 12, color: C.deepTeal, border: `0.5px dashed ${C.teal}`, borderRadius: 8, padding: 8, textAlign: "center", marginTop: 8, cursor: "pointer" }}>
-          + Add an event
+          {t("eventEditor.addEvent")}
         </div>
       )}
 

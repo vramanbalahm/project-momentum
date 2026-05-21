@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useTranslation } from "react-i18next";
 import IngredientSelector, { restrictionsToValue, valueToRestrictions } from "../components/IngredientSelector";
 
 const C = {
@@ -16,10 +17,10 @@ const DIET_IMAGES = {
   "Eggitarian": "https://cdn-icons-png.flaticon.com/512/837/837560.png",
 };
 const AGE_GROUPS = [
-  { value: "Child",  label: "Child",  sub: "0–12 yrs",  emoji: "👶" },
-  { value: "Teen",   label: "Teen",   sub: "13–17 yrs", emoji: "🧒" },
-  { value: "Adult",  label: "Adult",  sub: "18–59 yrs", emoji: "🧑" },
-  { value: "Senior", label: "Senior", sub: "60+ yrs",   emoji: "👴" },
+  { value: "Child",  emoji: "👶" },
+  { value: "Teen",   emoji: "🧒" },
+  { value: "Adult",  emoji: "🧑" },
+  { value: "Senior", emoji: "👴" },
 ];
 const GENDERS = [
   { value: "Male",              emoji: "👨" },
@@ -30,6 +31,22 @@ const GENDERS = [
 
 export default function MyProfile({ onBack }) {
   const { user, apiFetch } = useAuth();
+  const { t } = useTranslation();
+
+  // Translated arrays — inside component so t() is available
+  const AGE_GROUPS_T = [
+    { value: "Child",  label: t("ageGroup.child"),  sub: t("ageGroup.childSub"),  emoji: "👶" },
+    { value: "Teen",   label: t("ageGroup.teen"),   sub: t("ageGroup.teenSub"),   emoji: "🧒" },
+    { value: "Adult",  label: t("ageGroup.adult"),  sub: t("ageGroup.adultSub"),  emoji: "🧑" },
+    { value: "Senior", label: t("ageGroup.senior"), sub: t("ageGroup.seniorSub"), emoji: "👴" },
+  ];
+  const GENDERS_T = [
+    { value: "Male",              label: t("gender.male"),            emoji: "👨" },
+    { value: "Female",            label: t("gender.female"),          emoji: "👩" },
+    { value: "Transgender",       label: t("gender.transgender"),     emoji: "🏳️" },
+    { value: "Prefer not to say", label: t("gender.preferNotToSay"), emoji: "🤐" },
+  ];
+
   const isAdmin = user?.role === "household_admin" || user?.role === "platform_admin";
   const [profile, setProfile]           = useState(null);
   const [loading, setLoading]           = useState(true);
@@ -60,7 +77,7 @@ export default function MyProfile({ onBack }) {
         setPhone(p.phone_number || "");
         setRestrictionValue(restrictionsToValue(p.restrictions || []));
       } catch (e) {
-        setError("Failed to load profile. Please try again.");
+        setError(t("myProfile.loadingError"));
       } finally {
         setLoading(false);
       }
@@ -68,7 +85,7 @@ export default function MyProfile({ onBack }) {
   }, []);
 
   const handleAddMember = async () => {
-    if (!addForm.name.trim() || !addForm.password) { setError("Name and password are required."); return; }
+    if (!addForm.name.trim() || !addForm.password) { setError(t("myProfile.addMemberSheet.namePasswordRequired")); return; }
     setAddSaving(true);
     setError(null);
     try {
@@ -131,7 +148,7 @@ export default function MyProfile({ onBack }) {
       showSuccess("✓ Profile saved successfully!");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
-      setError(e.message || "Save failed. Please try again.");
+      setError(e.message || t("myProfile.saveError"));
     } finally {
       setSaving(false);
     }
@@ -149,7 +166,7 @@ export default function MyProfile({ onBack }) {
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ fontSize: 14, color: C.muted }}>Loading your profile...</div>
+      <div style={{ fontSize: 14, color: C.muted }}>{t("myProfile.loading")}</div>
     </div>
   );
 
@@ -160,12 +177,12 @@ export default function MyProfile({ onBack }) {
       <div style={{ background: C.green, padding: "16px 20px 20px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
           <span onClick={onBack} style={{ color: C.mint, fontSize: 20, cursor: "pointer" }}>←</span>
-          <div style={{ fontSize: 17, fontWeight: 500, color: "#FDFCF8" }}>My Profile</div>
+          <div style={{ fontSize: 17, fontWeight: 500, color: "#FDFCF8" }}>{t("myProfile.title")}</div>
           {isAdmin && (
             <button
               onClick={() => { setShowAddMember(true); setAddForm({ name: "", email: "", password: "" }); }}
               style={{ marginLeft: "auto", background: C.mint, color: C.green, border: "none", borderRadius: 10, padding: "7px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-            >+ Add member</button>
+            >{t("myProfile.addMember")}</button>
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -174,7 +191,7 @@ export default function MyProfile({ onBack }) {
           </div>
           <div>
             <div style={{ fontSize: 17, fontWeight: 500, color: "#FDFCF8" }}>{profile?.name}</div>
-            <div style={{ fontSize: 12, color: "#5DCAA5", marginTop: 2 }}>{profile?.email || "No email set"}</div>
+            <div style={{ fontSize: 12, color: "#5DCAA5", marginTop: 2 }}>{profile?.email || t("myProfile.noEmail")}</div>
             <div style={{ fontSize: 11, color: "#5DCAA5", marginTop: 1, textTransform: "uppercase", letterSpacing: "0.04em" }}>
               {(profile?.role || "").replace(/_/g, " ")}
             </div>
@@ -199,54 +216,54 @@ export default function MyProfile({ onBack }) {
         )}
 
         {/* ── Personal details ── */}
-        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Personal details</div>
+        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{t("myProfile.personalDetails")}</div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Full name</div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>{t("myProfile.fullName")}</div>
             {isAdmin ? (
               <input
                 value={editName}
                 onChange={e => setEditName(e.target.value)}
-                placeholder="Full name"
+                placeholder={t("myProfile.fullName")}
                 style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `0.5px solid ${C.border}`, fontSize: 14, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box" }}
               />
             ) : (
               <>
                 <div style={{ fontSize: 14, color: C.text, padding: "9px 12px", background: "#F1EFE8", borderRadius: 8, border: `0.5px solid ${C.border}` }}>{profile?.name}</div>
-                <div style={{ fontSize: 10, color: C.muted, marginTop: 3 }}>Contact your admin to change your name</div>
+                <div style={{ fontSize: 10, color: C.muted, marginTop: 3 }}>{t("myProfile.nameChangeHint")}</div>
               </>
             )}
           </div>
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Email address</div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>{t("myProfile.emailAddress")}</div>
             <div style={{ fontSize: 14, color: C.muted, padding: "9px 12px", background: "#F1EFE8", borderRadius: 8, border: `0.5px solid ${C.border}` }}>{profile?.email || "—"}</div>
-            <div style={{ fontSize: 10, color: C.muted, marginTop: 3 }}>Email cannot be changed</div>
+            <div style={{ fontSize: 10, color: C.muted, marginTop: 3 }}>{t("myProfile.emailChangeHint")}</div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Phone number <span style={{ color: "#B4B2A9" }}>(optional)</span></div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>{t("myProfile.phoneNumber")} <span style={{ color: "#B4B2A9" }}>({t("myProfile.phoneOptional")})</span></div>
             <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 98765 43210" style={inputStyle} />
           </div>
         </div>
 
         {/* ── Dietary preference ── */}
-        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Dietary preference</div>
+        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{t("myProfile.dietaryPreference")}</div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {DIET_PREFS.map(d => (
               <div key={d} onClick={() => setDietPref(d)}
                 style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "10px 8px", borderRadius: 12, border: `0.5px solid ${dietPref === d ? C.teal : C.border}`, background: dietPref === d ? "#E1F5EE" : "transparent", cursor: "pointer", transition: "all 0.15s" }}>
                 <img src={DIET_IMAGES[d]} alt={d} style={{ width: 32, height: 32, objectFit: "contain" }} onError={e => e.target.style.display = "none"} />
-                <span style={{ fontSize: 12, fontWeight: 500, color: dietPref === d ? C.deepTeal : C.muted }}>{d}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: dietPref === d ? C.deepTeal : C.muted }}>{t(`diet.${d === "Non-Veg" ? "nonVeg" : d === "Eggitarian" ? "eggitarian" : d.toLowerCase()}`)}</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* ── Age group ── */}
-        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Age group</div>
+        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{t("myProfile.ageGroup")}</div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            {AGE_GROUPS.map(ag => (
+            {AGE_GROUPS_T.map(ag => (
               <div key={ag.value} onClick={() => setAgeGroup(ageGroup === ag.value ? null : ag.value)}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, border: `0.5px solid ${ageGroup === ag.value ? C.teal : C.border}`, background: ageGroup === ag.value ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
                 <span style={{ fontSize: 24 }}>{ag.emoji}</span>
@@ -260,14 +277,14 @@ export default function MyProfile({ onBack }) {
         </div>
 
         {/* ── Gender ── */}
-        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Gender</div>
+        <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{t("myProfile.gender")}</div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {GENDERS.map(g => (
+            {GENDERS_T.map(g => (
               <div key={g.value} onClick={() => setGender(gender === g.value ? null : g.value)}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 20, border: `0.5px solid ${gender === g.value ? C.teal : C.border}`, background: gender === g.value ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
                 <span style={{ fontSize: 18 }}>{g.emoji}</span>
-                <span style={{ fontSize: 12, color: gender === g.value ? C.deepTeal : C.muted }}>{g.value}</span>
+                <span style={{ fontSize: 12, color: gender === g.value ? C.deepTeal : C.muted }}>{g.label || g.value}</span>
               </div>
             ))}
           </div>
@@ -275,24 +292,23 @@ export default function MyProfile({ onBack }) {
 
         {/* ── Allergies & dislikes — summary at top ── */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>Allergies & dislikes</div>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("myProfile.allergiesDislikes")}</div>
           <div style={{ display: "flex", gap: 8 }}>
             {allergyCount > 0 && (
               <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#FAECE7", color: "#712B13", fontWeight: 500 }}>
-                🚫 {allergyCount} {allergyCount === 1 ? "allergy" : "allergies"}
+                🚫 {allergyCount} {allergyCount === 1 ? t("myProfile.allergy") : t("myProfile.allergies")}
               </span>
             )}
             {dislikeCount > 0 && (
               <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#FAEEDA", color: "#633806", fontWeight: 500 }}>
-                😕 {dislikeCount} {dislikeCount === 1 ? "dislike" : "dislikes"}
+                😕 {dislikeCount} {dislikeCount === 1 ? t("myProfile.dislike") : t("myProfile.dislikes")}
               </span>
             )}
           </div>
         </div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
-            Tap <strong style={{ color: "#E24B4A" }}>🚫 Allergy</strong> for medical restrictions ·
-            <strong style={{ color: "#BA7517" }}> 😕 Dislike</strong> for preferences
+            {t("myProfile.allergyHint")}
           </div>
           <IngredientSelector
             mode="restriction"
@@ -308,7 +324,7 @@ export default function MyProfile({ onBack }) {
       <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: C.card, padding: "14px 16px 28px", borderTop: `0.5px solid ${C.border}`, boxSizing: "border-box", zIndex: 10 }}>
         <button onClick={handleSave} disabled={saving}
           style={{ width: "100%", padding: 13, border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, color: C.green, background: C.mint, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
-          {saving ? "Saving..." : "Save profile"}
+          {saving ? t("myProfile.saving") : t("myProfile.saveProfile")}
         </button>
       </div>
 
@@ -317,21 +333,21 @@ export default function MyProfile({ onBack }) {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
           <div style={{ background: C.card, borderRadius: "20px 20px 0 0", padding: "24px 20px 40px", width: "100%", maxWidth: 480, boxSizing: "border-box" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Add new member</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{t("myProfile.addMemberSheet.title")}</div>
               <span onClick={() => setShowAddMember(false)} style={{ fontSize: 18, color: C.muted, cursor: "pointer" }}>✕</span>
             </div>
-            <input type="text" placeholder="Full name *" value={addForm.name}
+            <input type="text" placeholder={t("myProfile.addMemberSheet.namePlaceholder")} value={addForm.name}
               onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
               style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box", marginBottom: 10 }} />
-            <input type="email" placeholder="Email address (optional)" value={addForm.email}
+            <input type="email" placeholder={t("myProfile.addMemberSheet.emailPlaceholder")} value={addForm.email}
               onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))}
               style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box", marginBottom: 10 }} />
-            <input type="password" placeholder="Temporary password *" value={addForm.password}
+            <input type="password" placeholder={t("myProfile.addMemberSheet.passwordPlaceholder")} value={addForm.password}
               onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))}
               style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box", marginBottom: 16 }} />
             <button onClick={handleAddMember} disabled={addSaving}
               style={{ width: "100%", padding: 13, border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, color: C.green, background: C.mint, cursor: addSaving ? "not-allowed" : "pointer", opacity: addSaving ? 0.7 : 1 }}>
-              {addSaving ? "Adding..." : "Add member"}
+              {addSaving ? t("myProfile.addMemberSheet.adding") : t("myProfile.addMemberSheet.addBtn")}
             </button>
           </div>
         </div>

@@ -6,14 +6,17 @@ import LunarEditor from "../components/LunarEditor.jsx";
 import EventEditor from "../components/EventEditor.jsx";
 
 import { C, DIET_PREFS, AGE_GROUPS, GENDERS, DIET_IMAGES, EVENT_ICONS, Field, HelpTip, Toggle, Chip, Avatar, NavButtons } from "../components/householdShared.jsx";
+import { useTranslation } from "react-i18next";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
-const STEP_LABELS = ["Welcome", "Members", "Satvik", "Calendar", "Events", "Done"];
+const STEP_LABEL_KEYS = ["welcome", "members", "satvik", "calendar", "events", "done"];
 
 // ── Main Wizard ───────────────────────────────────────────────────────────────
 export default function OnboardingWizard({ onComplete }) {
   const { apiFetch, user } = useAuth();
+  const { t } = useTranslation();
+  const STEP_LABELS = STEP_LABEL_KEYS.map(k => t(`onboarding.steps.${k}`));
   const [step, setStep]         = useState(0);
   const [data, setData]         = useState(null);
   const [loading, setLoading]   = useState(true);
@@ -134,7 +137,7 @@ export default function OnboardingWizard({ onComplete }) {
   if (loading) {
     return (
       <div style={{ minHeight: "100vh", background: C.green, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: C.mint, fontSize: 14 }}>Setting up your household...</div>
+        <div style={{ color: C.mint, fontSize: 14 }}>{t("common.loading")}</div>
       </div>
     );
   }
@@ -176,16 +179,16 @@ export default function OnboardingWizard({ onComplete }) {
             <div style={{ display: "flex", flexDirection: "column", minHeight: 480 }}>
               <div style={{ textAlign: "center", padding: "10px 0 12px" }}>
                 <div style={{ fontSize: 32, marginBottom: 6 }}>👋</div>
-                <div style={{ fontSize: 17, fontWeight: 500, color: C.text, marginBottom: 4 }}>Welcome, {user?.name?.split(" ")[0]}!</div>
-                <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>A few minutes now means smarter meal plans every week.</div>
+                <div style={{ fontSize: 17, fontWeight: 500, color: C.text, marginBottom: 4 }}>{t("onboarding.welcome.title")}</div>
+                <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{t("onboarding.welcome.subtitle")}</div>
               </div>
               <div style={{ background: "#E1F5EE", border: `0.5px solid ${C.teal}`, borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: C.deepTeal, marginBottom: 8 }}>Why this setup matters</div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: C.deepTeal, marginBottom: 8 }}>{t("onboarding.welcome.whyMatters")}</div>
                 {[
-                  ["🎯", "Recipes recommended based on who's home and what they enjoy"],
-                  ["🌙", "Satvik and lunar calendar ensure right meals on right days"],
-                  ["🎂", "Special events automatically get the right meal suggestions"],
-                  ["✨", "The more you share, the smarter your planner gets each week"],
+                  ["🎯", t("onboarding.welcome.point1")],
+                  ["🌙", t("onboarding.welcome.point2")],
+                  ["🎂", t("onboarding.welcome.point3")],
+                  ["✨", t("onboarding.welcome.point4")],
                 ].map(([icon, text]) => (
                   <div key={text} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                     <span style={{ fontSize: 14, flexShrink: 0 }}>{icon}</span>
@@ -194,8 +197,8 @@ export default function OnboardingWizard({ onComplete }) {
                 ))}
               </div>
               <div style={cardStyle}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: C.text, marginBottom: 8 }}>What we'll set up</div>
-                {["Member profiles & preferences", "Satvik definition", "Lunar calendar", "Events & special days"].map((item, i) => (
+                <div style={{ fontSize: 12, fontWeight: 500, color: C.text, marginBottom: 8 }}>{t("onboarding.welcome.whatSetup")}</div>
+                {[t("onboarding.members.title"), t("onboarding.satvik.title"), t("onboarding.lunar.title"), t("onboarding.events.title")].map((item, i) => (
                   <div key={item} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < 3 ? `0.5px solid ${C.border}` : "none" }}>
                     <div style={{ width: 20, height: 20, borderRadius: "50%", border: `0.5px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: C.muted, background: "#F7F4EE", flexShrink: 0 }}>{i + 1}</div>
                     <span style={{ fontSize: 13, color: C.text }}>{item}</span>
@@ -203,11 +206,11 @@ export default function OnboardingWizard({ onComplete }) {
                 ))}
               </div>
               <div style={{ fontSize: 11, color: C.muted, textAlign: "center", padding: "6px 0", cursor: "pointer", textDecoration: "underline" }} onClick={confirmOnboarding}>
-                Skip — confirm with defaults now
+                {t("common.skip")}
               </div>
               <div style={{ marginTop: "auto", paddingTop: 12 }}>
                 <button onClick={() => setStep(1)} style={{ width: "100%", padding: 12, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, color: C.green, background: C.mint, cursor: "pointer" }}>
-                  Let's begin
+                  {t("onboarding.welcome.getStarted")}
                 </button>
               </div>
             </div>
@@ -217,10 +220,10 @@ export default function OnboardingWizard({ onComplete }) {
           {step === 1 && (
             <div style={{ display: "flex", flexDirection: "column", minHeight: 480 }}>
               <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
-                <div style={{ fontSize: 17, fontWeight: 500, color: C.text }}>Member profiles</div>
+                <div style={{ fontSize: 17, fontWeight: 500, color: C.text }}>{t("onboarding.members.title")}</div>
                 <HelpTip text="Each member can have their own dietary preference and restrictions. When only some members are home, we recommend meals they'll enjoy." visible={help.members} onToggle={() => toggleHelp("members")} />
               </div>
-              <div style={{ fontSize: 12, color: C.muted, marginBottom: 14 }}>Set individual preferences for each member.</div>
+              <div style={{ fontSize: 12, color: C.muted, marginBottom: 14 }}>{t("onboarding.members.subtitle")}</div>
 
               <div style={cardStyle}>
                 {members.map((m, idx) => {
@@ -249,7 +252,7 @@ export default function OnboardingWizard({ onComplete }) {
               {/* Copy preference section */}
               {members.length > 1 && (
                 <div style={{ background: "#F7F4EE", border: `0.5px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>Copy preference from:</div>
+                  <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>{t("onboarding.members.copyFrom")}</div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
                     {members.map(m => (
                       <button key={m.user_id} onClick={() => setCopyFrom(m.user_id)}
@@ -271,7 +274,7 @@ export default function OnboardingWizard({ onComplete }) {
                         </div>
                       ))}
                       <button onClick={applyCopyTo} style={{ marginTop: 8, width: "100%", padding: 8, background: C.mint, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, color: C.green, cursor: "pointer" }}>
-                        Apply to selected
+                        {t("common.save")}
                       </button>
                     </>
                   )}
@@ -349,7 +352,7 @@ export default function OnboardingWizard({ onComplete }) {
                       setEditMember(null);
                       setIngSearch(""); setIngResults([]);
                     }} style={{ width: "100%", padding: 11, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 500, color: C.green, background: C.mint, cursor: "pointer" }}>
-                      Save
+                      {t("common.save")}
                     </button>
                   </div>
                 </div>
@@ -389,15 +392,15 @@ export default function OnboardingWizard({ onComplete }) {
             <div style={{ display: "flex", flexDirection: "column", minHeight: 480 }}>
               <div style={{ textAlign: "center", padding: "16px 0 12px" }}>
                 <div style={{ fontSize: 36, marginBottom: 8 }}>🎉</div>
-                <div style={{ fontSize: 17, fontWeight: 500, color: C.text, marginBottom: 4 }}>You're all set!</div>
-                <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Your household is ready. Change any setting anytime from your profile.</div>
+                <div style={{ fontSize: 17, fontWeight: 500, color: C.text, marginBottom: 4 }}>{t("onboarding.done.title")}</div>
+                <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{t("onboarding.done.subtitle")}</div>
               </div>
               <div style={cardStyle}>
                 {[
-                  ["Member profiles", completedSteps.includes(1) || data?.wizard_status?.members_done],
-                  ["Satvik definition", completedSteps.includes(2) || data?.wizard_status?.satvik_done],
-                  ["Lunar calendar", !!panchangamId],
-                  ["Events & special days", completedSteps.includes(4) || data?.wizard_status?.events_done],
+                  [t("onboarding.members.title"), completedSteps.includes(1) || data?.wizard_status?.members_done],
+                  [t("onboarding.satvik.title"), completedSteps.includes(2) || data?.wizard_status?.satvik_done],
+                  [t("onboarding.lunar.title"), !!panchangamId],
+                  [t("onboarding.events.title"), completedSteps.includes(4) || data?.wizard_status?.events_done],
                 ].map(([label, done]) => (
                   <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `0.5px solid ${C.border}` }}>
                     <div style={{ width: 20, height: 20, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, flexShrink: 0, background: done ? "#1D9E75" : "#F7F4EE", color: done ? "white" : C.muted, border: done ? "none" : `0.5px solid ${C.border}` }}>
@@ -409,10 +412,10 @@ export default function OnboardingWizard({ onComplete }) {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
                 <button onClick={confirmOnboarding} disabled={saving} style={{ width: "100%", padding: 13, border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, color: C.green, background: C.mint, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
-                  {saving ? "Setting up..." : "Confirm & go to Dashboard"}
+                  {saving ? t("common.saving") : t("onboarding.done.goToDashboard")}
                 </button>
                 <button onClick={() => setStep(0)} style={{ width: "100%", padding: 10, border: `0.5px solid ${C.border}`, borderRadius: 12, fontSize: 13, color: C.muted, background: "transparent", cursor: "pointer" }}>
-                  Review from beginning
+                  {t("common.back")}
                 </button>
               </div>
             </div>

@@ -10,6 +10,7 @@ import MealEditScreen from './components/MealEditScreen';
 import SwapCopyBar from './components/SwapCopyBar';
 import { swapSlots, swapDays, auditBlueprint, persistSwap } from './services/swapService';
 import { useAuth } from './context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import MemberAvailability from './pages/MemberAvailability';
 import ChangePassword from './pages/ChangePassword';
 
@@ -154,6 +155,7 @@ const WeekThumbCard = ({ meal, slotId, onClick, isSelected = false, isSwapMode =
 
 export default function App({ onBack }) {
   const { user, logout } = useAuth();
+  const { t, i18n } = useTranslation();
   const HH_ID = user?.house_id; // declared early — used in useEffects below
   const isAdmin = user?.role === "household_admin" || user?.role === "platform_admin";
   const isPlatformAdmin = user?.role === "platform_admin";
@@ -529,22 +531,22 @@ export default function App({ onBack }) {
   // After save → Saved ✓ briefly, then back to Review plan
   const getCtaButton = () => {
     if (isSaving) return {
-      label: "Saving...",
+      label: t("weeklyPlan.saving"),
       bg: "#B4B2A9", color: "#fff", border: "none",
       onClick: () => {}
     };
     if (isSaved && !isDirty) return {
-      label: "Saved ✓",
+      label: t("weeklyPlan.saved"),
       bg: "#5DCAA5", color: "#085041", border: "none",
       onClick: runAudit   // Tap saved → re-review anytime
     };
     if (!isAudited || isDirty) return {
-      label: "Review plan",
+      label: t("weeklyPlan.reviewPlan"),
       bg: "#EF9F27", color: "#2C2C2A", border: "none",
       onClick: runAudit
     };
     return {
-      label: "Save plan",
+      label: t("weeklyPlan.savePlan"),
       bg: "#FDFCF8", color: "#1A3A2E", border: "2px solid #5DCAA5",
       onClick: savePlan
     };
@@ -578,7 +580,7 @@ export default function App({ onBack }) {
         <div style={{ background: "#1A3A2E", padding: "16px 20px 12px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div>
-              {onBack && <span onClick={() => safeNavigate(onBack)} style={{ color: "#9FE1CB", fontSize: 12, cursor: "pointer", display: "block", marginBottom: 4 }}>← Dashboard</span>}
+              {onBack && <span onClick={() => safeNavigate(onBack)} style={{ color: "#9FE1CB", fontSize: 12, cursor: "pointer", display: "block", marginBottom: 4 }}>{t("weeklyPlan.backToDashboard")}</span>}
               {isAdmin && isCurrentWeek && ( // TODO: restrict to isPlatformAdmin before release
                 <span
                   onClick={() => setShowResetConfirm(true)}
@@ -588,7 +590,7 @@ export default function App({ onBack }) {
                 </span>
               )}
           <div style={{ color: "#9FE1CB", fontSize: 11, marginBottom: 1 }}>{greeting}, {user?.name?.split(' ')[0]} 👋</div>
-              <div style={{ color: "#FDFCF8", fontSize: 16, fontWeight: 500, letterSpacing: -0.3 }}>Your week awaits</div>
+              <div style={{ color: "#FDFCF8", fontSize: 16, fontWeight: 500, letterSpacing: -0.3 }}>{t("weeklyPlan.title")}</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {/* Availability button — admin only */}
@@ -602,7 +604,7 @@ export default function App({ onBack }) {
                     fontSize: 12, fontWeight: 500, cursor: "pointer"
                   }}
                 >
-                  👥 Availability
+                  {t("weeklyPlan.availability")}
                 </button>
               )}
               {/* Save button in header — admin only, hidden when viewing past weeks */}
@@ -647,10 +649,10 @@ export default function App({ onBack }) {
                         <div style={{ fontSize: 11, color: "#888780", marginTop: 2 }}>{user?.email}</div>
                       </div>
                       {onBack && (
-                        <PlannerMenuItem icon="🏠" label="Dashboard" onClick={() => safeNavigate(onBack)} />
+                        <PlannerMenuItem icon="🏠" label={t("weeklyPlan.menu.dashboard")} onClick={() => safeNavigate(onBack)} />
                       )}
-                      <PlannerMenuItem icon="🔑" label="Change Password" onClick={() => { setPlannerMenuOpen(false); setPlannerShowChangePassword(true); }} />
-                      <PlannerMenuItem icon="🚪" label="Sign out" onClick={() => safeNavigate(logout)} danger />
+                      <PlannerMenuItem icon="🔑" label={t("weeklyPlan.menu.changePassword")} onClick={() => { setPlannerMenuOpen(false); setPlannerShowChangePassword(true); }} />
+                      <PlannerMenuItem icon="🚪" label={t("weeklyPlan.menu.signOut")} onClick={() => safeNavigate(logout)} danger />
                     </div>
                   </>
                 )}
@@ -682,13 +684,13 @@ export default function App({ onBack }) {
                 fontSize: 11, fontWeight: 500, cursor: "pointer"
               }}
             >
-              {mode === 'day' ? '📅 Day view' : '📆 Week view'}
+              {mode === 'day' ? t("weeklyPlan.dayView") : t("weeklyPlan.weekView")}
 
             </button>
           ))}
           {isAdmin && isDirty && (
             <div style={{ marginLeft: "auto", fontSize: 10, color: "#EF9F27", fontWeight: 500 }}>
-              ● Unsaved changes
+              {t("weeklyPlan.unsavedChanges")}
             </div>
           )}
         </div>
@@ -711,7 +713,7 @@ export default function App({ onBack }) {
             {/* Week label + Today button */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ fontSize: 10, fontWeight: 500, color: weekOffset === 0 ? "#1A3A2E" : "#EF9F27", letterSpacing: "0.02em", textAlign: "center" }}>
-                {weekOffset === 0 ? "This week" : weekOffset === -1 ? "Last week" : weekOffset === 1 ? "Next week" : weekOffset > 0 ? `${weekOffset} weeks ahead` : `${Math.abs(weekOffset)} weeks ago`}
+                {weekOffset === 0 ? t("weeklyPlan.thisWeek") : weekOffset === -1 ? t("weeklyPlan.lastWeek") : weekOffset === 1 ? t("weeklyPlan.nextWeek") : weekOffset > 0 ? t("weeklyPlan.weeksAhead", { count: weekOffset }) : t("weeklyPlan.weeksAgo", { count: Math.abs(weekOffset) })}
                 <span style={{ color: "#B4B2A9", fontWeight: 400, display: "block", fontSize: 9 }}>{getWeekLabel()}</span>
               </div>
               {/* Today button — only shown when not on current week */}
@@ -723,7 +725,7 @@ export default function App({ onBack }) {
                     border: "none", borderRadius: 10, padding: "3px 10px",
                     fontSize: 10, fontWeight: 500, cursor: "pointer"
                   }}
-                >Today</button>
+                >{ t("weeklyPlan.today")}</button>
               )}
             </div>
 
@@ -741,11 +743,11 @@ export default function App({ onBack }) {
           {/* Copy to Current Week banner — shown at top when viewing past/future week */}
           {!isCurrentWeek && (
             <div style={{ margin: "4px 12px", padding: "8px 12px", background: "#FFF3DC", borderRadius: 10, border: "1px solid #FAC775", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 11, color: "#854F0B", fontWeight: 500 }}>Viewing {weekOffset < 0 ? "past" : "future"} week</div>
+              <div style={{ fontSize: 11, color: "#854F0B", fontWeight: 500 }}>{weekOffset < 0 ? t("weeklyPlan.viewingPast") : t("weeklyPlan.viewingFuture")}</div>
               <button
                 onClick={() => setShowCopyConfirm(true)}
                 style={{ background: "#EF9F27", color: "#2C2C2A", border: "none", borderRadius: 8, padding: "5px 12px", fontSize: 11, fontWeight: 500, cursor: "pointer" }}
-              >Copy to Current Week</button>
+              >{t("weeklyPlan.copyToCurrentWeek")}</button>
             </div>
           )}
 
@@ -801,7 +803,7 @@ export default function App({ onBack }) {
 
           {isLoading ? (
             <div style={{ textAlign: "center", padding: "48px 0", color: "#B4B2A9", fontSize: 14 }}>
-              Loading your plan...
+            {t("weeklyPlan.loading")}
             </div>
           ) : viewMode === 'day' ? (
 
@@ -811,8 +813,8 @@ export default function App({ onBack }) {
               {!isCurrentWeek && Object.keys(blueprint).length === 0 && (
                 <div style={{ textAlign: "center", padding: "48px 20px", color: "#B4B2A9" }}>
                   <div style={{ fontSize: 32, marginBottom: 12 }}>📭</div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: "#2C2C2A", marginBottom: 6 }}>No plan for this week</div>
-                  <div style={{ fontSize: 12, color: "#B4B2A9", marginBottom: 20 }}>No meals were saved for this period.</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "#2C2C2A", marginBottom: 6 }}>{t("weeklyPlan.noPlanTitle")}</div>
+                  <div style={{ fontSize: 12, color: "#B4B2A9", marginBottom: 20 }}>{t("weeklyPlan.noPlanDesc")}</div>
                   <button
                     onClick={() => { setWeekOffset(0); setSelectedDay(DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]); }}
                     style={{ background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 12, padding: "10px 20px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}
@@ -826,7 +828,7 @@ export default function App({ onBack }) {
                       <div style={{ width: 26, height: 26, borderRadius: "50%", background: MEAL_CONFIG[type].color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>
                         {MEAL_CONFIG[type].icon}
                       </div>
-                      <span style={{ fontSize: 12, fontWeight: 500, color: "#2C2C2A" }}>{type}</span>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: "#2C2C2A" }}>{t(`weeklyPlan.${type.toLowerCase()}`)}</span>
                       <span style={{ fontSize: 10, color: "#B4B2A9", marginLeft: "auto" }}>{MEAL_CONFIG[type].time}</span>
                     </div>
                     <MealCard
@@ -852,8 +854,8 @@ export default function App({ onBack }) {
               {!isCurrentWeek && Object.keys(blueprint).length === 0 ? (
                 <div style={{ textAlign: "center", padding: "48px 20px", color: "#B4B2A9" }}>
                   <div style={{ fontSize: 32, marginBottom: 12 }}>📭</div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: "#2C2C2A", marginBottom: 6 }}>No plan for this week</div>
-                  <div style={{ fontSize: 11, marginBottom: 10 }}>No meals were saved for this period.</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "#2C2C2A", marginBottom: 6 }}>{t("weeklyPlan.noPlanTitle")}</div>
+                  <div style={{ fontSize: 11, marginBottom: 10 }}>{t("weeklyPlan.noPlanDesc")}</div>
                   <button
                     onClick={() => { setWeekOffset(0); setSelectedDay(DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]); }}
                     style={{ background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 12, padding: "10px 20px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}
@@ -863,10 +865,10 @@ export default function App({ onBack }) {
               <>
               <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 6, fontStyle: "italic" }}>
                 {!isAdmin
-                  ? "View only — planning is managed by your household admin"
+                  ? t("weeklyPlan.viewOnlyDesc")
                   : isCurrentWeek
-                    ? (swapMode ? "" : "Tap any meal to edit that day")
-                    : "Read-only view — use Copy to Current Week to edit"}
+                    ? (swapMode ? "" : t("weeklyPlan.tapToEdit"))
+                    : t("weeklyPlan.readOnly")}
               </div>
 
               {/* Swap / Copy action bar — admin + current week only */}
@@ -913,7 +915,7 @@ export default function App({ onBack }) {
                   {/* Meal type label — above the row */}
                   <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 3 }}>
                     <span style={{ fontSize: 11 }}>{MEAL_CONFIG[type].icon}</span>
-                    <span style={{ fontSize: 8, color: "#B4B2A9", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em" }}>{type}</span>
+                  <span style={{ fontSize: 8, color: "#B4B2A9", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em" }}>{t(`weeklyPlan.${type.toLowerCase()}`)}</span>
                   </div>
                   {/* Cards row — full width */}
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 3, flex: 1, overflow: "visible", position: "relative", zIndex: 1 }}>
@@ -952,9 +954,9 @@ export default function App({ onBack }) {
         {/* ── BOTTOM NAV BAR ── */}
         <div style={{ background: "#1A3A2E", padding: "12px 20px 28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           {[
-            { val: "21", label: "Meals" },
-            { val: "C2.4", label: "Avg level" },
-            { val: "78%", label: "Fridge" }
+            { val: "21", label: t("weeklyPlan.meals") },
+            { val: "C2.4", label: t("weeklyPlan.avgLevel") },
+            { val: "78%", label: t("weeklyPlan.fridge") },
           ].map((stat, i) => (
             <div key={i} style={{ textAlign: "center" }}>
               <div style={{ color: "#FDFCF8", fontSize: 14, fontWeight: 500 }}>{stat.val}</div>
@@ -973,7 +975,7 @@ export default function App({ onBack }) {
                 boxShadow: "0 0 0 3px rgba(239,159,39,0.3)"
               }}
             >
-              Copy to Current Week
+              {t("weeklyPlan.copyToCurrentWeek")}
             </button>
           )}
           {isAdmin && isCurrentWeek && (
@@ -992,7 +994,7 @@ export default function App({ onBack }) {
           )}
           {!isAdmin && (
             <div style={{ fontSize: 11, color: "#5DCAA5", fontStyle: "italic" }}>
-              View only
+            {t("weeklyPlan.viewOnly")}
             </div>
           )}
         </div>
@@ -1008,10 +1010,10 @@ export default function App({ onBack }) {
               borderRadius: "24px 24px 0 0", padding: "28px 24px 40px"
             }}>
               <div style={{ fontSize: 18, fontWeight: 600, color: "#2C2C2A", marginBottom: 8 }}>
-                Copy to Current Week?
+              {t("weeklyPlan.copyModal.title")}
               </div>
               <div style={{ fontSize: 13, color: "#888780", marginBottom: 24, lineHeight: 1.5 }}>
-                This will replace your current week's plan with the meals from {getWeekLabel()}. You can review before saving.
+                {t("weeklyPlan.copyModal.desc", { weekLabel: getWeekLabel() })}
               </div>
               <div style={{ display: "flex", gap: 12 }}>
                 <button
@@ -1022,7 +1024,7 @@ export default function App({ onBack }) {
                     color: "#888780", fontSize: 14, fontWeight: 500, cursor: "pointer"
                   }}
                 >
-                  Cancel
+                  {t("weeklyPlan.copyModal.cancel")}
                 </button>
                 <button
                   onClick={copyToCurrentWeek}
@@ -1032,7 +1034,7 @@ export default function App({ onBack }) {
                     color: "#9FE1CB", fontSize: 14, fontWeight: 500, cursor: "pointer"
                   }}
                 >
-                  Yes, copy it
+                  {t("weeklyPlan.copyModal.confirm")}
                 </button>
               </div>
             </div>
@@ -1063,16 +1065,16 @@ export default function App({ onBack }) {
             <div style={{ width: "100%", maxWidth: 430, background: "#FFF9F2", borderRadius: "24px 24px 0 0", padding: "28px 24px 40px" }}>
               <div style={{ fontSize: 18, fontWeight: 600, color: "#2C2C2A", marginBottom: 8 }}>🗑 Reset this week?</div>
               <div style={{ fontSize: 13, color: "#888780", marginBottom: 24, lineHeight: 1.6 }}>
-                This will permanently delete all meal plan data, availability, and session records for the current week. Used for testing only.
+                {t("weeklyPlan.resetModal.desc")}
               </div>
               <div style={{ display: "flex", gap: 12 }}>
                 <button onClick={() => setShowResetConfirm(false)}
                   style={{ flex: 1, padding: "13px", borderRadius: 14, border: "1.5px solid #EDE8E0", background: "transparent", color: "#888780", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
-                  Cancel
+                  {t("weeklyPlan.copyModal.cancel")}
                 </button>
                 <button onClick={handleDevReset} disabled={resetting}
                   style={{ flex: 1, padding: "13px", borderRadius: 14, border: "none", background: "#E24B4A", color: "#FDFCF8", fontSize: 14, fontWeight: 500, cursor: resetting ? "not-allowed" : "pointer", opacity: resetting ? 0.7 : 1 }}>
-                  {resetting ? "Resetting…" : "Yes, reset"}
+                  {resetting ? t("weeklyPlan.resetModal.confirming") : t("weeklyPlan.resetModal.confirm")}
                 </button>
               </div>
             </div>
@@ -1090,10 +1092,10 @@ export default function App({ onBack }) {
               borderRadius: "24px 24px 0 0", padding: "28px 24px 40px"
             }}>
               <div style={{ fontSize: 18, fontWeight: 600, color: "#2C2C2A", marginBottom: 8 }}>
-                Unsaved changes
+                {t("weeklyPlan.unsavedModal.title")}
               </div>
               <div style={{ fontSize: 13, color: "#888780", marginBottom: 24, lineHeight: 1.6 }}>
-                Your plan has unsaved changes. Please save before leaving — or your changes will be lost.
+                {t("weeklyPlan.unsavedModal.desc")}
               </div>
               <div style={{ display: "flex", gap: 12 }}>
                 <button
@@ -1104,7 +1106,7 @@ export default function App({ onBack }) {
                     color: "#888780", fontSize: 14, fontWeight: 500, cursor: "pointer"
                   }}
                 >
-                  Go back and save
+                  {t("weeklyPlan.unsavedModal.goBack")}
                 </button>
                 <button
                   onClick={() => {
@@ -1117,7 +1119,7 @@ export default function App({ onBack }) {
                     color: "#FDFCF8", fontSize: 14, fontWeight: 500, cursor: "pointer"
                   }}
                 >
-                  Leave anyway
+                  {t("weeklyPlan.unsavedModal.leave")}
                 </button>
               </div>
             </div>

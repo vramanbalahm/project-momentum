@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import IngredientSelector, { satvikToValue, valueToSatvik } from "./IngredientSelector";
 import { C, HelpTip, NavButtons } from "./householdShared.jsx";
+import { useTranslation } from "react-i18next";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
@@ -13,8 +14,9 @@ const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 //   onDone   — called after successful save (replaces onNext in standalone mode)
 //   nextLabel — label for the primary action button (default: "Save & continue")
 
-export default function SatvikEditor({ onBack, onSkip, onDone, nextLabel = "Save & continue" }) {
+export default function SatvikEditor({ onBack, onSkip, onDone, nextLabel }) {
   const { apiFetch } = useAuth();
+  const { t } = useTranslation();
   const [satvikValue, setSatvikValue] = useState({});
   const [loading, setLoading]         = useState(true);
   const [saving, setSaving]           = useState(false);
@@ -28,7 +30,7 @@ export default function SatvikEditor({ onBack, onSkip, onDone, nextLabel = "Save
         const d = await apiFetch("/onboarding/data");
         setSatvikValue(satvikToValue(d.satvik));
       } catch {
-        setError("Failed to load Satvik settings.");
+        setError(t("common.error"));
       } finally {
         setLoading(false);
       }
@@ -47,7 +49,7 @@ export default function SatvikEditor({ onBack, onSkip, onDone, nextLabel = "Save
       setTimeout(() => setSuccess(false), 4000);
       if (onDone) onDone();
     } catch (e) {
-      setError(e.message || "Failed to save. Please try again.");
+      setError(e.message || t("common.error"));
     } finally {
       setSaving(false);
     }
@@ -56,7 +58,7 @@ export default function SatvikEditor({ onBack, onSkip, onDone, nextLabel = "Save
   if (loading) {
     return (
       <div style={{ padding: "32px 0", textAlign: "center", color: C.muted, fontSize: 13 }}>
-        Loading Satvik settings...
+        {t("common.loading")}
       </div>
     );
   }
@@ -64,7 +66,7 @@ export default function SatvikEditor({ onBack, onSkip, onDone, nextLabel = "Save
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: 480 }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
-        <div style={{ fontSize: 17, fontWeight: 500, color: C.text }}>Satvik definition</div>
+        <div style={{ fontSize: 17, fontWeight: 500, color: C.text }}>{t("satvikEditor.title")}</div>
         <HelpTip
           text="Select ingredients your household AVOIDS on Satvik days. e.g. most Tamil Brahmin households avoid onion and garlic. These rules apply on all Satvik-tagged days."
           visible={help.satvik}
@@ -72,7 +74,7 @@ export default function SatvikEditor({ onBack, onSkip, onDone, nextLabel = "Save
         />
       </div>
       <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
-        Toggle ingredients your household <strong>AVOIDS</strong> on Satvik days.
+        {t("satvikEditor.subtitle")}
       </div>
 
       {error && (
@@ -83,7 +85,7 @@ export default function SatvikEditor({ onBack, onSkip, onDone, nextLabel = "Save
 
       {success && (
         <div style={{ background: C.satvik.bg, border: `0.5px solid ${C.teal}`, borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontSize: 12, color: C.satvik.text }}>
-          Satvik settings saved ✓
+          {t("satvikEditor.saved")}
         </div>
       )}
 
