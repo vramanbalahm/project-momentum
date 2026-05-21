@@ -308,8 +308,7 @@ export default function MyProfile({ onBack }) {
         </div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
-            Tap <strong style={{ color: "#E24B4A" }}>🚫 Allergy</strong> for medical restrictions ·
-            <strong style={{ color: "#BA7517" }}> 😕 Dislike</strong> for preferences
+            {t("myProfile.allergyHint")}
           </div>
           <IngredientSelector
             mode="restriction"

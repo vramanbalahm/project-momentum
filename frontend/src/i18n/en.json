@@ -453,7 +453,11 @@
     "markedToAvoid": "Marked to avoid:",
     "currentlySelected": "Currently selected:",
     "enableAll": "Enable all",
-    "disableAll": "Disable all"
+    "disableAll": "Disable all",
+    "allAllergy": "All Allergy",
+    "allDislike": "All Dislike",
+    "clear": "Clear",
+    "allergyHint": "Tap 🚫 Allergy for medical restrictions · 😕 Dislike for preferences"
   },
   "swapCopy": {
     "swap": "Swap",

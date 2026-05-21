@@ -209,11 +209,11 @@ export default function IngredientSelector({
                 {mode === "restriction" && (
                   <>
                     <span onClick={() => enableAllRestriction(cat, "allergy")}
-                      style={{ fontSize: 11, color: "#E24B4A", cursor: "pointer" }}>All Allergy</span>
+                      style={{ fontSize: 11, color: "#E24B4A", cursor: "pointer" }}>{t("ingredientSelector.allAllergy")}</span>
                     <span onClick={() => enableAllRestriction(cat, "dislike")}
-                      style={{ fontSize: 11, color: "#BA7517", cursor: "pointer" }}>All Dislike</span>
+                      style={{ fontSize: 11, color: "#BA7517", cursor: "pointer" }}>{t("ingredientSelector.allDislike")}</span>
                     <span onClick={() => disableAllRestriction(cat)}
-                      style={{ fontSize: 11, color: C.muted, cursor: "pointer" }}>Clear</span>
+                      style={{ fontSize: 11, color: C.muted, cursor: "pointer" }}>{t("ingredientSelector.clear")}</span>
                   </>
                 )}
                 {mode === "satvik" && (
