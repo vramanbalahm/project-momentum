@@ -209,7 +209,7 @@ export default function MyProfile({ onBack }) {
               <input
                 value={editName}
                 onChange={e => setEditName(e.target.value)}
-                placeholder=t("myProfile.fullName")
+                placeholder={t("myProfile.fullName")}
                 style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `0.5px solid ${C.border}`, fontSize: 14, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box" }}
               />
             ) : (
