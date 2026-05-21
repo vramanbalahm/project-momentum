@@ -188,11 +188,11 @@ export default function FamilyProfile({ onBack }) {
         <div style={{ background: "#FFF9F2", borderRadius: 16, padding: "20px 16px", marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: "#B4B2A9", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>{t("familyProfile.household")}</div>
 
-          <Field label=t("familyProfile.householdName")>
+          <Field label={t("familyProfile.householdName")>
             <input type="text" value={form.house_name} onChange={e => set("house_name", e.target.value)} style={inputStyle} />
           </Field>
 
-          <Field label=t("familyProfile.dietaryPreference")>
+          <Field label={t("familyProfile.dietaryPreference")>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {DIET_PREFS.map(d => (
                 <button key={d} onClick={() => set("dietary_preference", d)} style={{
@@ -215,7 +215,7 @@ export default function FamilyProfile({ onBack }) {
             {t("familyProfile.cuisineHint")}
           </div>
 
-          <Field label=t("familyProfile.state")>
+          <Field label={t("familyProfile.state")>
             <select value={form.cuisine_state} onChange={e => set("cuisine_state", e.target.value)} style={selectStyle}>
               <option value="">{t("familyProfile.selectState")}</option>
               {cuisineStates.map(s => <option key={s} value={s}>{s}</option>)}
@@ -223,7 +223,7 @@ export default function FamilyProfile({ onBack }) {
           </Field>
 
           {regions.length > 0 && (
-            <Field label=t("familyProfile.region")>
+            <Field label={t("familyProfile.region")>
               <select value={form.cuisine_region} onChange={e => set("cuisine_region", e.target.value)} style={selectStyle}>
                 <option value="">{t("familyProfile.selectRegion")}</option>
                 {regions.map(r => <option key={r} value={r}>{r}</option>)}
@@ -232,7 +232,7 @@ export default function FamilyProfile({ onBack }) {
           )}
 
           {subRegions.length > 0 && (
-            <Field label=t("familyProfile.subRegion")>
+            <Field label={t("familyProfile.subRegion")>
               <select value={form.cuisine_sub_region_id} onChange={e => set("cuisine_sub_region_id", e.target.value)} style={selectStyle}>
                 <option value="">{t("familyProfile.selectSubRegion")}</option>
                 {subRegions.map(sr => <option key={sr.id} value={sr.id}>{sr.sub_region}</option>)}
@@ -248,7 +248,7 @@ export default function FamilyProfile({ onBack }) {
             {t("familyProfile.locationHint")}
           </div>
 
-          <Field label=t("familyProfile.state")>
+          <Field label={t("familyProfile.state")>
             <select value={form.city_state} onChange={e => set("city_state", e.target.value)} style={selectStyle}>
               <option value="">{t("familyProfile.selectState")}</option>
               {cityStates.map(s => <option key={s} value={s}>{s}</option>)}
@@ -256,7 +256,7 @@ export default function FamilyProfile({ onBack }) {
           </Field>
 
           {cities.length > 0 && (
-            <Field label=t("familyProfile.cityTown")>
+            <Field label={t("familyProfile.cityTown")>
               <select value={form.current_city} onChange={e => set("current_city", e.target.value)} style={selectStyle}>
                 <option value="">{t("familyProfile.selectCity")}</option>
                 {cities.map(c => <option key={c.id} value={c.display_name}>{c.display_name}</option>)}
