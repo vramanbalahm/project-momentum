@@ -23,7 +23,11 @@ async function apiFetch(path, options = {}, { skipLogoutOn401 = false } = {}) {
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Request failed" }));
-    throw new Error(err.detail || "Request failed");
+    // Pydantic 422 returns detail as an array of validation error objects
+    const detail = Array.isArray(err.detail)
+      ? err.detail.map(e => e.msg || JSON.stringify(e)).join(", ")
+      : err.detail || "Request failed";
+    throw new Error(detail);
   }
   if (res.status === 204) return null;
   return res.json();
