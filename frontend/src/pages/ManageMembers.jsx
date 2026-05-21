@@ -53,6 +53,7 @@ export default function ManageMembers({ onBack }) {
   const [addForm, setAddForm] = useState({ name: "", email: "", password: "" });
   const [adding, setAdding] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
+  const [confirmModal, setConfirmModal]   = useState(null); // { title, desc, onConfirm }
   const [editMember, setEditMember]     = useState(null);
   const [editForm, setEditForm]         = useState({});
   const [editSaving, setEditSaving]     = useState(false);
@@ -91,50 +92,58 @@ export default function ManageMembers({ onBack }) {
 
   useEffect(() => { loadMembers(); }, []);
 
-  const handleRoleChange = async (memberId, currentRole) => {
+  const handleRoleChange = (memberId, currentRole) => {
     const newRole = currentRole === "household_admin" ? "household_member" : "household_admin";
     const action = newRole === "household_admin" ? "promote" : "demote";
-    if (!confirm(`${action === "promote" ? "Promote" : "Demote"} this member? ${action === "promote" ? "A temporary password will be emailed to them." : ""}`)) return;
-
-    setError(null); setSuccess(null);
-    setActionLoading(memberId);
-    try {
-      const res = await apiFetch("/auth/members/role", {
-        method: "PUT",
-        body: JSON.stringify({ user_id: memberId, new_role: newRole })
-      });
-      setSuccess(res.message);
-      setTimeout(() => setSuccess(null), 4000);
-      await loadMembers();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setActionLoading(null);
-    }
+    setConfirmModal({
+      title: action === "promote" ? t("manageMembers.promoteTitle") : t("manageMembers.demoteTitle"),
+      desc:  action === "promote" ? t("manageMembers.promoteDesc")  : t("manageMembers.demoteDesc"),
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setError(null); setSuccess(null);
+        setActionLoading(memberId);
+        try {
+          const res = await apiFetch("/auth/members/role", {
+            method: "PUT",
+            body: JSON.stringify({ user_id: memberId, new_role: newRole })
+          });
+          setSuccess(res.message);
+          setTimeout(() => setSuccess(null), 4000);
+          await loadMembers();
+        } catch (e) {
+          setError(e.message);
+        } finally {
+          setActionLoading(null);
+        }
+      }
+    });
   };
 
-  const handleToggleActive = async (memberId, currentActive) => {
+  const handleToggleActive = (memberId, currentActive) => {
     const action = currentActive ? "deactivate" : "activate";
-    if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} this member?`)) return;
-
-    setError(null); setSuccess(null);
-    setActionLoading(memberId);
-    try {
-      const res = await apiFetch("/auth/members/deactivate", {
-        method: "PUT",
-        body: JSON.stringify({ user_id: memberId, is_active: !currentActive })
-      });
-      setSuccess(res.message);
-      setTimeout(() => setSuccess(null), 4000);
-      await loadMembers();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setActionLoading(null);
-    }
+    setConfirmModal({
+      title: action === "deactivate" ? t("manageMembers.deactivateTitle") : t("manageMembers.activateTitle"),
+      desc:  action === "deactivate" ? t("manageMembers.deactivateDesc")  : t("manageMembers.activateDesc"),
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setError(null); setSuccess(null);
+        setActionLoading(memberId);
+        try {
+          const res = await apiFetch("/auth/members/deactivate", {
+            method: "PUT",
+            body: JSON.stringify({ user_id: memberId, is_active: !currentActive })
+          });
+          setSuccess(res.message);
+          setTimeout(() => setSuccess(null), 4000);
+          await loadMembers();
+        } catch (e) {
+          setError(e.message);
+        } finally {
+          setActionLoading(null);
+        }
+      }
+    });
   };
-
-  const openEdit = async (m) => {
     setProfileLoading(true);
     setEditMember(m);  // Open sheet with loading state
     try {
@@ -441,6 +450,26 @@ export default function ManageMembers({ onBack }) {
               {editSaving ? t("manageMembers.saving") : t("manageMembers.saveProfile")}
             </button>
             </>)}
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirmation modal ── */}
+      {confirmModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
+          <div style={{ background: "#FFF9F2", borderRadius: 16, padding: "24px 20px", width: "100%", maxWidth: 360 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#2C2C2A", marginBottom: 8 }}>{confirmModal.title}</div>
+            <div style={{ fontSize: 13, color: "#888780", marginBottom: 24 }}>{confirmModal.desc}</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setConfirmModal(null)}
+                style={{ flex: 1, padding: "10px", borderRadius: 10, border: "0.5px solid #EDE8E0", background: "transparent", fontSize: 13, color: "#888780", cursor: "pointer" }}>
+                {t("manageMembers.cancelBtn")}
+              </button>
+              <button onClick={confirmModal.onConfirm}
+                style={{ flex: 1, padding: "10px", borderRadius: 10, border: "none", background: "#1A3A2E", color: "#9FE1CB", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+                {t("manageMembers.confirmBtn")}
+              </button>
+            </div>
           </div>
         </div>
       )}

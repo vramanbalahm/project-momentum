@@ -377,7 +377,17 @@
     "allergiesDislikes": "Allergies & dislikes",
     "saveProfile": "Save profile",
     "saving": "Saving...",
-    "savedSuccess": "{{name}}'s profile updated successfully!"
+    "savedSuccess": "{{name}}'s profile updated successfully!",
+    "promoteTitle": "Promote member?",
+    "promoteDesc": "A temporary password will be emailed to them.",
+    "demoteTitle": "Demote member?",
+    "demoteDesc": "This member will lose admin access.",
+    "activateTitle": "Activate member?",
+    "activateDesc": "This member will regain access to the household.",
+    "deactivateTitle": "Deactivate member?",
+    "deactivateDesc": "This member will lose access to the household.",
+    "confirmBtn": "Yes, confirm",
+    "cancelBtn": "Cancel"
   },
   "memberAvailability": {
     "title": "Member Availability",
