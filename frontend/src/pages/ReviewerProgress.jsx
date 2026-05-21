@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useTranslation } from "react-i18next";
 
 const C = {
   green:  "#1A3A2E",
@@ -20,11 +21,12 @@ const STATUS_MAP = {
 };
 
 const ProgressBar = ({ value, max, color = C.teal }) => {
+  const { t } = useTranslation();
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.muted, marginBottom: 4 }}>
-        <span>Progress</span><span>{pct}%</span>
+        <span>{t("reviewProgress.progress")}</span><span>{pct}%</span>
       </div>
       <div style={{ height: 6, background: C.border, borderRadius: 6, overflow: "hidden" }}>
         <div style={{ height: "100%", background: color, borderRadius: 6, width: `${pct}%`, transition: "width 0.4s" }} />
@@ -35,6 +37,7 @@ const ProgressBar = ({ value, max, color = C.teal }) => {
 
 export default function ReviewerProgress({ onBack, onNavigate }) {
   const { apiFetch } = useAuth();
+  const { t } = useTranslation();
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
@@ -48,7 +51,7 @@ export default function ReviewerProgress({ onBack, onNavigate }) {
       const d = await apiFetch("/recipes/reviewer-progress");
       setData(d);
     } catch (e) {
-      setError(e.message || "Failed to load progress.");
+      setError(e.message || t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -70,16 +73,16 @@ export default function ReviewerProgress({ onBack, onNavigate }) {
       {/* Header */}
       <div style={{ background: C.green, padding: "16px 20px 20px" }}>
         <div style={{ color: C.mint, fontSize: 12, cursor: "pointer", marginBottom: 6 }} onClick={onBack}>
-          ← Dashboard
+          {t("reviewProgress.backToDashboard")}
         </div>
-        <div style={{ color: "#FDFCF8", fontSize: 18, fontWeight: 500 }}>Review Progress</div>
-        <div style={{ color: C.teal, fontSize: 11, marginTop: 2 }}>Platform admin view</div>
+        <div style={{ color: "#FDFCF8", fontSize: 18, fontWeight: 500 }}>{t("reviewProgress.title")}</div>
+        <div style={{ color: C.teal, fontSize: 11, marginTop: 2 }}>{t("reviewProgress.subtitle")}</div>
       </div>
 
       <div style={{ padding: "16px" }}>
 
         {loading && (
-          <div style={{ textAlign: "center", padding: 40, color: C.muted, fontSize: 13 }}>Loading...</div>
+          <div style={{ textAlign: "center", padding: 40, color: C.muted, fontSize: 13 }}>{t("common.loading")}</div>
         )}
 
         {error && (
@@ -93,15 +96,15 @@ export default function ReviewerProgress({ onBack, onNavigate }) {
             {/* ── Vault overview — stats are clickable ── */}
             <div style={{ background: C.card, borderRadius: 16, padding: "14px 16px", border: `0.5px solid ${C.border}`, marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>
-                Vault overview — {data.totals.total} recipes
+                {t("reviewProgress.vaultOverview")} — {data.totals.total} {t("reviewProgress.recipes")}
               </div>
               <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                 {Object.entries(STATUS_MAP).map(([key, { tab, color, bg, labelColor }]) => (
                   <div key={key} onClick={() => goToTab(key)}
                     style={{ flex: 1, cursor: "pointer", background: bg, borderRadius: 8, padding: "8px 6px", textAlign: "center" }}>
                     <div style={{ fontSize: 17, fontWeight: 500, color }}>{data.totals[key]}</div>
-                    <div style={{ fontSize: 9, color: labelColor, marginTop: 2, textTransform: "capitalize" }}>{key}</div>
-                    <div style={{ fontSize: 8, color: labelColor, marginTop: 1, opacity: 0.7 }}>tap →</div>
+                    <div style={{ fontSize: 9, color: labelColor, marginTop: 2, textTransform: "capitalize" }}>{t(`reviewProgress.${key}`)}</div>
+                    <div style={{ fontSize: 8, color: labelColor, marginTop: 1, opacity: 0.7 }}>{t("common.tapToFilter")}</div>
                   </div>
                 ))}
               </div>
@@ -117,12 +120,12 @@ export default function ReviewerProgress({ onBack, onNavigate }) {
               onClick={() => onNavigate({ initialTab: "under_review" })}
               style={{ background: C.green, color: C.mint, borderRadius: 12, padding: "12px 16px", textAlign: "center", fontSize: 13, fontWeight: 500, cursor: "pointer", marginBottom: 20 }}
             >
-              Open Recipe Review →
+              {t("reviewProgress.openRecipeReview")}
             </div>
 
             {/* ── Reviewer cards — each clickable ── */}
             <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>
-              Reviewer breakdown
+              {t("reviewProgress.reviewerBreakdown")}
             </div>
 
             {data.reviewers.map((r, i) => {
@@ -143,8 +146,8 @@ export default function ReviewerProgress({ onBack, onNavigate }) {
                       <div style={{ fontSize: 11, color: C.muted }}>{r.email}</div>
                     </div>
                     {notStarted
-                      ? <span style={{ fontSize: 10, background: "#F0EFEC", color: C.muted, padding: "3px 8px", borderRadius: 10 }}>Not started</span>
-                      : <span style={{ fontSize: 12, fontWeight: 500, color: C.green }}>{r.total_done} done ›</span>
+                      ? <span style={{ fontSize: 10, background: "#F0EFEC", color: C.muted, padding: "3px 8px", borderRadius: 10 }}>{t("reviewProgress.notStarted")}</span>
+                      : <span style={{ fontSize: 12, fontWeight: 500, color: C.green }}>{r.total_done} {t("reviewProgress.done")} ›</span>
                     }
                   </div>
 
@@ -152,7 +155,7 @@ export default function ReviewerProgress({ onBack, onNavigate }) {
                     {Object.entries(STATUS_MAP).map(([key, { color, bg, labelColor }]) => (
                       <div key={key} style={{ flex: 1, background: bg, borderRadius: 6, padding: "5px 4px", textAlign: "center" }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color }}>{r[key]}</div>
-                        <div style={{ fontSize: 8, color: labelColor, marginTop: 1, textTransform: "capitalize" }}>{key}</div>
+                        <div style={{ fontSize: 8, color: labelColor, marginTop: 1, textTransform: "capitalize" }}>{t(`reviewProgress.${key}`)}</div>
                       </div>
                     ))}
                   </div>
