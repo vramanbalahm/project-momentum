@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import SatvikEditor from "../components/SatvikEditor.jsx";
 import LunarEditor  from "../components/LunarEditor.jsx";
 import EventEditor  from "../components/EventEditor.jsx";
@@ -8,40 +9,25 @@ import { C } from "../components/householdShared.jsx";
 // Acts as a menu; each item navigates to the corresponding editor.
 // Editors are the same components used in OnboardingWizard — no duplication.
 
-const MENU_ITEMS = [
-  {
-    id:    "satvik",
-    icon:  "🕉️",
-    label: "Satvik definition",
-    desc:  "Ingredients avoided on Satvik days",
-    color: "#E1F5EE",
-  },
-  {
-    id:    "lunar",
-    icon:  "🌙",
-    label: "Lunar calendar",
-    desc:  "Panchangam your household follows",
-    color: "#EEEDFE",
-  },
-  {
-    id:    "events",
-    icon:  "🎂",
-    label: "Events & special days",
-    desc:  "Birthdays, anniversaries, rituals",
-    color: "#FAEEDA",
-  },
-];
+
 
 export default function HouseholdSettings({ onBack }) {
-  const [activeEditor, setActiveEditor] = useState(null); // null | "satvik" | "lunar" | "events"
+  const { t } = useTranslation();
+  const [activeEditor, setActiveEditor] = useState(null);
+
+  const MENU_ITEMS = [
+    { id: "satvik", icon: "🕉️", label: t("householdSettings.satvik.label"), desc: t("householdSettings.satvik.desc"), color: "#E1F5EE" },
+    { id: "lunar",  icon: "🌙", label: t("householdSettings.lunar.label"),  desc: t("householdSettings.lunar.desc"),  color: "#EEEDFE" },
+    { id: "events", icon: "🎂", label: t("householdSettings.events.label"), desc: t("householdSettings.events.desc"), color: "#FAEEDA" },
+  ]; // null | "satvik" | "lunar" | "events"
 
   // ── Editor screens ────────────────────────────────────────────────────────
   if (activeEditor === "satvik") {
     return (
-      <EditorShell title="Satvik definition" testId="editor-satvik" onBack={() => setActiveEditor(null)}>
+      <EditorShell title={t("householdSettings.satvik.label")} testId="editor-satvik" onBack={() => setActiveEditor(null)}>
         <SatvikEditor
           onDone={null}
-          nextLabel="Save"
+          nextLabel={t("common.save")}
         />
       </EditorShell>
     );
@@ -49,10 +35,10 @@ export default function HouseholdSettings({ onBack }) {
 
   if (activeEditor === "lunar") {
     return (
-      <EditorShell title="Lunar calendar" testId="editor-lunar" onBack={() => setActiveEditor(null)}>
+      <EditorShell title={t("householdSettings.lunar.label")} testId="editor-lunar" onBack={() => setActiveEditor(null)}>
         <LunarEditor
           onDone={null}
-          nextLabel="Save"
+          nextLabel={t("common.save")}
         />
       </EditorShell>
     );
@@ -60,10 +46,10 @@ export default function HouseholdSettings({ onBack }) {
 
   if (activeEditor === "events") {
     return (
-      <EditorShell title="Events & special days" testId="editor-events" onBack={() => setActiveEditor(null)}>
+      <EditorShell title={t("householdSettings.events.label")} testId="editor-events" onBack={() => setActiveEditor(null)}>
         <EventEditor
           onDone={null}
-          nextLabel="Save"
+          nextLabel={t("common.save")}
         />
       </EditorShell>
     );
@@ -76,16 +62,16 @@ export default function HouseholdSettings({ onBack }) {
       {/* Header */}
       <div style={{ background: C.green, padding: "16px 20px 20px" }}>
         <div style={{ color: "#9FE1CB", fontSize: 12, cursor: "pointer", marginBottom: 6 }} onClick={onBack}>
-          ← Dashboard
+          {t("householdSettings.backToDashboard")}
         </div>
-        <div style={{ color: "#FDFCF8", fontSize: 18, fontWeight: 500 }}>Household Settings</div>
-        <div style={{ color: "#5DCAA5", fontSize: 11, marginTop: 2 }}>Configure your household preferences</div>
+        <div style={{ color: "#FDFCF8", fontSize: 18, fontWeight: 500 }}>{t("householdSettings.title")}</div>
+        <div style={{ color: "#5DCAA5", fontSize: 11, marginTop: 2 }}>{t("householdSettings.subtitle")}</div>
       </div>
 
       {/* Menu items */}
       <div style={{ padding: "24px 20px" }}>
         <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>
-          Settings
+          {t("householdSettings.settings")}
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -127,7 +113,7 @@ function EditorShell({ title, onBack, children, testId }) {
       <div style={{ width: "100%", maxWidth: 400, padding: "0 16px" }}>
         <div style={{ background: C.card, borderRadius: 20, padding: "20px 18px", position: "relative" }}>
           <div onClick={onBack} style={{ fontSize: 12, color: C.muted, cursor: "pointer", marginBottom: 12 }}>
-            ← Back to settings
+            {t("householdSettings.backToSettings")}
           </div>
           {children}
         </div>
