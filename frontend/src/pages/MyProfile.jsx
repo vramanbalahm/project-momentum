@@ -17,21 +17,36 @@ const DIET_IMAGES = {
   "Eggitarian": "https://cdn-icons-png.flaticon.com/512/837/837560.png",
 };
 const AGE_GROUPS = [
-  { value: "Child",  label: t("ageGroup.child"),  sub: t("ageGroup.childSub"),  emoji: "👶" },
-  { value: "Teen",   label: t("ageGroup.teen"),   sub: t("ageGroup.teenSub"),   emoji: "🧒" },
-  { value: "Adult",  label: t("ageGroup.adult"),  sub: t("ageGroup.adultSub"),  emoji: "🧑" },
-  { value: "Senior", label: t("ageGroup.senior"), sub: t("ageGroup.seniorSub"), emoji: "👴" },
+  { value: "Child",  emoji: "👶" },
+  { value: "Teen",   emoji: "🧒" },
+  { value: "Adult",  emoji: "🧑" },
+  { value: "Senior", emoji: "👴" },
 ];
 const GENDERS = [
-  { value: "Male",              label: t("gender.male"),            emoji: "👨" },
-  { value: "Female",            label: t("gender.female"),          emoji: "👩" },
-  { value: "Transgender",       label: t("gender.transgender"),     emoji: "🏳️" },
-  { value: "Prefer not to say", label: t("gender.preferNotToSay"), emoji: "🤐" },
+  { value: "Male",              emoji: "👨" },
+  { value: "Female",            emoji: "👩" },
+  { value: "Transgender",       emoji: "🏳️" },
+  { value: "Prefer not to say", emoji: "🤐" },
 ];
 
 export default function MyProfile({ onBack }) {
   const { user, apiFetch } = useAuth();
   const { t } = useTranslation();
+
+  // Translated arrays — inside component so t() is available
+  const AGE_GROUPS_T = [
+    { value: "Child",  label: t("ageGroup.child"),  sub: t("ageGroup.childSub"),  emoji: "👶" },
+    { value: "Teen",   label: t("ageGroup.teen"),   sub: t("ageGroup.teenSub"),   emoji: "🧒" },
+    { value: "Adult",  label: t("ageGroup.adult"),  sub: t("ageGroup.adultSub"),  emoji: "🧑" },
+    { value: "Senior", label: t("ageGroup.senior"), sub: t("ageGroup.seniorSub"), emoji: "👴" },
+  ];
+  const GENDERS_T = [
+    { value: "Male",              label: t("gender.male"),            emoji: "👨" },
+    { value: "Female",            label: t("gender.female"),          emoji: "👩" },
+    { value: "Transgender",       label: t("gender.transgender"),     emoji: "🏳️" },
+    { value: "Prefer not to say", label: t("gender.preferNotToSay"), emoji: "🤐" },
+  ];
+
   const isAdmin = user?.role === "household_admin" || user?.role === "platform_admin";
   const [profile, setProfile]           = useState(null);
   const [loading, setLoading]           = useState(true);
@@ -204,7 +219,7 @@ export default function MyProfile({ onBack }) {
         <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{t("myProfile.personalDetails")}</div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Full name</div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>{t("myProfile.fullName")}</div>
             {isAdmin ? (
               <input
                 value={editName}
@@ -248,7 +263,7 @@ export default function MyProfile({ onBack }) {
         <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{t("myProfile.ageGroup")}</div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            {AGE_GROUPS.map(ag => (
+            {AGE_GROUPS_T.map(ag => (
               <div key={ag.value} onClick={() => setAgeGroup(ageGroup === ag.value ? null : ag.value)}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, border: `0.5px solid ${ageGroup === ag.value ? C.teal : C.border}`, background: ageGroup === ag.value ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
                 <span style={{ fontSize: 24 }}>{ag.emoji}</span>
@@ -265,7 +280,7 @@ export default function MyProfile({ onBack }) {
         <div style={{ fontSize: 11, color: C.muted, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{t("myProfile.gender")}</div>
         <div style={{ background: C.card, border: `0.5px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {GENDERS.map(g => (
+            {GENDERS_T.map(g => (
               <div key={g.value} onClick={() => setGender(gender === g.value ? null : g.value)}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 20, border: `0.5px solid ${gender === g.value ? C.teal : C.border}`, background: gender === g.value ? "#E1F5EE" : "transparent", cursor: "pointer" }}>
                 <span style={{ fontSize: 18 }}>{g.emoji}</span>
@@ -322,13 +337,13 @@ export default function MyProfile({ onBack }) {
               <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{t("myProfile.addMemberSheet.title")}</div>
               <span onClick={() => setShowAddMember(false)} style={{ fontSize: 18, color: C.muted, cursor: "pointer" }}>✕</span>
             </div>
-            <input type="text" placeholder="Full name *" value={addForm.name}
+            <input type="text" placeholder={t("myProfile.addMemberSheet.namePlaceholder")} value={addForm.name}
               onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
               style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box", marginBottom: 10 }} />
-            <input type="email" placeholder="Email address (optional)" value={addForm.email}
+            <input type="email" placeholder={t("myProfile.addMemberSheet.emailPlaceholder")} value={addForm.email}
               onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))}
               style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box", marginBottom: 10 }} />
-            <input type="password" placeholder="Temporary password *" value={addForm.password}
+            <input type="password" placeholder={t("myProfile.addMemberSheet.passwordPlaceholder")} value={addForm.password}
               onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))}
               style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, color: C.text, background: "#F1EFE8", outline: "none", boxSizing: "border-box", marginBottom: 16 }} />
             <button onClick={handleAddMember} disabled={addSaving}
