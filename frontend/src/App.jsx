@@ -10,6 +10,7 @@ import MealEditScreen from './components/MealEditScreen';
 import SwapCopyBar from './components/SwapCopyBar';
 import { swapSlots, swapDays, auditBlueprint, persistSwap } from './services/swapService';
 import { useAuth } from './context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import MemberAvailability from './pages/MemberAvailability';
 import ChangePassword from './pages/ChangePassword';
 
@@ -154,6 +155,7 @@ const WeekThumbCard = ({ meal, slotId, onClick, isSelected = false, isSwapMode =
 
 export default function App({ onBack }) {
   const { user, logout } = useAuth();
+  const { t, i18n } = useTranslation();
   const HH_ID = user?.house_id; // declared early — used in useEffects below
   const isAdmin = user?.role === "household_admin" || user?.role === "platform_admin";
   const isPlatformAdmin = user?.role === "platform_admin";
