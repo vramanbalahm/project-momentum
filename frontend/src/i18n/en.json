@@ -330,7 +330,11 @@
     "cityTown": "City / Town",
     "selectCity": "— Select city —",
     "familyRestrictions": "Family Restrictions",
-    "restrictionsHint": "Ingredients that nobody in the family eats — these apply to the whole household and will be excluded from all meal suggestions."
+    "restrictionsHint": "Ingredients that nobody in the family eats — these apply to the whole household and will be excluded from all meal suggestions.",
+    "preferredLanguage": "Preferred language",
+    "languageHint": "This sets the language used throughout the app for your household",
+    "english": "English",
+    "tamil": "Tamil (தமிழ்)"
   },
   "manageMembers": {
     "title": "Manage Members",

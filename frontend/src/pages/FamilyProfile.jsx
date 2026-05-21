@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useTranslation } from "react-i18next";
+import i18n from "../i18n/i18n.js";
 import IngredientSelector, { restrictionsToValue, valueToRestrictions } from "../components/IngredientSelector";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
@@ -28,7 +29,7 @@ export default function FamilyProfile({ onBack }) {
   const [form, setForm] = useState({
     house_name: "", dietary_preference: "Veg",
     cuisine_state: "", cuisine_region: "", cuisine_sub_region_id: "",
-    city_state: "", current_city: ""
+    city_state: "", current_city: "", preferred_language: "en"
   });
   const [regions, setRegions] = useState([]);
   const [subRegions, setSubRegions] = useState([]);
@@ -67,6 +68,7 @@ export default function FamilyProfile({ onBack }) {
         setForm(prev => ({
           ...prev,
           house_name:            me.house_name || "",
+          preferred_language:    me.preferred_language || "en",
           dietary_preference:    me.dietary_preference || "Veg",
           // household_allergies removed — handled by IngredientSelector household restrictions
           cuisine_state:         me.cuisine_state || "",
@@ -143,7 +145,8 @@ export default function FamilyProfile({ onBack }) {
         dietary_preference: form.dietary_preference,
         current_city: form.current_city || undefined,
         // household_allergies removed — handled by /onboarding/household-restrictions
-        cuisine_sub_region_id: form.cuisine_sub_region_id ? parseInt(form.cuisine_sub_region_id) : undefined
+        cuisine_sub_region_id: form.cuisine_sub_region_id ? parseInt(form.cuisine_sub_region_id) : undefined,
+        preferred_language: form.preferred_language
       };
       const res = await apiFetch("/auth/profile", { method: "PUT", body: JSON.stringify(payload) });
       // Save household-level restrictions
@@ -152,6 +155,11 @@ export default function FamilyProfile({ onBack }) {
         body: JSON.stringify({ restrictions: valueToRestrictions(householdRestrictions) })
       });
       setSuccess(t("familyProfile.savedSuccess"));
+      // Apply language change immediately
+      i18n.changeLanguage(form.preferred_language);
+      localStorage.setItem("momentum_language", form.preferred_language);
+      // Navigate to dashboard after short delay
+      setTimeout(() => onBack(), 1000);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -210,6 +218,22 @@ export default function FamilyProfile({ onBack }) {
 
         {/* Cuisine region */}
         <div style={{ background: "#FFF9F2", borderRadius: 16, padding: "20px 16px", marginBottom: 12 }}>
+          {/* ── Preferred language ── */}
+          <div style={{ background: "#FFF9F2", borderRadius: 14, padding: "16px", border: "0.5px solid #EDE8E0", marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#B4B2A9", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{t("familyProfile.preferredLanguage")}</div>
+            <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 12 }}>{t("familyProfile.languageHint")}</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {[{ value: "en", label: t("familyProfile.english") }, { value: "ta", label: t("familyProfile.tamil") }].map(lang => (
+                <div key={lang.value} onClick={() => set("preferred_language", lang.value)}
+                  style={{ flex: 1, padding: "10px 8px", borderRadius: 10, textAlign: "center", cursor: "pointer",
+                    border: `0.5px solid ${form.preferred_language === lang.value ? "#5DCAA5" : "#EDE8E0"}`,
+                    background: form.preferred_language === lang.value ? "#E1F5EE" : "transparent" }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: form.preferred_language === lang.value ? "#0F6E56" : "#2C2C2A" }}>{lang.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div style={{ fontSize: 12, fontWeight: 600, color: "#B4B2A9", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>{t("familyProfile.homeCuisine")}</div>
           <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 14, lineHeight: 1.5 }}>
             {t("familyProfile.cuisineHint")}
