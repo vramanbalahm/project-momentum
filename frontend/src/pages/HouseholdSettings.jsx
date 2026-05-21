@@ -108,6 +108,7 @@ export default function HouseholdSettings({ onBack }) {
 
 // Shell wrapper for each editor — provides header with back nav
 function EditorShell({ title, onBack, children, testId }) {
+  const { t } = useTranslation();
   return (
     <div data-testid={testId} style={{ minHeight: "100vh", background: "#1A3A2E", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif", padding: "24px 0" }}>
       <div style={{ width: "100%", maxWidth: 400, padding: "0 16px" }}>
