@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useTranslation } from "react-i18next";
 import IngredientSelector, { restrictionsToValue, valueToRestrictions } from "../components/IngredientSelector";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
@@ -23,6 +24,7 @@ const Field = ({ label, hint, children }) => (
 
 export default function FamilyProfile({ onBack }) {
   const { user, apiFetch } = useAuth();
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     house_name: "", dietary_preference: "Veg",
     cuisine_state: "", cuisine_region: "", cuisine_sub_region_id: "",
@@ -90,7 +92,7 @@ export default function FamilyProfile({ onBack }) {
           setCities(c);
         }
       } catch (e) {
-        setError("Failed to load profile.");
+        setError(t("familyProfile.loadError"));
       } finally {
         setLoading(false);
         initialised.current = true;  // pre-fill complete — cascade effects can now reset on user change
@@ -133,7 +135,7 @@ export default function FamilyProfile({ onBack }) {
 
   const handleSave = async () => {
     setError(null); setSuccess(null);
-    if (!form.house_name.trim()) { setError("Household name is required."); return; }
+    if (!form.house_name.trim()) { setError(t("familyProfile.nameRequired")); return; }
     setSaving(true);
     try {
       const payload = {
@@ -149,7 +151,7 @@ export default function FamilyProfile({ onBack }) {
         method: "POST",
         body: JSON.stringify({ restrictions: valueToRestrictions(householdRestrictions) })
       });
-      setSuccess("Family profile saved successfully.");
+      setSuccess(t("familyProfile.savedSuccess"));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -159,7 +161,7 @@ export default function FamilyProfile({ onBack }) {
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "#F7F4EE", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ color: "#888780", fontSize: 14 }}>Loading profile...</div>
+      <div style={{ color: "#888780", fontSize: 14 }}>{t("familyProfile.loading")}</div>
     </div>
   );
 
@@ -171,7 +173,7 @@ export default function FamilyProfile({ onBack }) {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span onClick={onBack} style={{ color: "#9FE1CB", fontSize: 20, cursor: "pointer" }}>←</span>
           <div>
-            <div style={{ color: "#FDFCF8", fontSize: 17, fontWeight: 500 }}>Family Profile</div>
+            <div style={{ color: "#FDFCF8", fontSize: 17, fontWeight: 500 }}>{t("familyProfile.title")}</div>
             <div style={{ color: "#5DCAA5", fontSize: 11, marginTop: 2 }}>Admin — {user?.house_name}</div>
           </div>
         </div>
@@ -184,13 +186,13 @@ export default function FamilyProfile({ onBack }) {
 
         {/* Basic info */}
         <div style={{ background: "#FFF9F2", borderRadius: 16, padding: "20px 16px", marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#B4B2A9", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>Household</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#B4B2A9", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>{t("familyProfile.household")}</div>
 
-          <Field label="Household name *">
+          <Field label=t("familyProfile.householdName")>
             <input type="text" value={form.house_name} onChange={e => set("house_name", e.target.value)} style={inputStyle} />
           </Field>
 
-          <Field label="Dietary preference">
+          <Field label=t("familyProfile.dietaryPreference")>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {DIET_PREFS.map(d => (
                 <button key={d} onClick={() => set("dietary_preference", d)} style={{
@@ -198,7 +200,7 @@ export default function FamilyProfile({ onBack }) {
                   background: form.dietary_preference === d ? "#1A3A2E" : "transparent",
                   color: form.dietary_preference === d ? "#9FE1CB" : "#888780",
                   border: form.dietary_preference === d ? "none" : "0.5px solid #EDE8E0"
-                }}>{d}</button>
+                }}>{t(`diet.${d === "Non-Veg" ? "nonVeg" : d === "Eggetarian" ? "eggitarian" : d.toLowerCase()}`)}</button>
               ))}
             </div>
           </Field>
@@ -208,31 +210,31 @@ export default function FamilyProfile({ onBack }) {
 
         {/* Cuisine region */}
         <div style={{ background: "#FFF9F2", borderRadius: 16, padding: "20px 16px", marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#B4B2A9", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>Home Cuisine Region</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#B4B2A9", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>{t("familyProfile.homeCuisine")}</div>
           <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 14, lineHeight: 1.5 }}>
-            This helps us personalise recipe suggestions to your family's culinary roots — e.g. Chettinad, Udupi, Malabar.
+            {t("familyProfile.cuisineHint")}
           </div>
 
-          <Field label="State">
+          <Field label=t("familyProfile.state")>
             <select value={form.cuisine_state} onChange={e => set("cuisine_state", e.target.value)} style={selectStyle}>
-              <option value="">— Select state —</option>
+              <option value="">{t("familyProfile.selectState")}</option>
               {cuisineStates.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </Field>
 
           {regions.length > 0 && (
-            <Field label="Region">
+            <Field label=t("familyProfile.region")>
               <select value={form.cuisine_region} onChange={e => set("cuisine_region", e.target.value)} style={selectStyle}>
-                <option value="">— Select region —</option>
+                <option value="">{t("familyProfile.selectRegion")}</option>
                 {regions.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </Field>
           )}
 
           {subRegions.length > 0 && (
-            <Field label="Sub-region / Cuisine style">
+            <Field label=t("familyProfile.subRegion")>
               <select value={form.cuisine_sub_region_id} onChange={e => set("cuisine_sub_region_id", e.target.value)} style={selectStyle}>
-                <option value="">— Select sub-region —</option>
+                <option value="">{t("familyProfile.selectSubRegion")}</option>
                 {subRegions.map(sr => <option key={sr.id} value={sr.id}>{sr.sub_region}</option>)}
               </select>
             </Field>
@@ -241,22 +243,22 @@ export default function FamilyProfile({ onBack }) {
 
         {/* Current city */}
         <div style={{ background: "#FFF9F2", borderRadius: 16, padding: "20px 16px", marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#B4B2A9", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>Current Location</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#B4B2A9", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>{t("familyProfile.currentLocation")}</div>
           <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 14, lineHeight: 1.5 }}>
-            Used to fetch local mandi (market) prices for your area.
+            {t("familyProfile.locationHint")}
           </div>
 
-          <Field label="State">
+          <Field label=t("familyProfile.state")>
             <select value={form.city_state} onChange={e => set("city_state", e.target.value)} style={selectStyle}>
-              <option value="">— Select state —</option>
+              <option value="">{t("familyProfile.selectState")}</option>
               {cityStates.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </Field>
 
           {cities.length > 0 && (
-            <Field label="City / Town">
+            <Field label=t("familyProfile.cityTown")>
               <select value={form.current_city} onChange={e => set("current_city", e.target.value)} style={selectStyle}>
-                <option value="">— Select city —</option>
+                <option value="">{t("familyProfile.selectCity")}</option>
                 {cities.map(c => <option key={c.id} value={c.display_name}>{c.display_name}</option>)}
               </select>
             </Field>
@@ -265,9 +267,9 @@ export default function FamilyProfile({ onBack }) {
 
         {/* Family-level restrictions */}
         <div style={{ background: "#FFF9F2", borderRadius: 16, padding: "20px 16px", marginBottom: 100 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#B4B2A9", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Family Restrictions</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#B4B2A9", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>{t("familyProfile.familyRestrictions")}</div>
           <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 14, lineHeight: 1.5 }}>
-            Ingredients that nobody in the family eats — these apply to the whole household and will be excluded from all meal suggestions.
+            {t("familyProfile.restrictionsHint")}
           </div>
           <IngredientSelector
             mode="restriction"
@@ -283,7 +285,7 @@ export default function FamilyProfile({ onBack }) {
       {/* Save button — fixed bottom, constrained to container maxWidth */}
       <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "#FFF9F2", padding: "16px 20px 32px", borderTop: "0.5px solid #EDE8E0", boxSizing: "border-box" }}>
         <button onClick={handleSave} disabled={saving} style={{ width: "100%", background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 14, padding: "14px", fontSize: 15, fontWeight: 500, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
-          {saving ? "Saving..." : "Save changes"}
+          {saving ? t("familyProfile.saving") : t("familyProfile.saveChanges")}
         </button>
       </div>
     </div>
