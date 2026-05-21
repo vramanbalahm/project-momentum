@@ -377,11 +377,23 @@
   },
   "memberAvailability": {
     "title": "Member Availability",
-    "subtitle": "Who's home this week?",
-    "save": "Save availability",
-    "saved": "Availability saved ✓",
-    "allHome": "All home",
-    "noneHome": "None home"
+    "weekOf": "Week of {{start}} — {{end}}",
+    "loading": "Loading members…",
+    "hint": "Tap a day to expand · tap an avatar to mark someone away · save when done",
+    "allAvailable": "All {{count}} available",
+    "someAvailable": "{{min}}–{{max}} of {{max}} available",
+    "away": "away",
+    "breakfast": "Breakfast",
+    "lunch": "Lunch",
+    "dinner": "Dinner",
+    "noMembers": "No household members found.",
+    "saveBtn": "Save Availability",
+    "saving": "Saving…",
+    "savedSuccess": "Availability saved for this week.",
+    "saveError": "Save failed. Please try again.",
+    "loadError": "Failed to load availability.",
+    "awayLabel": "Away",
+    "presentLabel": "Present"
   },
   "householdSettings": {
     "title": "Household Settings",

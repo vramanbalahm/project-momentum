@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useTranslation } from "react-i18next";
 
 const C = {
   green: "#1A3A2E", mint: "#9FE1CB", teal: "#5DCAA5",
@@ -60,6 +61,7 @@ function slotKey(date, slot) { return `${date}__${slot}`; }
 
 export default function MemberAvailability({ onBack, onProceed }) {
   const { apiFetch } = useAuth();
+  const { t } = useTranslation();
 
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
@@ -92,7 +94,7 @@ export default function MemberAvailability({ onBack, onProceed }) {
       }
       setAbsent(map);
     } catch (e) {
-      setError(e.message || "Failed to load availability.");
+      setError(e.message || t("memberAvailability.loadError"));
     } finally {
       setLoading(false);
     }
@@ -133,8 +135,8 @@ export default function MemberAvailability({ onBack, onProceed }) {
       if (present < minPresent) minPresent = present;
     }
 
-    if (minPresent === members.length) return `All ${members.length} available`;
-    return `${minPresent}–${members.length} of ${members.length} available`;
+    if (minPresent === members.length) return t("memberAvailability.allAvailable", { count: members.length });
+    return t("memberAvailability.someAvailable", { min: minPresent, max: members.length });
   }
 
   const handleSave = async () => {
@@ -160,11 +162,11 @@ export default function MemberAvailability({ onBack, onProceed }) {
         method: "POST",
         body: JSON.stringify({ week_start_date: weekStart, slots })
       });
-      setSuccess("Availability saved for this week.");
+      setSuccess(t("memberAvailability.savedSuccess"));
       setTimeout(() => setSuccess(null), 4000);
       if (onProceed) setTimeout(onProceed, 800);
     } catch (e) {
-      setError(e.message || "Save failed. Please try again.");
+      setError(e.message || t("memberAvailability.saveError"));
       window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setSaving(false);
@@ -185,7 +187,7 @@ export default function MemberAvailability({ onBack, onProceed }) {
           >←</div>
           <div>
             <div style={{ color: C.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>MOMENTUM</div>
-            <div style={{ color: "#FDFCF8", fontSize: 17, fontWeight: 500, marginTop: 2 }}>Member Availability</div>
+            <div style={{ color: "#FDFCF8", fontSize: 17, fontWeight: 500, marginTop: 2 }}>{t("memberAvailability.title")}</div>
             {weekStart && (
               <div style={{ color: C.teal, fontSize: 11, marginTop: 2 }}>
                 Week of {formatDisplayDate(weekStart)} — {formatDisplayDate(dateStr((() => { const d = new Date(weekStart + "T00:00:00"); d.setDate(d.getDate() + 6); return d; })()))}
@@ -215,14 +217,14 @@ export default function MemberAvailability({ onBack, onProceed }) {
         {/* Loading */}
         {loading && (
           <div style={{ textAlign: "center", padding: "48px 0", color: C.muted, fontSize: 13 }}>
-            Loading members…
+            {t("memberAvailability.loading")}
           </div>
         )}
 
         {/* Hint */}
         {!loading && !error && (
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 14, lineHeight: 1.5 }}>
-            Tap a day to expand · tap an avatar to mark someone away · save when done
+            {t("memberAvailability.hint")}
           </div>
         )}
 
@@ -287,7 +289,7 @@ export default function MemberAvailability({ onBack, onProceed }) {
                         {/* Meal label */}
                         <div style={{ width: 72, flexShrink: 0 }}>
                           <div style={{ fontSize: 11, color: C.muted }}>
-                            {MEAL_ICONS[slot]} {slot}
+                            {MEAL_ICONS[slot]} {t(`memberAvailability.${slot.toLowerCase()}`)}
                           </div>
                         </div>
 
@@ -300,7 +302,7 @@ export default function MemberAvailability({ onBack, onProceed }) {
                               <div
                                 key={m.user_id}
                                 onClick={() => toggle(dStr, slot, m.user_id)}
-                                title={away ? `${m.name} — Away` : `${m.name} — Present`}
+                                title={away ? `${m.name} — ${t("memberAvailability.awayLabel")}` : `${m.name} — ${t("memberAvailability.presentLabel")}`}
                                 style={{
                                   width: 38, height: 38, borderRadius: "50%",
                                   background: away ? "#F0EFEC" : col.bg,
@@ -336,7 +338,7 @@ export default function MemberAvailability({ onBack, onProceed }) {
                             background: "#FAECE7", borderRadius: 20,
                             padding: "2px 8px", fontWeight: 500
                           }}>
-                            {absentSet.size} away
+                            {absentSet.size} {t("memberAvailability.away")}
                           </div>
                         )}
                       </div>
@@ -351,7 +353,7 @@ export default function MemberAvailability({ onBack, onProceed }) {
         {/* Empty state */}
         {!loading && members.length === 0 && !error && (
           <div style={{ textAlign: "center", padding: "48px 0", color: C.muted, fontSize: 13 }}>
-            No household members found.
+            {t("memberAvailability.noMembers")}
           </div>
         )}
       </div>
@@ -376,7 +378,7 @@ export default function MemberAvailability({ onBack, onProceed }) {
               transition: "background 0.2s"
             }}
           >
-            {saving ? "Saving…" : "Save Availability"}
+            {saving ? t("memberAvailability.saving") : t("memberAvailability.saveBtn")}
           </button>
         </div>
       )}
