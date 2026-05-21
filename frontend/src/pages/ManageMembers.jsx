@@ -144,6 +144,8 @@ export default function ManageMembers({ onBack }) {
       }
     });
   };
+
+  const openEdit = async (m) => {
     setProfileLoading(true);
     setEditMember(m);  // Open sheet with loading state
     try {
