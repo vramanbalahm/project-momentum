@@ -251,3 +251,101 @@ class TestDeactivateMember:
             headers={"Authorization": f"Bearer {admin_user['access_token']}"}
         )
         assert resp.status_code == 404
+
+
+# ── New test cases added after bug fixes ──────────────────────────────────────
+
+class TestCreateMemberEmailOptional:
+
+    def test_create_member_without_email_succeeds(self, client, admin_user, db):
+        """Admin creates a member with no email — should succeed (email is optional)."""
+        resp = client.post("/auth/members/create",
+            json={"name": "No Email Member", "password": "ValidPass1!", "email": ""},
+            headers={"Authorization": f"Bearer {admin_user['access_token']}"}
+        )
+        assert resp.status_code == 201
+        assert "user_id" in resp.json()
+
+    def test_create_member_name_and_password_only(self, client, admin_user, db):
+        """Admin creates a member with name + password only — should succeed."""
+        resp = client.post("/auth/members/create",
+            json={"name": "Minimal Member", "password": "ValidPass1!"},
+            headers={"Authorization": f"Bearer {admin_user['access_token']}"}
+        )
+        assert resp.status_code == 201
+
+    def test_create_member_without_name_fails(self, client, admin_user):
+        """Name is required — missing name returns 422."""
+        resp = client.post("/auth/members/create",
+            json={"password": "ValidPass1!"},
+            headers={"Authorization": f"Bearer {admin_user['access_token']}"}
+        )
+        assert resp.status_code == 422
+
+    def test_create_member_without_password_fails(self, client, admin_user):
+        """Password is required — missing password returns 422."""
+        resp = client.post("/auth/members/create",
+            json={"name": "No Password"},
+            headers={"Authorization": f"Bearer {admin_user['access_token']}"}
+        )
+        assert resp.status_code == 422
+
+
+class TestPromoteMemberWithoutEmail:
+
+    def test_promote_member_without_email_succeeds(self, client, admin_user, db):
+        """Promoting a member without email still succeeds — returns 200."""
+        # Create member without email
+        resp = client.post("/auth/members/create",
+            json={"name": "No Email Promo", "password": "ValidPass1!"},
+            headers={"Authorization": f"Bearer {admin_user['access_token']}"}
+        )
+        assert resp.status_code == 201
+        member_id = resp.json()["user_id"]
+
+        # Promote them
+        resp = client.put("/auth/members/role",
+            json={"user_id": member_id, "new_role": "household_admin"},
+            headers={"Authorization": f"Bearer {admin_user['access_token']}"}
+        )
+        assert resp.status_code == 200
+
+    def test_promote_member_without_email_returns_temp_password(self, client, admin_user, db):
+        """Promoting member without email includes temp password in message."""
+        resp = client.post("/auth/members/create",
+            json={"name": "Temp Pwd Member", "password": "ValidPass1!"},
+            headers={"Authorization": f"Bearer {admin_user['access_token']}"}
+        )
+        member_id = resp.json()["user_id"]
+
+        resp = client.put("/auth/members/role",
+            json={"user_id": member_id, "new_role": "household_admin"},
+            headers={"Authorization": f"Bearer {admin_user['access_token']}"}
+        )
+        assert resp.status_code == 200
+        assert "temp password" in resp.json()["message"].lower() or "manually" in resp.json()["message"].lower()
+
+    def test_promote_member_with_email_succeeds(self, client, admin_user, member_user, db):
+        """Promoting member with email returns 200 with email sent message."""
+        resp = client.put("/auth/members/role",
+            json={"user_id": member_user["user_id"], "new_role": "household_admin"},
+            headers={"Authorization": f"Bearer {admin_user['access_token']}"}
+        )
+        assert resp.status_code == 200
+        assert "promoted" in resp.json()["message"].lower()
+
+    def test_demote_never_sends_email(self, client, admin_user, member_user, db):
+        """Demotion always succeeds without email regardless of member email status."""
+        # First promote
+        client.put("/auth/members/role",
+            json={"user_id": member_user["user_id"], "new_role": "household_admin"},
+            headers={"Authorization": f"Bearer {admin_user['access_token']}"}
+        )
+        # Then demote
+        resp = client.put("/auth/members/role",
+            json={"user_id": member_user["user_id"], "new_role": "household_member"},
+            headers={"Authorization": f"Bearer {admin_user['access_token']}"}
+        )
+        assert resp.status_code == 200
+        # Demotion message should not mention email
+        assert "email" not in resp.json()["message"].lower()
