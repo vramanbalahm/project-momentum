@@ -315,8 +315,9 @@ def get_session_constants(db: Session, h_id: str):
     member_row = db.execute(
         text("""
             SELECT COUNT(*) as cnt
-            FROM household_members
+            FROM users
             WHERE house_id = CAST(:h_id AS uuid)
+            AND is_active = true
         """),
         {"h_id": clean_h_id}
     ).fetchone()

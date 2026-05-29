@@ -23,8 +23,8 @@ function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
 
   useEffect(() => {
     if (!recipe?.recipe_id) return;
-    // Use data already on recipe object if available, else fetch
-    if (recipe.prep_steps !== undefined) {
+    // Use data already on recipe object if available (steps or prep_steps), else fetch
+    if (recipe.prep_steps !== undefined || recipe.steps !== undefined) {
       setVault(recipe);
     } else {
       axios.get(`${API_BASE}/recipe/${recipe.recipe_id}/vault`)
@@ -33,8 +33,9 @@ function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
     }
   }, [recipe?.recipe_id]);
 
-  const steps = vault?.prep_steps
-    ? vault.prep_steps.split('\n').filter(s => s.trim()).slice(0, 6)
+  const rawSteps = vault?.prep_steps || vault?.steps || "";
+  const steps = rawSteps
+    ? rawSteps.split('\n').filter(s => s.trim()).slice(0, 6)
     : [];
 
   const ingredients = (() => {
@@ -57,8 +58,8 @@ function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
       <div style={{ flex: 1, overflowY: "auto" }}>
         {/* Hero image */}
         <div style={{ position: "relative", height: 160, background: "#B4B2A9", flexShrink: 0 }}>
-          {recipe?.hero && (
-            <img src={recipe.hero} alt={recipe.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          {(recipe?.hero || recipe?.hero_image_url) && (
+            <img src={recipe.hero || recipe.hero_image_url} alt={recipe.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
               onError={e => { e.target.style.display = "none"; }} />
           )}
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(to top, rgba(26,58,46,0.9), transparent)", padding: "24px 14px 10px" }}>

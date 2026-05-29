@@ -205,7 +205,7 @@ export default function ManageMembers({ onBack }) {
 
   const handleAddMember = async () => {
     setError(null);
-    if (!addForm.name || !addForm.email || !addForm.password) { setError(t("manageMembers.allFieldsRequired")); return; }
+    if (!addForm.name || !addForm.password) { setError(t("manageMembers.allFieldsRequired")); return; }
     if (addForm.password.length < 8) { setError(t("manageMembers.passwordMin8")); return; }
     setAdding(true);
     try {
