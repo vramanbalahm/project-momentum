@@ -548,7 +548,9 @@ async def update_member_role(
             WHERE user_id = CAST(:uid AS uuid)
         """), {"role": req.new_role, "pwd": hp(temp_password), "uid": req.user_id})
         db.commit()
-        # Email the promoted user
+        # Email the promoted user — only if they have an email address
+        if not target.email:
+            return {"message": f"{target.name} promoted to admin. No email on file — share temp password manually: {temp_password}"}
         send_otp_email.__module__  # ensure imported
         from services.email_service import send_otp_email as send_email
         # Reuse email service with custom message via a direct send
@@ -585,7 +587,7 @@ async def update_member_role(
                     server.sendmail(gmail_user, target.email, msg.as_string())
             except Exception as e:
                 print(f"[role_email] Failed: {e}")
-        return {"message": f"{target.name} promoted to admin. Temporary password sent to {target.email}."}
+        return {"message": f"{target.name} promoted to admin. Temporary password sent by email."}
     else:
         # Demotion — just update role, no password change
         db.execute(text("""
