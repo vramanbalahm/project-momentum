@@ -66,7 +66,11 @@ function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
       const raw = vault?.ingredients_json;
       if (!raw) return [];
       const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-      return Array.isArray(parsed) ? parsed : Object.keys(parsed);
+      if (Array.isArray(parsed)) {
+        // Array of objects — extract name field; array of strings — use as-is
+        return parsed.map(item => typeof item === "object" ? (item.name || item.name_en || "") : item).filter(Boolean);
+      }
+      return Object.keys(parsed);
     } catch { return []; }
   })();
 
