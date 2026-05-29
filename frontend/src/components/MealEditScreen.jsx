@@ -47,15 +47,17 @@ function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
     } catch { return []; }
   })();
 
+  if (!recipe) return null;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       {/* Header */}
       <div style={{ background: "#1A3A2E", padding: "48px 16px 14px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", color: "#9FE1CB", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>←</button>
         <span style={{ fontSize: 15, fontWeight: 500, color: "#FDFCF8" }}>Dish details</span>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
         {/* Hero image */}
         <div style={{ position: "relative", height: 160, background: "#B4B2A9", flexShrink: 0 }}>
           {(recipe?.hero || recipe?.hero_image_url) && (
@@ -396,7 +398,7 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
   if (panel === 'search') {
     return (
       <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start" }}>
-        <div style={{ width: "100%", maxWidth: 430, height: "100%", background: "#FFF9F2", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ width: "100%", maxWidth: 430, height: "100%", minHeight: 0, background: "#FFF9F2", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <SearchPanel
           context={searchContext.mode}
           onBack={() => { setPanel('edit'); setDuplicateWarning(null); }}
@@ -412,7 +414,7 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
   if (panel === 'reason') {
     return (
       <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start" }}>
-        <div style={{ width: "100%", maxWidth: 430, height: "100%", background: "#FFF9F2", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ width: "100%", maxWidth: 430, height: "100%", minHeight: 0, background: "#FFF9F2", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <ReasonPanel
           recipe={pendingRecipe}
           onBack={() => setPanel('search')}
@@ -426,7 +428,7 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
   if (panel === 'detail') {
     return (
       <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start" }}>
-        <div style={{ width: "100%", maxWidth: 430, height: "100%", background: "#FFF9F2", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ width: "100%", maxWidth: 430, height: "100%", minHeight: 0, background: "#FFF9F2", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <DishDetailPanel
           recipe={detailRecipe}
           onBack={() => setPanel('edit')}
@@ -440,7 +442,7 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
   // ── EDIT PANEL (default) ──
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start" }}>
-      <div style={{ width: "100%", maxWidth: 430, height: "100%", background: "#FFF9F2", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ width: "100%", maxWidth: 430, height: "100%", minHeight: 0, background: "#FFF9F2", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* Header */}
       <div style={{ background: "#1A3A2E", padding: "48px 16px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
         <div>
@@ -450,7 +452,7 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
         <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: "50%", border: "0.5px solid #5DCAA5", background: "none", color: "#9FE1CB", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
         {/* Main dishes */}
         <div style={{ padding: "14px 16px", borderBottom: "0.5px solid #EDE8E0" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
