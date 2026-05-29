@@ -58,7 +58,12 @@ function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
 
   const rawSteps = vault?.prep_steps || vault?.steps || "";
   const steps = (typeof rawSteps === "string" && rawSteps)
-    ? rawSteps.split("\n").filter(s => s && s.trim()).slice(0, 6)
+    ? rawSteps
+        .replace(/\\n/g, "\n")   // handle escaped \n as literal text
+        .split(/\n|\r\n/)          // split on actual newlines
+        .map(s => s.trim())
+        .filter(Boolean)
+        .slice(0, 8)
     : [];
 
   const ingredients = (() => {
@@ -117,7 +122,7 @@ function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
             {steps.map((step, i) => (
               <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 8 }}>
                 <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#1A3A2E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#9FE1CB", flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
-                <div style={{ fontSize: 12, color: "#2C2C2A", lineHeight: 1.5 }}>{step}</div>
+                <div style={{ fontSize: 12, color: "#2C2C2A", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{step}</div>
               </div>
             ))}
           </div>
