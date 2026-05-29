@@ -260,7 +260,7 @@ class TestCreateMemberEmailOptional:
     def test_create_member_without_email_succeeds(self, client, admin_user, db):
         """Admin creates a member with no email — should succeed (email is optional)."""
         resp = client.post("/auth/members/create",
-            json={"name": "No Email Member", "password": "ValidPass1!", "email": ""},
+            json={"name": "No Email Member", "password": "ValidPass1!"},
             headers={"Authorization": f"Bearer {admin_user['access_token']}"}
         )
         assert resp.status_code == 201
