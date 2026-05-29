@@ -18,6 +18,27 @@ const DietBadge = ({ dietType, isSattvic }) => {
 };
 
 // ── DISH DETAIL PANEL ──────────────────────────────────────────────────────
+class DishDetailErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+          <div style={{ background: "#1A3A2E", padding: "48px 16px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+            <button onClick={this.props.onBack} style={{ background: "none", border: "none", color: "#9FE1CB", fontSize: 20, cursor: "pointer" }}>←</button>
+            <span style={{ fontSize: 15, fontWeight: 500, color: "#FDFCF8" }}>Dish details</span>
+          </div>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#888780", fontSize: 13 }}>
+            Unable to load dish details.
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
   const [vault, setVault] = useState(null);
 
@@ -33,21 +54,21 @@ function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
     }
   }, [recipe?.recipe_id]);
 
+  if (!recipe) return null;
+
   const rawSteps = vault?.prep_steps || vault?.steps || "";
-  const steps = rawSteps
-    ? rawSteps.split('\n').filter(s => s.trim()).slice(0, 6)
+  const steps = (typeof rawSteps === "string" && rawSteps)
+    ? rawSteps.split("\n").filter(s => s && s.trim()).slice(0, 6)
     : [];
 
   const ingredients = (() => {
     try {
       const raw = vault?.ingredients_json;
       if (!raw) return [];
-      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
       return Array.isArray(parsed) ? parsed : Object.keys(parsed);
     } catch { return []; }
   })();
-
-  if (!recipe) return null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -429,11 +450,13 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
     return (
       <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start" }}>
         <div style={{ width: "100%", maxWidth: 430, height: "100%", minHeight: 0, background: "#FFF9F2", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <DishDetailPanel
-          recipe={detailRecipe}
-          onBack={() => setPanel('edit')}
-          onSelect={null}
-        />
+        <DishDetailErrorBoundary onBack={() => setPanel('edit')}>
+          <DishDetailPanel
+            recipe={detailRecipe}
+            onBack={() => setPanel('edit')}
+            onSelect={null}
+          />
+        </DishDetailErrorBoundary>
         </div>
       </div>
     );
