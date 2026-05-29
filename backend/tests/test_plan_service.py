@@ -45,11 +45,13 @@ class TestSessionConstants:
         )
         initial_count = resp.json()["member_count"]
 
-        # Add a new member
-        client.post("/auth/members/create",
+        # Add a new member (no email — email is optional)
+        import uuid
+        resp_add = client.post("/auth/members/create",
             json={"name": "Count Test Member", "password": "ValidPass1!"},
             headers=auth(admin_user)
         )
+        assert resp_add.status_code == 201, f"Member creation failed: {resp_add.text}"
 
         # Get new count
         resp = client.get(

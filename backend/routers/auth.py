@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, EmailStr
+from typing import Optional
 from uuid import uuid4
 import hashlib
 import os
@@ -81,7 +82,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 class CreateMemberRequest(BaseModel):
-    email: EmailStr
+    email: Optional[EmailStr] = None
     password: str
     name: str
 
@@ -313,16 +314,16 @@ async def create_member(
     Admin-only — creates a household_member under the same household.
     Members cannot self-register into an existing household.
     """
-    # Check email not taken
-    existing = db.execute(text(
-        "SELECT user_id FROM users WHERE email = :email"
-    ), {"email": req.email}).fetchone()
-
-    if existing:
-        raise HTTPException(
-            status_code=409,
-            detail="This email is already registered in the system."
-        )
+    # Check email not taken — only if email provided
+    if req.email:
+        existing = db.execute(text(
+            "SELECT user_id FROM users WHERE email = :email"
+        ), {"email": req.email}).fetchone()
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail="This email is already registered in the system."
+            )
 
     pwd_errors = validate_password(req.password)
     if pwd_errors:
