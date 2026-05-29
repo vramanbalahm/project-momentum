@@ -51,3 +51,50 @@ def send_otp_email(to_email: str, otp: str, user_name: str = "") -> bool:
     except Exception as e:
         print(f"[email_service] Failed to send email: {e}")
         return False
+
+
+def send_promotion_email(to_email: str, user_name: str, temp_password: str) -> bool:
+    """
+    Send promotion email with temporary password via Gmail SMTP.
+    Returns True on success, False on failure.
+    """
+    if not GMAIL_APP_PASSWORD:
+        print("[email_service] GMAIL_APP_PASSWORD not set — skipping promotion email")
+        return False
+
+    subject = "You have been promoted — Momentum"
+    greeting = f"Hi {user_name}," if user_name else "Hi,"
+
+    body_html = f"""
+    <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto;">
+      <div style="background: #1A3A2E; padding: 24px; border-radius: 16px 16px 0 0; text-align: center;">
+        <div style="font-size: 28px;">🌿</div>
+        <div style="color: #FDFCF8; font-size: 18px; font-weight: 500; margin-top: 6px;">Momentum</div>
+      </div>
+      <div style="background: #FFF9F2; padding: 28px 24px; border-radius: 0 0 16px 16px;">
+        <p style="color: #2C2C2A; font-size: 15px;">{greeting}</p>
+        <p style="color: #2C2C2A; font-size: 14px;">You have been promoted to <strong>Household Admin</strong> by your household administrator.</p>
+        <p style="color: #2C2C2A; font-size: 14px;">Your new temporary password is:</p>
+        <div style="background: #E1F5EE; border-radius: 12px; padding: 20px; text-align: center; margin: 20px 0;">
+          <div style="font-size: 28px; font-weight: 700; letter-spacing: 6px; color: #1A3A2E;">{temp_password}</div>
+        </div>
+        <p style="color: #888780; font-size: 12px;">Please log in and change your password immediately from your profile settings.</p>
+      </div>
+    </div>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"Momentum <{GMAIL_USER}>"
+    msg["To"] = to_email
+    msg.attach(MIMEText(body_html, "html"))
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+            server.sendmail(GMAIL_USER, to_email, msg.as_string())
+        print(f"[email_service] Promotion email sent to {to_email}")
+        return True
+    except Exception as e:
+        print(f"[email_service] Failed to send promotion email: {e}")
+        return False

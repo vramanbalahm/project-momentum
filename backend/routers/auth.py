@@ -551,42 +551,8 @@ async def update_member_role(
         # Email the promoted user — only if they have an email address
         if not target.email:
             return {"message": f"{target.name} promoted to admin. No email on file — share temp password manually: {temp_password}"}
-        send_otp_email.__module__  # ensure imported
-        from services.email_service import send_otp_email as send_email
-        # Reuse email service with custom message via a direct send
-        import smtplib, os
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-        gmail_user = os.getenv("GMAIL_USER", "vramanbala@gmail.com")
-        gmail_pwd = os.getenv("GMAIL_APP_PASSWORD", "")
-        if gmail_pwd:
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = "You have been promoted — Momentum"
-            msg["From"] = f"Momentum <{gmail_user}>"
-            msg["To"] = target.email
-            body = f"""
-            <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;">
-              <div style="background:#1A3A2E;padding:24px;border-radius:16px 16px 0 0;text-align:center;">
-                <div style="font-size:28px;">🌿</div>
-                <div style="color:#FDFCF8;font-size:18px;font-weight:500;margin-top:6px;">Momentum</div>
-              </div>
-              <div style="background:#FFF9F2;padding:28px 24px;border-radius:0 0 16px 16px;">
-                <p style="color:#2C2C2A;">Hi {target.name},</p>
-                <p style="color:#2C2C2A;">You have been promoted to <strong>Household Admin</strong> by your household administrator.</p>
-                <p style="color:#2C2C2A;">Your new temporary password is:</p>
-                <div style="background:#E1F5EE;border-radius:12px;padding:16px;text-align:center;margin:16px 0;">
-                  <div style="font-size:22px;font-weight:700;letter-spacing:4px;color:#1A3A2E;">{temp_password}</div>
-                </div>
-                <p style="color:#888780;font-size:12px;">Please log in and change your password immediately.</p>
-              </div>
-            </div>"""
-            msg.attach(MIMEText(body, "html"))
-            try:
-                with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-                    server.login(gmail_user, gmail_pwd)
-                    server.sendmail(gmail_user, target.email, msg.as_string())
-            except Exception as e:
-                print(f"[role_email] Failed: {e}")
+        from services.email_service import send_promotion_email
+        send_promotion_email(target.email, target.name, temp_password)
         return {"message": f"{target.name} promoted to admin. Temporary password sent by email."}
     else:
         # Demotion — just update role, no password change
