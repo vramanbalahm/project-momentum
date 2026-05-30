@@ -440,7 +440,13 @@
     "saved": "Lunar calendar saved ✓",
     "save": "Save",
     "noFollow": "We don't follow a Panchangam",
-    "noFollowDesc": "Skip lunar calendar — plan freely"
+    "noFollowDesc": "Skip lunar calendar — plan freely",
+    "observations": "Which days do you observe?",
+    "observationsHint": "Toggle the days your household follows. All are active by default.",
+    "changeWarningTitle": "Change Panchangam?",
+    "changeWarningDesc": "Changing your Panchangam will reset all your lunar calendar customisations. Do you want to proceed?",
+    "changeWarningConfirm": "Yes, change it",
+    "changeWarningCancel": "Cancel"
   },
   "eventEditor": {
     "title": "Events & special days",
