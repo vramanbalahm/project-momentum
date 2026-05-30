@@ -78,30 +78,28 @@ export default function LunarEditor({ onBack, onSkip, onDone, nextLabel }) {
     setSaving(true);
     setError(null);
     try {
-      // Step 1 — Save panchangam type (this also copies ADMIN events if needed)
-      await apiFetch("/onboarding/panchangam", {
-        method: "POST",
-        body: JSON.stringify({ panchangam_type_id: panchangamId }),
-      });
+      const panchangamChanged = panchangamId !== prevPanchangamId;
 
-      // Step 2 — If we have observations, refresh them (in case just populated)
-      if (observations.length === 0 && panchangamId) {
-        const obs = await apiFetch("/onboarding/lunar-observations");
-        setObservations(obs.observations || []);
-        // Save default active state
-        if (obs.observations?.length > 0) {
-          await apiFetch("/onboarding/lunar-observations", {
-            method: "PUT",
-            body: JSON.stringify({
-              observations: obs.observations.map(o => ({
-                event_name: o.event_name,
-                is_active: o.is_active
-              }))
-            })
-          });
+      // Step 1 — Save panchangam type only if it changed or is being set for first time
+      if (panchangamChanged || (panchangamId && observations.length === 0)) {
+        await apiFetch("/onboarding/panchangam", {
+          method: "POST",
+          body: JSON.stringify({ panchangam_type_id: panchangamId }),
+        });
+        // Refresh observations after panchangam change
+        if (panchangamId) {
+          const obs = await apiFetch("/onboarding/lunar-observations");
+          setObservations(obs.observations || []);
+          setPrevPanchangamId(panchangamId);
+          setSuccess(true);
+          setTimeout(() => setSuccess(false), 4000);
+          if (onDone) onDone();
+          return;
         }
-      } else if (observations.length > 0) {
-        // Step 3 — Save observation toggles
+      }
+
+      // Step 2 — Save observation toggles if panchangam unchanged but observations modified
+      if (observations.length > 0) {
         await apiFetch("/onboarding/lunar-observations", {
           method: "PUT",
           body: JSON.stringify({
