@@ -46,7 +46,25 @@ CREATE INDEX IF NOT EXISTS idx_event_master_house_panchangam
     ON public.event_master(house_id, panchangam_type_id)
     WHERE source = 'ADMIN';
 
--- STEP 4: Verify
+-- STEP 4: Fix existing ADMIN data — all ADMIN rows must be event_type = 'Lunar'
+UPDATE public.event_master
+SET event_type = 'Lunar'
+WHERE source = 'ADMIN'
+AND event_type != 'Lunar';
+
+-- STEP 5: Add CHECK constraint to enforce ADMIN = Lunar only
+-- Drop existing check first then recreate
+ALTER TABLE public.event_master
+    DROP CONSTRAINT IF EXISTS event_master_event_type_check;
+
+ALTER TABLE public.event_master
+    ADD CONSTRAINT event_master_event_type_check CHECK (
+        (source = 'ADMIN' AND event_type = 'Lunar')
+        OR
+        (source = 'USER' AND event_type IN ('Lunar', 'Social', 'Ritual', 'Personal'))
+    );
+
+-- STEP 6: Verify
 SELECT
     source,
     event_type,
