@@ -408,15 +408,151 @@ async def save_panchangam(
             raise HTTPException(status_code=404,
                 detail=f"Panchangam type {req.panchangam_type_id} not found")
 
+    # Check if household is changing panchangam type (existing rows need clearing)
+    existing_hh = db.execute(text("""
+        SELECT panchangam_type_id FROM household_master
+        WHERE household_id = CAST(:hid AS uuid)
+    """), {"hid": house_id}).fetchone()
+
+    old_panchangam_id = existing_hh.panchangam_type_id if existing_hh else None
+    changing_type = (old_panchangam_id is not None and
+                     old_panchangam_id != req.panchangam_type_id)
+
+    # Update household panchangam type
     db.execute(text("""
         UPDATE household_master
         SET panchangam_type_id = :ptid
         WHERE household_id = CAST(:hid AS uuid)
     """), {"ptid": req.panchangam_type_id, "hid": house_id})
 
-    db.commit()
-    return {"message": "Panchangam preference saved."}
+    if req.panchangam_type_id is not None:
+        # If changing type — remove old lunar events first
+        if changing_type:
+            db.execute(text("""
+                DELETE FROM event_master
+                WHERE house_id = CAST(:hid AS uuid)
+                AND source = 'ADMIN'
+                AND event_type = 'Lunar'
+            """), {"hid": house_id})
 
+        # Copy all ADMIN lunar events for this panchangam type into household rows
+        from datetime import date
+        current_year = date.today().year
+        db.execute(text("""
+            INSERT INTO event_master
+                (house_id, event_name, event_date, event_type,
+                 is_sattvic_required, recurring_annual,
+                 local_name, icon, source, is_active,
+                 event_year, region_code, panchangam_type_id)
+            SELECT
+                CAST(:hid AS uuid), event_name, event_date, 'Lunar',
+                is_sattvic_required, false,
+                local_name, icon, 'ADMIN', true,
+                event_year, region_code, panchangam_type_id
+            FROM event_master
+            WHERE source = 'ADMIN'
+            AND house_id IS NULL
+            AND event_type = 'Lunar'
+            AND panchangam_type_id = :ptid
+            AND event_year = :year
+            AND NOT EXISTS (
+                SELECT 1 FROM event_master e2
+                WHERE e2.house_id = CAST(:hid AS uuid)
+                AND e2.source = 'ADMIN'
+                AND e2.event_type = 'Lunar'
+                AND e2.panchangam_type_id = :ptid
+            )
+        """), {"hid": house_id, "ptid": req.panchangam_type_id, "year": current_year})
+
+    db.commit()
+    return {"message": "Panchangam preference saved.", "events_copied": True}
+
+
+
+
+# ── GET /onboarding/lunar-observations ────────────────────────────────────────
+
+@router.get("/lunar-observations", status_code=200)
+async def get_lunar_observations(
+    current_user: dict = Depends(require_role("household_admin", "platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns all unique lunar observation types for this household
+    with their active/inactive status.
+    Used by Lunar Calendar Editor to show toggles.
+    """
+    house_id = current_user["house_id"]
+
+    rows = db.execute(text("""
+        SELECT DISTINCT
+            event_name,
+            local_name,
+            icon,
+            bool_and(is_active) as is_active,
+            bool_and(is_sattvic_required) as is_sattvic_required
+        FROM event_master
+        WHERE house_id = CAST(:hid AS uuid)
+        AND source = 'ADMIN'
+        AND event_type = 'Lunar'
+        GROUP BY event_name, local_name, icon
+        ORDER BY event_name
+    """), {"hid": house_id}).fetchall()
+
+    return {
+        "observations": [
+            {
+                "event_name":          r.event_name,
+                "local_name":          r.local_name,
+                "icon":                r.icon,
+                "is_active":           r.is_active,
+                "is_sattvic_required": r.is_sattvic_required,
+            }
+            for r in rows
+        ]
+    }
+
+
+# ── PUT /onboarding/lunar-observations ────────────────────────────────────────
+
+class LunarObservationToggle(BaseModel):
+    event_name: str
+    is_active:  bool
+
+class UpdateLunarObservationsRequest(BaseModel):
+    observations: List[LunarObservationToggle]
+
+@router.put("/lunar-observations", status_code=200)
+async def update_lunar_observations(
+    req: UpdateLunarObservationsRequest,
+    current_user: dict = Depends(require_role("household_admin", "platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Toggle active/inactive for each lunar observation type.
+    e.g. turn off Pradosham → all Pradosham rows for this household set is_active=false.
+    Used by Lunar Calendar Editor observation toggles.
+    """
+    house_id = current_user["house_id"]
+
+    updated = 0
+    for obs in req.observations:
+        result = db.execute(text("""
+            UPDATE event_master
+            SET is_active = :active
+            WHERE house_id = CAST(:hid AS uuid)
+            AND source = 'ADMIN'
+            AND event_type = 'Lunar'
+            AND event_name = :name
+        """), {
+            "active": obs.is_active,
+            "hid":    house_id,
+            "name":   obs.event_name,
+        })
+        updated += result.rowcount
+
+    db.commit()
+    return {"message": "Lunar observations updated.", "rows_updated": updated}
 
 # ── POST /onboarding/events ───────────────────────────────────────────────────
 
