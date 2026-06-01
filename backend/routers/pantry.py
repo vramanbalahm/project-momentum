@@ -4,7 +4,7 @@
 #                             with household's current availability status
 # POST /pantry/save         — save household's ingredient availability
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
@@ -117,22 +117,25 @@ async def save_pantry(
         return {"message": "No items to save.", "saved": 0}
 
     saved = 0
-    for item in req.items:
-        db.execute(text("""
-            INSERT INTO household_pantry (house_id, ingredient_id, is_available, updated_at)
-            VALUES (CAST(:hid AS uuid), :iid, :avail, NOW())
-            ON CONFLICT (house_id, ingredient_id)
-            DO UPDATE SET
-                is_available = EXCLUDED.is_available,
-                updated_at   = NOW()
-        """), {
-            "hid":   house_id,
-            "iid":   item.ingredient_id,
-            "avail": item.is_available,
-        })
-        saved += 1
-
-    db.commit()
+    try:
+        for item in req.items:
+            db.execute(text("""
+                INSERT INTO household_pantry (house_id, ingredient_id, is_available, updated_at)
+                VALUES (CAST(:hid AS uuid), :iid, :avail, NOW())
+                ON CONFLICT (house_id, ingredient_id)
+                DO UPDATE SET
+                    is_available = EXCLUDED.is_available,
+                    updated_at   = NOW()
+            """), {
+                "hid":   house_id,
+                "iid":   item.ingredient_id,
+                "avail": item.is_available,
+            })
+            saved += 1
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Invalid ingredient: {str(e)}")
     return {"message": "Pantry saved.", "saved": saved}
 
 
