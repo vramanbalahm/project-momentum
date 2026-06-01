@@ -65,6 +65,7 @@ export default function EventEditor({ onBack, onSkip, onDone, nextLabel }) {
               event_type:          e.event_type,
               is_sattvic_required: e.is_sattvic_required,
               recurring_annual:    e.recurring_annual,
+              icon:                e.icon || "🎉",
             }))
           })
         });
