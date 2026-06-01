@@ -100,7 +100,8 @@ export default function Dashboard({ onNavigate }) {
       id: "my_pantry",
       label: t("dashboard.tiles.myPantry"),
       desc: t("dashboard.tiles.myPantryDesc"),
-      emoji: "🥬",
+      icon: "🥬",
+      color: "#E1F5EE",
       available: true,
     },
     {

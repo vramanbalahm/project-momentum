@@ -59,16 +59,31 @@ export default function MyPantry({ onBack }) {
     };
   }, [categories, activeKey, changes]);
 
-  // Filtered ingredients based on search
+  // Global search across ALL categories
+  const isSearching = search.trim().length > 0;
+  const globalSearchResults = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return [];
+    const results = [];
+    categories.forEach(cat => {
+      cat.ingredients.forEach(ing => {
+        const avail = changes[ing.id] !== undefined ? changes[ing.id] : ing.is_available;
+        if (
+          ing.name_en.toLowerCase().includes(q) ||
+          (ing.name_ta && ing.name_ta.includes(q))
+        ) {
+          results.push({ ...ing, is_available: avail, categoryLabel: cat.label, categoryEmoji: cat.emoji });
+        }
+      });
+    });
+    return results;
+  }, [categories, changes, search]);
+
+  // Filtered ingredients for active category (when not searching)
   const filteredIngredients = useMemo(() => {
     if (!activeCategory) return [];
-    const q = search.toLowerCase().trim();
-    if (!q) return activeCategory.ingredients;
-    return activeCategory.ingredients.filter(ing =>
-      ing.name_en.toLowerCase().includes(q) ||
-      (ing.name_ta && ing.name_ta.includes(q))
-    );
-  }, [activeCategory, search]);
+    return activeCategory.ingredients;
+  }, [activeCategory]);
 
   // Get selected count for a category (including changes)
   const getSelectedCount = (cat) => {
@@ -245,57 +260,54 @@ export default function MyPantry({ onBack }) {
 
               {/* Grid */}
               <div style={{ flex: 1, overflowY: "auto", padding: "10px" }}>
-                {filteredIngredients.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "40px 0", color: C.muted, fontSize: 13 }}>
-                    No ingredients found
-                  </div>
-                ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
-                    {filteredIngredients.map(ing => {
-                      const avail = changes[ing.id] !== undefined ? changes[ing.id] : ing.is_available;
-                      return (
-                        <div
-                          key={ing.id}
-                          onClick={() => toggle(ing.id, avail)}
-                          style={{
-                            background: avail ? C.selected : C.bg,
-                            border: `${avail ? "1.5px" : "0.5px"} solid ${avail ? C.selBorder : C.border}`,
-                            borderRadius: 10,
-                            overflow: "hidden",
-                            cursor: "pointer",
-                            position: "relative",
-                            transition: "all 0.15s",
-                          }}
-                        >
-                          {/* Image area */}
-                          <div style={{ height: 64, background: avail ? "#d0ede4" : "#EEEBE4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32 }}>
-                            {ing.emoji}
-                          </div>
-                          {/* Name */}
-                          <div style={{ padding: "6px 8px" }}>
-                            <div style={{ fontSize: 11, fontWeight: 500, color: avail ? C.deepTeal : C.text, lineHeight: 1.3 }}>
-                              {ing.name_en}
-                            </div>
-                            {ing.name_ta && (
-                              <div style={{ fontSize: 9, color: avail ? C.midTeal : C.muted, marginTop: 1 }}>
-                                {ing.name_ta}
+                {isSearching ? (
+                  globalSearchResults.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "40px 0", color: C.muted, fontSize: 13 }}>No ingredients found</div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>{globalSearchResults.length} result{globalSearchResults.length !== 1 ? "s" : ""} across all categories</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+                        {globalSearchResults.map(ing => {
+                          const avail = ing.is_available;
+                          return (
+                            <div key={ing.id} onClick={() => toggle(ing.id, avail)}
+                              style={{ background: avail ? C.selected : C.bg, border: `${avail ? "1.5px" : "0.5px"} solid ${avail ? C.selBorder : C.border}`, borderRadius: 10, overflow: "hidden", cursor: "pointer", position: "relative" }}
+                            >
+                              <div style={{ height: 64, background: avail ? "#d0ede4" : "#EEEBE4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32 }}>{ing.emoji}</div>
+                              <div style={{ padding: "6px 8px" }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: avail ? C.deepTeal : C.text }}>{ing.name_en}</div>
+                                {ing.name_ta && <div style={{ fontSize: 9, color: avail ? C.midTeal : C.muted }}>{ing.name_ta}</div>}
+                                <div style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>{ing.categoryEmoji} {ing.categoryLabel}</div>
                               </div>
-                            )}
+                              {avail && <div style={{ position: "absolute", top: 4, right: 4, background: C.deepTeal, color: "white", borderRadius: "50%", width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9 }}>✓</div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )
+                ) : (
+                  filteredIngredients.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "40px 0", color: C.muted, fontSize: 13 }}>No ingredients found</div>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+                      {filteredIngredients.map(ing => {
+                        const avail = changes[ing.id] !== undefined ? changes[ing.id] : ing.is_available;
+                        return (
+                          <div key={ing.id} onClick={() => toggle(ing.id, avail)}
+                            style={{ background: avail ? C.selected : C.bg, border: `${avail ? "1.5px" : "0.5px"} solid ${avail ? C.selBorder : C.border}`, borderRadius: 10, overflow: "hidden", cursor: "pointer", position: "relative" }}
+                          >
+                            <div style={{ height: 64, background: avail ? "#d0ede4" : "#EEEBE4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32 }}>{ing.emoji}</div>
+                            <div style={{ padding: "6px 8px" }}>
+                              <div style={{ fontSize: 11, fontWeight: 500, color: avail ? C.deepTeal : C.text }}>{ing.name_en}</div>
+                              {ing.name_ta && <div style={{ fontSize: 9, color: avail ? C.midTeal : C.muted }}>{ing.name_ta}</div>}
+                            </div>
+                            {avail && <div style={{ position: "absolute", top: 4, right: 4, background: C.deepTeal, color: "white", borderRadius: "50%", width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9 }}>✓</div>}
                           </div>
-                          {/* Checkmark */}
-                          {avail && (
-                            <div style={{
-                              position: "absolute", top: 4, right: 4,
-                              background: C.deepTeal, color: "white",
-                              borderRadius: "50%", width: 16, height: 16,
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: 9
-                            }}>✓</div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )
                 )}
               </div>
             </>
