@@ -163,17 +163,18 @@ export default function MyPantry({ onBack }) {
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: C.green, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ minHeight: "100vh", background: "#1A3A2E", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" }}>
         <div style={{ color: C.mint, fontSize: 14 }}>Loading your pantry...</div>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: C.green, display: "flex", flexDirection: "column", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#1A3A2E", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ width: "100%", maxWidth: 430, flex: 1, display: "flex", flexDirection: "column", background: C.card, position: "relative" }}>
 
       {/* ── Header ── */}
-      <div style={{ background: C.green, padding: "48px 16px 12px", flexShrink: 0 }}>
+      <div style={{ background: "#1A3A2E", padding: "48px 16px 12px", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <span onClick={onBack} style={{ color: C.mint, fontSize: 12, cursor: "pointer" }}>← Dashboard</span>
           <span style={{ color: "#FDFCF8", fontSize: 15, fontWeight: 500 }}>My Pantry</span>
@@ -208,7 +209,7 @@ export default function MyPantry({ onBack }) {
       )}
 
       {/* ── Body: sidebar + grid ── */}
-      <div style={{ flex: 1, display: "flex", background: C.card, margin: "0 0 0 0", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "flex", background: C.card, overflow: "hidden", minHeight: 0 }}>
 
         {/* Sidebar */}
         <div style={{ width: 72, background: "#F1EFE8", borderRight: `0.5px solid ${C.border}`, overflowY: "auto", flexShrink: 0 }}>
@@ -330,6 +331,7 @@ export default function MyPantry({ onBack }) {
         >
           {saving ? "Saving..." : `Save pantry${Object.keys(changes).length > 0 ? ` — ${Object.keys(changes).length} change${Object.keys(changes).length > 1 ? "s" : ""}` : ""}`}
         </button>
+      </div>
       </div>
     </div>
   );
