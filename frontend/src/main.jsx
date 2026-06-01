@@ -18,6 +18,7 @@ import RecipeReview from './pages/RecipeReview.jsx'
 import HelpScreen from './pages/HelpScreen.jsx'
 import HouseholdSettings from './pages/HouseholdSettings.jsx'
 import ReviewerProgress from './pages/ReviewerProgress.jsx'
+import MyPantry from './pages/MyPantry.jsx'
 
 // AuthGate — isolated from App's state so Login/Register inputs never lose focus
 function AuthGate() {
@@ -68,6 +69,7 @@ function AuthGate() {
     <HelpScreen onBack={() => { setScreen('recipe_review'); }} returnRecipeId={helpReturnRecipeId} />
   );
   if (screen === 'household_settings') return <HouseholdSettings onBack={() => setScreen('dashboard')} />;
+  if (screen === 'my_pantry') return <MyPantry onBack={() => setScreen('dashboard')} />;
   if (screen === 'reviewer_progress') return <ReviewerProgress onBack={() => setScreen('dashboard')} onNavigate={(params) => { setReviewerNavParams(params); setScreen('recipe_review'); }} />;
   if (screen === 'member_availability') return (
     <MemberAvailability

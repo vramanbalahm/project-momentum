@@ -97,6 +97,13 @@ export default function Dashboard({ onNavigate }) {
       available: isAdmin,
     },
     {
+      id: "my_pantry",
+      label: t("dashboard.tiles.myPantry"),
+      desc: t("dashboard.tiles.myPantryDesc"),
+      emoji: "🥬",
+      available: true,
+    },
+    {
       id: "household_settings",
       icon: "⚙️",
       label: t("dashboard.tiles.householdSettings"),

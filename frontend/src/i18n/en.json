@@ -121,7 +121,9 @@
       "reviewProgress": "Review Progress",
       "reviewProgressDesc": "Reviewer stats & progress",
       "recipeReview": "Recipe Review",
-      "recipeReviewDesc": "Review and approve recipes"
+      "recipeReviewDesc": "Review and approve recipes",
+      "myPantry": "My Pantry",
+      "myPantryDesc": "What's available"
     },
     "menu": {
       "myProfile": "My Profile",

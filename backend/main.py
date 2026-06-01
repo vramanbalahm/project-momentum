@@ -177,6 +177,9 @@ app.include_router(weekly_plan_router)
 from routers.availability import router as availability_router
 app.include_router(availability_router)
 
+from routers.pantry import router as pantry_router
+app.include_router(pantry_router)
+
 # --- RECIPE REVIEW ENDPOINTS ---
 
 @app.get("/recipes/review")
