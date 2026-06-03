@@ -180,6 +180,9 @@ app.include_router(availability_router)
 from routers.pantry import router as pantry_router
 app.include_router(pantry_router)
 
+from routers.recommendation import router as recommendation_router
+app.include_router(recommendation_router)
+
 # --- RECIPE REVIEW ENDPOINTS ---
 
 @app.get("/recipes/review")
