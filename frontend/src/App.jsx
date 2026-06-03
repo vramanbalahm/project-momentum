@@ -614,11 +614,28 @@ export default function App({ onBack }) {
   // HH_ID declared above useAuth() — see line 157
 
   // ── AUTH GATE — after all hooks ──
-  // FIX 1: Demo events matched to actual current week dates
-  const demoEvents = [
-    { dayName: "Wednesday", emoji: "🎂", title: "Amma's Birthday", pill: "Feast day", pillBg: "#FAECE7", pillColor: "#712B13" },
-    { dayName: "Friday",    emoji: "🕉",  title: "Amavasai",       pill: "Satvik required", pillBg: "#E1F5EE", pillColor: "#085041" }
-  ];
+  // Week events loaded from event_master
+  const [weekEvents, setWeekEvents] = useState([]);
+
+  useEffect(() => {
+    if (!HH_ID) return;
+    const monday = new Date();
+    monday.setDate(monday.getDate() - monday.getDay() + 1 + weekOffset * 7);
+    const ws = monday.toISOString().split("T")[0];
+    axios.get(`${API_BASE}/onboarding/week-events?week_start=${ws}`)
+      .then(r => setWeekEvents(r.data.events || []))
+      .catch(() => setWeekEvents([]));
+  }, [weekOffset, HH_ID]);
+
+  // Map event_master rows to day-keyed structure
+  const demoEvents = weekEvents.map(ev => ({
+    dayName: ev.day_name,
+    emoji: ev.icon || "🗓️",
+    title: ev.event_name,
+    pill: ev.is_sattvic_required ? "Satvik required" : "Feast day",
+    pillBg: ev.is_sattvic_required ? "#E1F5EE" : "#FAECE7",
+    pillColor: ev.is_sattvic_required ? "#085041" : "#712B13",
+  }));
 
   const selectedDayMeals = MEAL_TYPES.map(type => ({
     type,

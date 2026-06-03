@@ -554,6 +554,42 @@ async def update_lunar_observations(
     db.commit()
     return {"message": "Lunar observations updated.", "rows_updated": updated}
 
+
+
+# ── GET /onboarding/week-events ───────────────────────────────────────────────
+
+@router.get("/week-events", status_code=200)
+async def get_week_events(
+    week_start: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Returns active events for the household for a given week."""
+    from datetime import date, timedelta
+    house_id = current_user["house_id"]
+    ws = date.fromisoformat(week_start)
+    we = ws + timedelta(days=7)
+    days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+
+    rows = db.execute(text("""
+        SELECT event_name, event_date, icon, is_sattvic_required
+        FROM event_master
+        WHERE house_id = CAST(:hid AS uuid)
+        AND event_date >= :ws AND event_date < :we
+        AND is_active = true
+        ORDER BY event_date
+    """), {"hid": house_id, "ws": ws, "we": we}).fetchall()
+
+    return {"events": [
+        {
+            "day_name": days[(r.event_date - ws).days],
+            "event_name": r.event_name,
+            "icon": r.icon,
+            "is_sattvic_required": r.is_sattvic_required,
+        }
+        for r in rows if 0 <= (r.event_date - ws).days < 7
+    ]}
+
 # ── POST /onboarding/events ───────────────────────────────────────────────────
 
 class EventItem(BaseModel):
