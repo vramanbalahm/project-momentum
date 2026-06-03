@@ -29,10 +29,9 @@ VALUES
     ('RA-F16',  'Side dish auto-pairing',         'pair_side_dishes',           'services/recommendation_service.py', false, true,  '{RA-F13,RA-F14,RA-F15}', 'F16: Auto-pair sides with mains.'),
     ('RA-F05',  'No repeat within 1 week',        'filter_recent_recipes',      'services/recommendation_service.py', false, true,  '{RA-F01}',  'F05: Exclude recipes from past N weeks. Default=1 week.')
 ON CONFLICT (feature_code) DO UPDATE SET
-    execution_order = EXCLUDED.execution_order,
-    is_active       = EXCLUDED.is_active,
-    description     = EXCLUDED.description,
-    updated_at      = NOW();
+    is_active   = EXCLUDED.is_active,
+    description = EXCLUDED.description,
+    updated_at  = NOW();
 
 -- STEP 3: Create plan_audit_log table (Bucket C)
 CREATE TABLE IF NOT EXISTS public.plan_audit_log (
