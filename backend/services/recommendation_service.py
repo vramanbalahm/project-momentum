@@ -1,22 +1,24 @@
 # services/recommendation_service.py
 # Recommendation Engine — Bucket A (Rule-based)
 #
-# Execution order driven by feature_registry.execution_order
-# Every formula logs to plan_audit_log (Bucket C)
+# Design principles:
+#   1. Pipeline sequence defined here in code (not DB)
+#   2. All data loaded upfront in 5 targeted queries
+#   3. Formula execution is pure in-memory — no DB hits during filtering
+#   4. Each formula independently toggleable via feature_registry.is_active
+#   5. Every formula logs to plan_audit_log (Bucket C)
 #
-# Formula pipeline:
-#   RA-F03  → filter_by_availability     (who's home)
-#   RA-FA01 → filter_by_allergies        (hard block)
-#   RA-F02  → calc_effective_diet        (strictest diet)
-#   RA-F01  → filter_by_diet             (filter vault)
-#   RA-FA02 → check_satvik_day           (is today Satvik)
-#   RA-F08  → filter_satvik_ingredients  (Satvik filter)
-#   RA-F04  → filter_by_meal_slot        (slot + intensity)
-#   RA-F13  → apply_breakfast_model
-#   RA-F14  → apply_lunch_model
-#   RA-F15  → apply_dinner_model
-#   RA-F16  → pair_side_dishes
-#   RA-F05  → filter_recent_recipes      (no repeat)
+# Pipeline:
+#   F03  → filter_by_availability
+#   FA01 → filter_by_allergies
+#   F02  → calc_effective_diet
+#   F01  → filter_by_diet
+#   FA02 → check_satvik_day
+#   F08  → filter_satvik_ingredients
+#   F04  → filter_by_meal_slot
+#   F05  → filter_recent_recipes
+#   F13/F14/F15 → meal model (slot-specific)
+#   F16  → pair_side_dishes
 
 import time
 import random
@@ -24,10 +26,8 @@ from datetime import date, timedelta
 from typing import List, Dict, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from uuid import UUID
 
-
-# ── Diet strictness order ─────────────────────────────────────────────────────
+DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 DIET_ORDER = {"Vegan": 4, "Veg": 3, "Eggitarian": 2, "Non-Veg": 1}
 DIET_COMPATIBLE = {
@@ -36,35 +36,201 @@ DIET_COMPATIBLE = {
     "Eggitarian": ["Veg", "Vegan", "Eggitarian"],
     "Non-Veg":    ["Veg", "Vegan", "Eggitarian", "Non-Veg"],
 }
-
-# Meal slot intensity rules
 SLOT_INTENSITY = {
     "Breakfast": ["Light"],
     "Lunch":     ["Medium", "Heavy"],
     "Dinner":    ["Medium", "Heavy"],
 }
 
-DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+# Pipeline sequence — owned by this service, not DB
+MAIN_PIPELINE = [
+    "filter_by_availability",
+    "filter_by_allergies",
+    "calc_effective_diet",
+    "filter_by_diet",
+    "check_satvik_day",
+    "filter_satvik_ingredients",
+    "filter_by_meal_slot",
+    "filter_recent_recipes",
+]
+SLOT_PIPELINE = {
+    "Breakfast": ["apply_breakfast_model"],
+    "Lunch":     ["apply_lunch_model"],
+    "Dinner":    ["apply_dinner_model"],
+}
 
 
-# ── Audit logger ─────────────────────────────────────────────────────────────
+# ── Step 1: Load all data upfront in 5 queries ────────────────────────────────
+
+def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_weeks: int = 1) -> Dict:
+    """
+    Load ALL data needed for the full week in 5 targeted queries.
+    Formula execution reads from this context — zero DB hits during filtering.
+    """
+
+    # Query 1 — Approved recipe vault (all approved mains)
+    vault_rows = db.execute(text("""
+        SELECT
+            r.recipe_id, r.dish_name, r.diet_type,
+            r.intensity_level, r.is_sattvic,
+            rv.meal_slots,
+            COALESCE(
+                ARRAY(
+                    SELECT ri.ingredient_id
+                    FROM recipe_ingredients ri
+                    WHERE ri.recipe_id = r.recipe_id
+                ), '{}'::integer[]
+            ) as ingredient_ids
+        FROM recipe_dna_master r
+        JOIN recipe_review_master rv ON rv.recipe_id = r.recipe_id
+        WHERE rv.review_status = 'approved'
+        AND (rv.is_side_dish = false OR rv.is_side_dish IS NULL)
+    """)).fetchall()
+
+    approved_recipes = [
+        {
+            "recipe_id":       str(r.recipe_id),
+            "dish_name":       r.dish_name,
+            "diet_type":       str(r.diet_type) if r.diet_type else "Veg",
+            "intensity_level": r.intensity_level or "Medium",
+            "is_sattvic":      r.is_sattvic or False,
+            "meal_slots":      list(r.meal_slots) if r.meal_slots else [],
+            "ingredient_ids":  list(r.ingredient_ids) if r.ingredient_ids else [],
+        }
+        for r in vault_rows
+    ]
+
+    # Query 2 — Members: diets + allergens per member
+    member_rows = db.execute(text("""
+        SELECT
+            u.user_id,
+            u.name,
+            u.dietary_preference,
+            COALESCE(
+                ARRAY(
+                    SELECT mr.ingredient_id
+                    FROM member_restrictions mr
+                    WHERE mr.user_id = u.user_id
+                    AND mr.restriction_type = 'Allergy'
+                ), '{}'::integer[]
+            ) as allergen_ids
+        FROM users u
+        WHERE u.house_id = CAST(:hid AS uuid)
+        AND u.is_active = true
+    """), {"hid": house_id}).fetchall()
+
+    members = {
+        str(r.user_id): {
+            "name":              r.name,
+            "dietary_preference": r.dietary_preference or "Veg",
+            "allergen_ids":      list(r.allergen_ids) if r.allergen_ids else [],
+        }
+        for r in member_rows
+    }
+
+    # Query 3 — Weekly availability: who's home per day per slot
+    avail_rows = db.execute(text("""
+        SELECT user_id, availability_date, meal_slot
+        FROM member_availability
+        WHERE house_id = CAST(:hid AS uuid)
+        AND availability_date >= :ws
+        AND availability_date < :we
+        AND is_present = true
+    """), {
+        "hid": house_id,
+        "ws":  week_start,
+        "we":  week_start + timedelta(days=7),
+    }).fetchall()
+
+    # Build availability map: {day_name: {slot: [user_id, ...]}}
+    availability = {}
+    for r in avail_rows:
+        day_idx = (r.availability_date - week_start).days
+        if 0 <= day_idx < 7:
+            day = DAYS_OF_WEEK[day_idx]
+            if day not in availability:
+                availability[day] = {}
+            slot = r.meal_slot
+            if slot not in availability[day]:
+                availability[day][slot] = []
+            availability[day][slot].append(str(r.user_id))
+
+    # Query 4 — Satvik: event days this week + household satvik restrictions
+    satvik_rows = db.execute(text("""
+        SELECT event_date FROM event_master
+        WHERE house_id = CAST(:hid AS uuid)
+        AND event_date >= :ws
+        AND event_date < :we
+        AND is_sattvic_required = true
+        AND is_active = true
+    """), {
+        "hid": house_id,
+        "ws":  week_start,
+        "we":  week_start + timedelta(days=7),
+    }).fetchall()
+
+    satvik_days = {
+        DAYS_OF_WEEK[(r.event_date - week_start).days]
+        for r in satvik_rows
+        if 0 <= (r.event_date - week_start).days < 7
+    }
+
+    satvik_restriction_rows = db.execute(text("""
+        SELECT ingredient_id FROM satvik_restrictions
+        WHERE house_id = CAST(:hid AS uuid)
+    """), {"hid": house_id}).fetchall()
+
+    satvik_avoided_ids = {r.ingredient_id for r in satvik_restriction_rows}
+
+    # Query 5 — Recent recipes: what was served in past N weeks per slot
+    cutoff = week_start - timedelta(weeks=no_repeat_weeks)
+    recent_rows = db.execute(text("""
+        SELECT DISTINCT recipe_id, meal_slot
+        FROM weekly_plan_slots
+        WHERE house_id = CAST(:hid AS uuid)
+        AND week_start >= :cutoff
+        AND week_start < :ws
+    """), {"hid": house_id, "cutoff": cutoff, "ws": week_start}).fetchall()
+
+    recent_by_slot = {}
+    for r in recent_rows:
+        slot = r.meal_slot
+        if slot not in recent_by_slot:
+            recent_by_slot[slot] = set()
+        recent_by_slot[slot].add(str(r.recipe_id))
+
+    return {
+        "approved_recipes":  approved_recipes,
+        "members":           members,
+        "availability":      availability,
+        "satvik_days":       satvik_days,
+        "satvik_avoided_ids": satvik_avoided_ids,
+        "recent_by_slot":    recent_by_slot,
+        "no_repeat_weeks":   no_repeat_weeks,
+    }
+
+
+def get_active_formulas(db: Session) -> Dict[str, bool]:
+    """Load which formulas are active from feature_registry."""
+    rows = db.execute(text("""
+        SELECT function_name, is_active
+        FROM feature_registry
+        WHERE feature_code LIKE 'RA-%'
+    """)).fetchall()
+    return {r.function_name: r.is_active for r in rows}
+
+
+# ── Step 2: Audit logger ──────────────────────────────────────────────────────
 
 def _log(
-    db: Session,
-    house_id: str,
-    week_start: date,
-    day_name: str,
-    meal_slot: str,
-    feature_code: str,
-    function_name: str,
-    recipes_in: int,
-    recipes_out: int,
-    filtered_ids: List[str],
-    filter_reason: str,
+    db: Session, house_id: str, week_start: date,
+    day_name: str, meal_slot: str,
+    feature_code: str, function_name: str,
+    recipes_in: int, recipes_out: int,
+    filtered_ids: List[str], filter_reason: str,
     selected_id: Optional[str] = None,
     execution_ms: int = 0
 ):
-    """Write one audit log entry."""
     try:
         db.execute(text("""
             INSERT INTO plan_audit_log
@@ -74,9 +240,11 @@ def _log(
                  filter_reason, filtered_ids, selected_id, execution_ms)
             VALUES
                 (CAST(:hid AS uuid), :ws, :day, :slot,
-                 :fc, :fn,
-                 :rin, :rout, :fcnt,
-                 :reason, CAST(:fids AS uuid[]), CAST(:sel AS uuid), :ms)
+                 :fc, :fn, :rin, :rout, :fcnt,
+                 :reason,
+                 CAST(:fids AS uuid[]),
+                 CAST(:sel AS uuid),
+                 :ms)
         """), {
             "hid":    house_id,
             "ws":     week_start,
@@ -93,522 +261,291 @@ def _log(
             "ms":     execution_ms,
         })
     except Exception as e:
-        print(f"[audit_log] Failed to write log: {e}")
+        print(f"[audit_log] {e}")
 
 
-# ── Formula functions ─────────────────────────────────────────────────────────
+# ── Step 3: Formula functions — pure in-memory ────────────────────────────────
 
 def filter_by_availability(
-    db: Session, house_id: str, week_start: date, day_name: str, meal_slot: str,
-    recipes: List[Dict], context: Dict
+    recipes: List[Dict], day: str, slot: str,
+    ctx: Dict, week_ctx: Dict,
+    db: Session, house_id: str, week_start: date
 ) -> Tuple[List[Dict], Dict]:
-    """
-    RA-F03: Get list of present members for this day.
-    If no availability data → assume all members home.
-    Sets context['present_members'] for downstream formulas.
-    """
     t0 = time.time()
 
-    day_index = DAYS_OF_WEEK.index(day_name) if day_name in DAYS_OF_WEEK else 0
-    slot_date = week_start + timedelta(days=day_index)
+    avail = week_ctx["availability"]
+    members = week_ctx["members"]
+    all_member_ids = list(members.keys())
 
-    rows = db.execute(text("""
-        SELECT DISTINCT ma.user_id, u.dietary_preference
-        FROM member_availability ma
-        JOIN users u ON u.user_id = ma.user_id
-        WHERE ma.house_id = CAST(:hid AS uuid)
-        AND ma.availability_date = :dt
-        AND ma.meal_slot = :slot
-        AND ma.is_present = true
-    """), {"hid": house_id, "dt": slot_date, "slot": meal_slot}).fetchall()
-
-    if not rows:
-        # No availability data — fetch all active household members
-        rows = db.execute(text("""
-            SELECT user_id, dietary_preference
-            FROM users
-            WHERE house_id = CAST(:hid AS uuid)
-            AND is_active = true
-        """), {"hid": house_id}).fetchall()
-        reason = f"No availability data — assuming all {len(rows)} members home"
+    # Get present members for this day+slot
+    present_ids = avail.get(day, {}).get(slot, None)
+    if present_ids is None:
+        # No availability data — assume all home
+        present_ids = all_member_ids
+        reason = f"No availability data — all {len(all_member_ids)} members assumed home"
     else:
-        reason = f"{len(rows)} member(s) home for {day_name} {meal_slot}"
+        reason = f"{len(present_ids)} member(s) home"
 
-    context["present_members"] = [
-        {"user_id": str(r.user_id), "dietary_preference": r.dietary_preference}
-        for r in rows
-    ]
+    ctx["present_ids"] = present_ids
 
     ms = int((time.time() - t0) * 1000)
-    _log(db, house_id, week_start, day_name, meal_slot,
+    _log(db, house_id, week_start, day, slot,
          "RA-F03", "filter_by_availability",
          len(recipes), len(recipes), [], reason, None, ms)
-
-    return recipes, context
+    return recipes, ctx
 
 
 def filter_by_allergies(
-    db: Session, house_id: str, week_start: date, day_name: str, meal_slot: str,
-    recipes: List[Dict], context: Dict
+    recipes: List[Dict], day: str, slot: str,
+    ctx: Dict, week_ctx: Dict,
+    db: Session, house_id: str, week_start: date
 ) -> Tuple[List[Dict], Dict]:
-    """
-    RA-FA01: Hard block — exclude recipes containing allergens
-    of any present member. No exceptions.
-    """
     t0 = time.time()
 
-    present = context.get("present_members", [])
-    if not present:
-        return recipes, context
+    present_ids = ctx.get("present_ids", [])
+    members = week_ctx["members"]
 
-    member_ids = [m["user_id"] for m in present]
+    # Collect all allergen ingredient IDs for present members
+    allergen_ids = set()
+    allergen_desc = []
+    for uid in present_ids:
+        m = members.get(uid, {})
+        ids = m.get("allergen_ids", [])
+        if ids:
+            allergen_ids.update(ids)
+            allergen_desc.append(f"{m.get('name','?')}:{len(ids)} allergens")
 
-    # Get all allergen ingredient IDs for present members
-    rows = db.execute(text("""
-        SELECT DISTINCT mr.ingredient_id, ic.name_en, u.name as member_name
-        FROM member_restrictions mr
-        JOIN users u ON u.user_id = mr.user_id
-        JOIN ingredient_catalog ic ON ic.id = mr.ingredient_id
-        WHERE mr.user_id = ANY(CAST(:mids AS uuid[]))
-        AND mr.restriction_type = 'Allergy'
-    """), {"mids": "{" + ",".join(member_ids) + "}"}).fetchall()
-
-    if not rows:
+    if not allergen_ids:
         ms = int((time.time() - t0) * 1000)
-        _log(db, house_id, week_start, day_name, meal_slot,
+        _log(db, house_id, week_start, day, slot,
              "RA-FA01", "filter_by_allergies",
-             len(recipes), len(recipes), [], "No allergens for present members", None, ms)
-        return recipes, context
+             len(recipes), len(recipes), [], "No allergens", None, ms)
+        return recipes, ctx
 
-    allergen_ids = {r.ingredient_id for r in rows}
-    allergen_names = [f"{r.name_en} ({r.member_name})" for r in rows]
-    context["allergen_ids"] = allergen_ids
-
-    # Filter recipes that contain any allergen
-    filtered = []
-    removed_ids = []
-    for recipe in recipes:
-        recipe_ingredient_ids = set(recipe.get("ingredient_ids", []))
-        if recipe_ingredient_ids & allergen_ids:
-            removed_ids.append(recipe["recipe_id"])
+    filtered, removed = [], []
+    for r in recipes:
+        if set(r.get("ingredient_ids", [])) & allergen_ids:
+            removed.append(r["recipe_id"])
         else:
-            filtered.append(recipe)
+            filtered.append(r)
 
-    reason = f"Allergy block: {', '.join(allergen_names[:5])}"
+    reason = f"Allergy block: {', '.join(allergen_desc)}"
     ms = int((time.time() - t0) * 1000)
-    _log(db, house_id, week_start, day_name, meal_slot,
+    _log(db, house_id, week_start, day, slot,
          "RA-FA01", "filter_by_allergies",
-         len(recipes), len(filtered), removed_ids, reason, None, ms)
-
-    return filtered, context
+         len(recipes), len(filtered), removed, reason, None, ms)
+    return filtered, ctx
 
 
 def calc_effective_diet(
-    db: Session, house_id: str, week_start: date, day_name: str, meal_slot: str,
-    recipes: List[Dict], context: Dict
+    recipes: List[Dict], day: str, slot: str,
+    ctx: Dict, week_ctx: Dict,
+    db: Session, house_id: str, week_start: date
 ) -> Tuple[List[Dict], Dict]:
-    """
-    RA-F02: Calculate strictest diet among present members.
-    Vegan > Veg > Eggitarian > Non-Veg
-    """
     t0 = time.time()
 
-    present = context.get("present_members", [])
-    if not present:
-        # Fallback to household diet
-        hh = db.execute(text("""
-            SELECT dietary_preference FROM household_master
-            WHERE household_id = CAST(:hid AS uuid)
-        """), {"hid": house_id}).fetchone()
-        effective = hh.dietary_preference if hh else "Veg"
-    else:
-        diets = [m.get("dietary_preference", "Veg") or "Veg" for m in present]
-        effective = max(diets, key=lambda d: DIET_ORDER.get(d, 0))
+    present_ids = ctx.get("present_ids", [])
+    members = week_ctx["members"]
 
-    context["effective_diet"] = effective
+    diets = [members[uid]["dietary_preference"] for uid in present_ids if uid in members]
+    effective = max(diets, key=lambda d: DIET_ORDER.get(d, 0)) if diets else "Veg"
+    ctx["effective_diet"] = effective
 
-    reason = f"Effective diet: {effective} (from {len(present)} present member(s))"
+    reason = f"Effective diet: {effective} from {len(diets)} member(s)"
     ms = int((time.time() - t0) * 1000)
-    _log(db, house_id, week_start, day_name, meal_slot,
+    _log(db, house_id, week_start, day, slot,
          "RA-F02", "calc_effective_diet",
          len(recipes), len(recipes), [], reason, None, ms)
-
-    return recipes, context
+    return recipes, ctx
 
 
 def filter_by_diet(
-    db: Session, house_id: str, week_start: date, day_name: str, meal_slot: str,
-    recipes: List[Dict], context: Dict
+    recipes: List[Dict], day: str, slot: str,
+    ctx: Dict, week_ctx: Dict,
+    db: Session, house_id: str, week_start: date
 ) -> Tuple[List[Dict], Dict]:
-    """
-    RA-F01: Filter vault by effective diet + approved only.
-    """
     t0 = time.time()
 
-    effective_diet = context.get("effective_diet", "Veg")
-    allowed_diets = DIET_COMPATIBLE.get(effective_diet, ["Veg"])
+    effective = ctx.get("effective_diet", "Veg")
+    allowed = DIET_COMPATIBLE.get(effective, ["Veg"])
 
-    filtered = [r for r in recipes if r.get("diet_type") in allowed_diets]
-    removed_ids = [r["recipe_id"] for r in recipes if r not in filtered]
+    filtered = [r for r in recipes if r.get("diet_type") in allowed]
+    removed  = [r["recipe_id"] for r in recipes if r not in filtered]
 
-    reason = f"Diet filter: {effective_diet} — allowed: {allowed_diets}"
+    reason = f"Diet: {effective} — allowed types: {allowed}"
     ms = int((time.time() - t0) * 1000)
-    _log(db, house_id, week_start, day_name, meal_slot,
+    _log(db, house_id, week_start, day, slot,
          "RA-F01", "filter_by_diet",
-         len(recipes), len(filtered), removed_ids, reason, None, ms)
-
-    return filtered, context
+         len(recipes), len(filtered), removed, reason, None, ms)
+    return filtered, ctx
 
 
 def check_satvik_day(
-    db: Session, house_id: str, week_start: date, day_name: str, meal_slot: str,
-    recipes: List[Dict], context: Dict
+    recipes: List[Dict], day: str, slot: str,
+    ctx: Dict, week_ctx: Dict,
+    db: Session, house_id: str, week_start: date
 ) -> Tuple[List[Dict], Dict]:
-    """
-    RA-FA02: Check if today is a Satvik day for this household.
-    Sets context['is_satvik_day'] for downstream formulas.
-    """
     t0 = time.time()
 
-    day_index = DAYS_OF_WEEK.index(day_name) if day_name in DAYS_OF_WEEK else 0
-    slot_date = week_start + timedelta(days=day_index)
+    is_satvik = day in week_ctx["satvik_days"]
+    ctx["is_satvik_day"] = is_satvik
 
-    row = db.execute(text("""
-        SELECT COUNT(*) as cnt FROM event_master
-        WHERE house_id = CAST(:hid AS uuid)
-        AND event_date = :dt
-        AND is_sattvic_required = true
-        AND is_active = true
-    """), {"hid": house_id, "dt": slot_date}).fetchone()
-
-    is_satvik = row.cnt > 0 if row else False
-    context["is_satvik_day"] = is_satvik
-
-    reason = f"{'Satvik day — applying Satvik rules' if is_satvik else 'Not a Satvik day'}"
+    reason = "Satvik day ✓" if is_satvik else "Not a Satvik day"
     ms = int((time.time() - t0) * 1000)
-    _log(db, house_id, week_start, day_name, meal_slot,
+    _log(db, house_id, week_start, day, slot,
          "RA-FA02", "check_satvik_day",
          len(recipes), len(recipes), [], reason, None, ms)
-
-    return recipes, context
+    return recipes, ctx
 
 
 def filter_satvik_ingredients(
-    db: Session, house_id: str, week_start: date, day_name: str, meal_slot: str,
-    recipes: List[Dict], context: Dict
+    recipes: List[Dict], day: str, slot: str,
+    ctx: Dict, week_ctx: Dict,
+    db: Session, house_id: str, week_start: date
 ) -> Tuple[List[Dict], Dict]:
-    """
-    RA-F08: On Satvik days exclude recipes containing
-    household's Satvik-avoided ingredients.
-    """
     t0 = time.time()
 
-    if not context.get("is_satvik_day", False):
-        ms = int((time.time() - t0) * 1000)
-        _log(db, house_id, week_start, day_name, meal_slot,
+    if not ctx.get("is_satvik_day", False):
+        _log(db, house_id, week_start, day, slot,
              "RA-F08", "filter_satvik_ingredients",
-             len(recipes), len(recipes), [], "Not a Satvik day — skipped", None, ms)
-        return recipes, context
+             len(recipes), len(recipes), [], "Not Satvik day — skipped", None, 0)
+        return recipes, ctx
 
-    # Get household's Satvik-avoided ingredients
-    rows = db.execute(text("""
-        SELECT sr.ingredient_id, ic.name_en
-        FROM satvik_restrictions sr
-        JOIN ingredient_catalog ic ON ic.id = sr.ingredient_id
-        WHERE sr.house_id = CAST(:hid AS uuid)
-    """), {"hid": house_id}).fetchall()
-
-    if not rows:
-        ms = int((time.time() - t0) * 1000)
-        _log(db, house_id, week_start, day_name, meal_slot,
+    avoided = week_ctx["satvik_avoided_ids"]
+    if not avoided:
+        _log(db, house_id, week_start, day, slot,
              "RA-F08", "filter_satvik_ingredients",
-             len(recipes), len(recipes), [], "Satvik day but no restrictions defined", None, ms)
-        return recipes, context
+             len(recipes), len(recipes), [], "Satvik day — no restrictions defined", None, 0)
+        return recipes, ctx
 
-    satvik_avoided_ids = {r.ingredient_id for r in rows}
-    satvik_names = [r.name_en for r in rows[:5]]
+    filtered = [r for r in recipes if not (set(r.get("ingredient_ids", [])) & avoided)]
+    removed  = [r["recipe_id"] for r in recipes if r not in filtered]
 
-    filtered = []
-    removed_ids = []
-    for recipe in recipes:
-        recipe_ingredient_ids = set(recipe.get("ingredient_ids", []))
-        if recipe_ingredient_ids & satvik_avoided_ids:
-            removed_ids.append(recipe["recipe_id"])
-        else:
-            filtered.append(recipe)
-
-    reason = f"Satvik filter: avoiding {', '.join(satvik_names)}"
+    reason = f"Satvik: excluded {len(removed)} recipes with avoided ingredients"
     ms = int((time.time() - t0) * 1000)
-    _log(db, house_id, week_start, day_name, meal_slot,
+    _log(db, house_id, week_start, day, slot,
          "RA-F08", "filter_satvik_ingredients",
-         len(recipes), len(filtered), removed_ids, reason, None, ms)
-
-    return filtered, context
+         len(recipes), len(filtered), removed, reason, None, ms)
+    return filtered, ctx
 
 
 def filter_by_meal_slot(
-    db: Session, house_id: str, week_start: date, day_name: str, meal_slot: str,
-    recipes: List[Dict], context: Dict
+    recipes: List[Dict], day: str, slot: str,
+    ctx: Dict, week_ctx: Dict,
+    db: Session, house_id: str, week_start: date
 ) -> Tuple[List[Dict], Dict]:
-    """
-    RA-F04: Filter by meal_slots array and intensity_level.
-    Breakfast=Light only, Lunch/Dinner=Medium/Heavy.
-    """
     t0 = time.time()
 
-    allowed_intensities = SLOT_INTENSITY.get(meal_slot, ["Medium"])
+    allowed_intensities = SLOT_INTENSITY.get(slot, ["Medium"])
+    filtered = [
+        r for r in recipes
+        if slot in r.get("meal_slots", [])
+        and r.get("intensity_level", "Medium") in allowed_intensities
+    ]
+    removed = [r["recipe_id"] for r in recipes if r not in filtered]
 
-    filtered = []
-    removed_ids = []
-    for recipe in recipes:
-        meal_slots = recipe.get("meal_slots", [])
-        intensity = recipe.get("intensity_level", "Medium")
-        if meal_slot in meal_slots and intensity in allowed_intensities:
-            filtered.append(recipe)
-        else:
-            removed_ids.append(recipe["recipe_id"])
-
-    reason = f"Slot filter: {meal_slot} requires {allowed_intensities}"
+    reason = f"{slot}: intensity={allowed_intensities}, {len(filtered)} pass"
     ms = int((time.time() - t0) * 1000)
-    _log(db, house_id, week_start, day_name, meal_slot,
+    _log(db, house_id, week_start, day, slot,
          "RA-F04", "filter_by_meal_slot",
-         len(recipes), len(filtered), removed_ids, reason, None, ms)
-
-    return filtered, context
+         len(recipes), len(filtered), removed, reason, None, ms)
+    return filtered, ctx
 
 
 def filter_recent_recipes(
-    db: Session, house_id: str, week_start: date, day_name: str, meal_slot: str,
-    recipes: List[Dict], context: Dict
+    recipes: List[Dict], day: str, slot: str,
+    ctx: Dict, week_ctx: Dict,
+    db: Session, house_id: str, week_start: date
 ) -> Tuple[List[Dict], Dict]:
-    """
-    RA-F05: Exclude recipes used in the past N weeks.
-    Default = 1 week. Configurable via household_plan_config.
-    """
     t0 = time.time()
 
-    # Get household config
-    config = db.execute(text("""
-        SELECT no_repeat_weeks FROM household_plan_config
-        WHERE house_id = CAST(:hid AS uuid)
-    """), {"hid": house_id}).fetchone()
-
-    no_repeat_weeks = config.no_repeat_weeks if config else 1
-    cutoff_date = week_start - timedelta(weeks=no_repeat_weeks)
-
-    # Get recipes used in the past N weeks for this slot
-    rows = db.execute(text("""
-        SELECT DISTINCT recipe_id FROM weekly_plan_slots
-        WHERE house_id = CAST(:hid AS uuid)
-        AND meal_slot = :slot
-        AND week_start >= :cutoff
-        AND week_start < :ws
-    """), {
-        "hid":    house_id,
-        "slot":   meal_slot,
-        "cutoff": cutoff_date,
-        "ws":     week_start,
-    }).fetchall()
-
-    recent_ids = {str(r.recipe_id) for r in rows}
-
-    if not recent_ids:
-        ms = int((time.time() - t0) * 1000)
-        _log(db, house_id, week_start, day_name, meal_slot,
+    recent = week_ctx["recent_by_slot"].get(slot, set())
+    if not recent:
+        _log(db, house_id, week_start, day, slot,
              "RA-F05", "filter_recent_recipes",
              len(recipes), len(recipes), [],
-             f"No recent recipes in past {no_repeat_weeks} week(s)", None, ms)
-        return recipes, context
+             f"No recent recipes in past {week_ctx['no_repeat_weeks']} week(s)", None, 0)
+        return recipes, ctx
 
-    filtered = [r for r in recipes if str(r["recipe_id"]) not in recent_ids]
-    removed_ids = [r["recipe_id"] for r in recipes if str(r["recipe_id"]) in recent_ids]
+    filtered = [r for r in recipes if r["recipe_id"] not in recent]
+    removed  = [r["recipe_id"] for r in recipes if r not in filtered]
 
-    reason = f"No-repeat filter: {len(recent_ids)} recipes excluded from past {no_repeat_weeks} week(s)"
-    ms = int((time.time() - t0) * 1000)
-    _log(db, house_id, week_start, day_name, meal_slot,
-         "RA-F05", "filter_recent_recipes",
-         len(recipes), len(filtered), removed_ids, reason, None, ms)
-
-    # If pool is empty after filter — relax and return all (log it)
+    # Pool empty after filter — relax and use full pool
     if not filtered:
-        _log(db, house_id, week_start, day_name, meal_slot,
+        _log(db, house_id, week_start, day, slot,
              "RA-F05", "filter_recent_recipes",
              len(recipes), len(recipes), [],
-             f"Pool empty after no-repeat filter — relaxing constraint", None, 0)
-        return recipes, context
+             "Pool empty after no-repeat — constraint relaxed", None, 0)
+        return recipes, ctx
 
-    return filtered, context
+    reason = f"No-repeat: {len(removed)} excluded from past {week_ctx['no_repeat_weeks']} week(s)"
+    ms = int((time.time() - t0) * 1000)
+    _log(db, house_id, week_start, day, slot,
+         "RA-F05", "filter_recent_recipes",
+         len(recipes), len(filtered), removed, reason, None, ms)
+    return filtered, ctx
 
 
 def apply_breakfast_model(
-    db: Session, house_id: str, week_start: date, day_name: str, meal_slot: str,
-    recipes: List[Dict], context: Dict
+    recipes: List[Dict], day: str, slot: str,
+    ctx: Dict, week_ctx: Dict,
+    db: Session, house_id: str, week_start: date
 ) -> Tuple[List[Dict], Dict]:
-    """RA-F13: Breakfast model — Light only, already filtered by F04."""
     t0 = time.time()
-    if meal_slot != "Breakfast":
-        return recipes, context
-    ms = int((time.time() - t0) * 1000)
-    _log(db, house_id, week_start, day_name, meal_slot,
+    _log(db, house_id, week_start, day, slot,
          "RA-F13", "apply_breakfast_model",
          len(recipes), len(recipes), [],
-         f"Breakfast model: {len(recipes)} candidates", None, ms)
-    return recipes, context
+         f"Breakfast pool: {len(recipes)} candidates", None,
+         int((time.time() - t0) * 1000))
+    return recipes, ctx
 
 
 def apply_lunch_model(
-    db: Session, house_id: str, week_start: date, day_name: str, meal_slot: str,
-    recipes: List[Dict], context: Dict
+    recipes: List[Dict], day: str, slot: str,
+    ctx: Dict, week_ctx: Dict,
+    db: Session, house_id: str, week_start: date
 ) -> Tuple[List[Dict], Dict]:
-    """RA-F14: Lunch model — Medium/Heavy, already filtered by F04."""
     t0 = time.time()
-    if meal_slot != "Lunch":
-        return recipes, context
-    ms = int((time.time() - t0) * 1000)
-    _log(db, house_id, week_start, day_name, meal_slot,
+    _log(db, house_id, week_start, day, slot,
          "RA-F14", "apply_lunch_model",
          len(recipes), len(recipes), [],
-         f"Lunch model: {len(recipes)} candidates", None, ms)
-    return recipes, context
+         f"Lunch pool: {len(recipes)} candidates", None,
+         int((time.time() - t0) * 1000))
+    return recipes, ctx
 
 
 def apply_dinner_model(
-    db: Session, house_id: str, week_start: date, day_name: str, meal_slot: str,
-    recipes: List[Dict], context: Dict
+    recipes: List[Dict], day: str, slot: str,
+    ctx: Dict, week_ctx: Dict,
+    db: Session, house_id: str, week_start: date
 ) -> Tuple[List[Dict], Dict]:
-    """RA-F15: Dinner model — Medium/Heavy, already filtered by F04."""
     t0 = time.time()
-    if meal_slot != "Dinner":
-        return recipes, context
-    ms = int((time.time() - t0) * 1000)
-    _log(db, house_id, week_start, day_name, meal_slot,
+    _log(db, house_id, week_start, day, slot,
          "RA-F15", "apply_dinner_model",
          len(recipes), len(recipes), [],
-         f"Dinner model: {len(recipes)} candidates", None, ms)
-    return recipes, context
+         f"Dinner pool: {len(recipes)} candidates", None,
+         int((time.time() - t0) * 1000))
+    return recipes, ctx
 
 
-def pair_side_dishes(
-    db: Session, house_id: str, week_start: date, day_name: str, meal_slot: str,
-    recipes: List[Dict], context: Dict
-) -> Tuple[List[Dict], Dict]:
-    """
-    RA-F16: Auto-pair side dishes with the selected main.
-    Filters sides compatible with effective diet and meal slot.
-    """
-    t0 = time.time()
+# ── Formula map ───────────────────────────────────────────────────────────────
 
-    selected_main = context.get("selected_main")
-    if not selected_main:
-        return recipes, context
-
-    effective_diet = context.get("effective_diet", "Veg")
-    allowed_diets = DIET_COMPATIBLE.get(effective_diet, ["Veg"])
-
-    # Get side dishes compatible with this slot and diet
-    sides = db.execute(text("""
-        SELECT r.recipe_id, r.dish_name, r.diet_type, r.intensity_level,
-               rv.meal_slots
-        FROM recipe_dna_master r
-        JOIN recipe_review_master rv ON rv.recipe_id = r.recipe_id
-        WHERE rv.review_status = 'approved'
-        AND r.diet_type = ANY(CAST(:diets AS diet_pref[]))
-        AND rv.meal_slots @> CAST(:slot AS text[])
-        AND rv.is_side_dish = true
-        LIMIT 20
-    """), {
-        "diets": "{" + ",".join(f'"{d}"' for d in allowed_diets) + "}",
-        "slot":  "{" + meal_slot + "}"
-    }).fetchall()
-
-    side_list = [
-        {"recipe_id": str(s.recipe_id), "dish_name": s.dish_name,
-         "diet_type": s.diet_type, "meal_slots": s.meal_slots}
-        for s in sides
-    ]
-
-    context["available_sides"] = side_list
-
-    reason = f"Side dish pairing: {len(side_list)} compatible sides found"
-    ms = int((time.time() - t0) * 1000)
-    _log(db, house_id, week_start, day_name, meal_slot,
-         "RA-F16", "pair_side_dishes",
-         len(side_list), len(side_list), [], reason, None, ms)
-
-    return side_list, context
-
-
-# ── Main pipeline ─────────────────────────────────────────────────────────────
-
-# Formula map — function_name → function
 FORMULA_MAP = {
-    "filter_by_availability":    filter_by_availability,
-    "filter_by_allergies":       filter_by_allergies,
-    "calc_effective_diet":       calc_effective_diet,
-    "filter_by_diet":            filter_by_diet,
-    "check_satvik_day":          check_satvik_day,
-    "filter_satvik_ingredients": filter_satvik_ingredients,
-    "filter_by_meal_slot":       filter_by_meal_slot,
-    "filter_recent_recipes":     filter_recent_recipes,
-    "apply_breakfast_model":     apply_breakfast_model,
-    "apply_lunch_model":         apply_lunch_model,
-    "apply_dinner_model":        apply_dinner_model,
-    "pair_side_dishes":          pair_side_dishes,
+    "filter_by_availability":    ("RA-F03",  filter_by_availability),
+    "filter_by_allergies":       ("RA-FA01", filter_by_allergies),
+    "calc_effective_diet":       ("RA-F02",  calc_effective_diet),
+    "filter_by_diet":            ("RA-F01",  filter_by_diet),
+    "check_satvik_day":          ("RA-FA02", check_satvik_day),
+    "filter_satvik_ingredients": ("RA-F08",  filter_satvik_ingredients),
+    "filter_by_meal_slot":       ("RA-F04",  filter_by_meal_slot),
+    "filter_recent_recipes":     ("RA-F05",  filter_recent_recipes),
+    "apply_breakfast_model":     ("RA-F13",  apply_breakfast_model),
+    "apply_lunch_model":         ("RA-F14",  apply_lunch_model),
+    "apply_dinner_model":        ("RA-F15",  apply_dinner_model),
 }
 
 
-def get_active_formulas(db: Session) -> List[Dict]:
-    """Load active Bucket A formulas from feature_registry ordered by execution_order."""
-    rows = db.execute(text("""
-        SELECT feature_code, function_name, execution_order
-        FROM feature_registry
-        WHERE feature_code LIKE 'RA-%'
-        AND is_active = true
-        ORDER BY execution_order
-    """)).fetchall()
-    return [{"code": r.feature_code, "fn": r.function_name} for r in rows]
-
-
-def load_approved_recipes(db: Session) -> List[Dict]:
-    """
-    Load all approved recipes from vault with ingredients.
-    This is the full candidate pool before any filtering.
-    """
-    rows = db.execute(text("""
-        SELECT
-            r.recipe_id,
-            r.dish_name,
-            r.diet_type,
-            r.intensity_level,
-            r.is_sattvic,
-            rv.meal_slots,
-            rv.is_side_dish,
-            COALESCE(
-                ARRAY(
-                    SELECT ri.ingredient_id
-                    FROM recipe_ingredients ri
-                    WHERE ri.recipe_id = r.recipe_id
-                ), '{}'::integer[]
-            ) as ingredient_ids
-        FROM recipe_dna_master r
-        JOIN recipe_review_master rv ON rv.recipe_id = r.recipe_id
-        WHERE rv.review_status = 'approved'
-        AND (rv.is_side_dish = false OR rv.is_side_dish IS NULL)
-    """)).fetchall()
-
-    return [
-        {
-            "recipe_id":      str(r.recipe_id),
-            "dish_name":      r.dish_name,
-            "diet_type":      str(r.diet_type) if r.diet_type else "Veg",
-            "intensity_level": r.intensity_level or "Medium",
-            "is_sattvic":     r.is_sattvic or False,
-            "meal_slots":     list(r.meal_slots) if r.meal_slots else [],
-            "ingredient_ids": list(r.ingredient_ids) if r.ingredient_ids else [],
-        }
-        for r in rows
-    ]
-
+# ── Main entry point ──────────────────────────────────────────────────────────
 
 def generate_plan(
     db: Session,
@@ -617,22 +554,25 @@ def generate_plan(
     fill_empty_only: bool = True
 ) -> Dict:
     """
-    Main entry point — generate recommendations for all 21 slots.
-    Runs Bucket A pipeline for each day+slot combination.
-
-    Args:
-        fill_empty_only: True = only fill empty slots, False = replace all
-    Returns:
-        Dict of {day: {slot: {recipe_id, dish_name, ...}}}
+    Generate recommendations for all 21 slots.
+    5 DB queries upfront. Formula execution is pure in-memory.
     """
-    # Load active formulas from feature_registry
-    formulas = get_active_formulas(db)
 
-    # Load full approved recipe vault once (shared across all slots)
-    all_recipes = load_approved_recipes(db)
+    # Get household no_repeat config
+    config = db.execute(text("""
+        SELECT no_repeat_weeks FROM household_plan_config
+        WHERE house_id = CAST(:hid AS uuid)
+    """), {"hid": house_id}).fetchone()
+    no_repeat_weeks = config.no_repeat_weeks if config else 1
+
+    # Load all data in 5 queries
+    week_ctx = load_week_context(db, house_id, week_start, no_repeat_weeks)
+
+    # Load which formulas are active from feature_registry
+    active_formulas = get_active_formulas(db)
 
     # Get existing plan if fill_empty_only
-    existing_plan = {}
+    existing = {}
     if fill_empty_only:
         rows = db.execute(text("""
             SELECT day_name, meal_slot, recipe_id, dish_name
@@ -641,47 +581,48 @@ def generate_plan(
             AND week_start = :ws
         """), {"hid": house_id, "ws": week_start}).fetchall()
         for r in rows:
-            if r.day_name not in existing_plan:
-                existing_plan[r.day_name] = {}
-            existing_plan[r.day_name][r.meal_slot] = {
+            existing.setdefault(r.day_name, {})[r.meal_slot] = {
                 "recipe_id": str(r.recipe_id),
-                "dish_name": r.dish_name
+                "dish_name": r.dish_name,
             }
 
     result = {}
-    db_dirty = False
 
     for day in DAYS_OF_WEEK:
         result[day] = {}
         for slot in ["Breakfast", "Lunch", "Dinner"]:
 
-            # Skip if slot already filled and fill_empty_only
-            if fill_empty_only and existing_plan.get(day, {}).get(slot):
-                result[day][slot] = existing_plan[day][slot]
+            # Skip if already filled
+            if fill_empty_only and existing.get(day, {}).get(slot):
+                result[day][slot] = existing[day][slot]
                 continue
 
-            # Run pipeline
-            context = {}
-            candidates = list(all_recipes)  # fresh copy per slot
+            # Build pipeline for this slot
+            pipeline = (
+                [fn for fn in MAIN_PIPELINE if active_formulas.get(fn, True)]
+                + [fn for fn in SLOT_PIPELINE.get(slot, []) if active_formulas.get(fn, True)]
+            )
 
-            for formula in formulas:
-                fn_name = formula["fn"]
-                fn = FORMULA_MAP.get(fn_name)
-                if not fn:
+            # Run pipeline — pure in-memory
+            candidates = list(week_ctx["approved_recipes"])
+            ctx = {}
+
+            for fn_name in pipeline:
+                entry = FORMULA_MAP.get(fn_name)
+                if not entry:
                     continue
+                _, fn = entry
                 try:
-                    candidates, context = fn(
-                        db, house_id, week_start, day, slot, candidates, context
+                    candidates, ctx = fn(
+                        candidates, day, slot, ctx, week_ctx,
+                        db, house_id, week_start
                     )
                 except Exception as e:
-                    print(f"[recommendation] Formula {fn_name} failed: {e}")
-                    continue
+                    print(f"[recommendation] {fn_name} failed: {e}")
 
-            # Select one recipe from candidates
-            selected = None
+            # Select one recipe randomly from final pool
             if candidates:
                 selected = random.choice(candidates)
-                # Log selection
                 _log(db, house_id, week_start, day, slot,
                      "RA-SELECT", "random_select",
                      len(candidates), 1, [],
@@ -694,15 +635,10 @@ def generate_plan(
                     "intensity": selected["intensity_level"],
                 }
             else:
-                # Empty pool — log and leave slot empty
                 _log(db, house_id, week_start, day, slot,
                      "RA-SELECT", "random_select",
-                     0, 0, [], "No candidates after all filters — slot left empty", None)
+                     0, 0, [], "No candidates — slot left empty", None)
                 result[day][slot] = None
 
-            db_dirty = True
-
-    if db_dirty:
-        db.commit()
-
+    db.commit()
     return result

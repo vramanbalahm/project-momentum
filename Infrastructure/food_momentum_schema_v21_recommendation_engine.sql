@@ -7,32 +7,27 @@
 --   3. Create plan_audit_log table (Bucket C)
 -- ============================================================
 
--- STEP 1: Add execution_order to feature_registry
-ALTER TABLE public.feature_registry
-    ADD COLUMN IF NOT EXISTS execution_order INTEGER DEFAULT 999;
-
-COMMENT ON COLUMN public.feature_registry.execution_order IS
-    'Order in which this feature/formula is executed in the pipeline.
-     Lower number = runs first. Recommendation formulas use 1-99.
-     Other features use 999 (not in pipeline).';
+-- STEP 1: No schema change to feature_registry needed
+-- Pipeline sequence is defined in recommendation_service.py (not DB)
+-- feature_registry only stores: function_name, is_active, description
 
 -- STEP 2: Seed Bucket A recommendation formula entries
 INSERT INTO public.feature_registry
     (feature_code, feature_name, function_name, router_file,
-     is_mandatory, is_active, depends_on, description, execution_order)
+     is_mandatory, is_active, depends_on, description)
 VALUES
-    ('RA-F03',    'Member availability filter',    'filter_by_availability',     'services/recommendation_service.py', true,  true,  '{FT-030}',             'F03: For each day+slot get list of present members from member_availability. If no data assume all home.', 1),
-    ('RA-FA01',   'Allergy hard block',            'filter_by_allergies',        'services/recommendation_service.py', true,  true,  '{RA-F03}',             'F-A01: Hard block — exclude recipes containing allergens of any present member. No exceptions.', 2),
-    ('RA-F02',    'Effective diet calculation',    'calc_effective_diet',        'services/recommendation_service.py', true,  true,  '{RA-F03}',             'F02: Strictest diet among present members. Vegan > Veg > Eggitarian > Non-Veg.', 3),
-    ('RA-F01',    'Diet filter on vault',          'filter_by_diet',             'services/recommendation_service.py', true,  true,  '{RA-F02}',             'F01: Filter approved recipes by effective diet. Only review_status=approved.', 4),
-    ('RA-FA02',   'Satvik day check',              'check_satvik_day',           'services/recommendation_service.py', false, true,  '{RA-F01}',             'F-A02: Check event_master for household Satvik days. Sets satvik_required flag for the day.', 5),
-    ('RA-F08',    'Satvik ingredient filter',      'filter_satvik_ingredients',  'services/recommendation_service.py', false, true,  '{RA-FA02}',            'F08: On Satvik days exclude recipes containing household Satvik-avoided ingredients.', 6),
-    ('RA-F04',    'Meal slot and intensity filter','filter_by_meal_slot',        'services/recommendation_service.py', true,  true,  '{RA-F01}',             'F04: Filter by meal_slots array and intensity_level. Breakfast=Light, Lunch/Dinner=Medium/Heavy.', 7),
-    ('RA-F13',    'Breakfast model',               'apply_breakfast_model',      'services/recommendation_service.py', true,  true,  '{RA-F04}',             'F13: Breakfast-specific rules — Light intensity, breakfast meal_slots only.', 8),
-    ('RA-F14',    'Lunch model',                   'apply_lunch_model',          'services/recommendation_service.py', true,  true,  '{RA-F04}',             'F14: Lunch-specific rules — Medium/Heavy intensity, lunch meal_slots only.', 9),
-    ('RA-F15',    'Dinner model',                  'apply_dinner_model',         'services/recommendation_service.py', true,  true,  '{RA-F04}',             'F15: Dinner-specific rules — Medium/Heavy intensity, dinner meal_slots only.', 10),
-    ('RA-F16',    'Side dish auto-pairing',        'pair_side_dishes',           'services/recommendation_service.py', false, true,  '{RA-F13,RA-F14,RA-F15}', 'F16: Auto-pair side dishes with selected mains. Compatible diet and meal slot.', 11),
-    ('RA-F05',    'No repeat within 1 week',       'filter_recent_recipes',      'services/recommendation_service.py', false, true,  '{RA-F01}',             'F05: Exclude recipes used in current + previous week. Configurable window default=1 week.', 12)
+    ('RA-F03',  'Member availability filter',     'filter_by_availability',     'services/recommendation_service.py', true,  true,  '{FT-030}',  'F03: Get present members per day+slot. Assumes all home if no data.'),
+    ('RA-FA01', 'Allergy hard block',             'filter_by_allergies',        'services/recommendation_service.py', true,  true,  '{RA-F03}',  'FA01: Hard block allergens for present members. No exceptions.'),
+    ('RA-F02',  'Effective diet calculation',     'calc_effective_diet',        'services/recommendation_service.py', true,  true,  '{RA-F03}',  'F02: Strictest diet among present members. Vegan>Veg>Eggitarian>Non-Veg.'),
+    ('RA-F01',  'Diet filter on vault',           'filter_by_diet',             'services/recommendation_service.py', true,  true,  '{RA-F02}',  'F01: Filter approved recipes by effective diet.'),
+    ('RA-FA02', 'Satvik day check',               'check_satvik_day',           'services/recommendation_service.py', false, true,  '{RA-F01}',  'FA02: Check event_master for Satvik days this week.'),
+    ('RA-F08',  'Satvik ingredient filter',       'filter_satvik_ingredients',  'services/recommendation_service.py', false, true,  '{RA-FA02}', 'F08: On Satvik days exclude recipes with avoided ingredients.'),
+    ('RA-F04',  'Meal slot and intensity filter', 'filter_by_meal_slot',        'services/recommendation_service.py', true,  true,  '{RA-F01}',  'F04: Breakfast=Light, Lunch/Dinner=Medium/Heavy.'),
+    ('RA-F13',  'Breakfast model',                'apply_breakfast_model',      'services/recommendation_service.py', true,  true,  '{RA-F04}',  'F13: Breakfast-specific rules.'),
+    ('RA-F14',  'Lunch model',                    'apply_lunch_model',          'services/recommendation_service.py', true,  true,  '{RA-F04}',  'F14: Lunch-specific rules.'),
+    ('RA-F15',  'Dinner model',                   'apply_dinner_model',         'services/recommendation_service.py', true,  true,  '{RA-F04}',  'F15: Dinner-specific rules.'),
+    ('RA-F16',  'Side dish auto-pairing',         'pair_side_dishes',           'services/recommendation_service.py', false, true,  '{RA-F13,RA-F14,RA-F15}', 'F16: Auto-pair sides with mains.'),
+    ('RA-F05',  'No repeat within 1 week',        'filter_recent_recipes',      'services/recommendation_service.py', false, true,  '{RA-F01}',  'F05: Exclude recipes from past N weeks. Default=1 week.')
 ON CONFLICT (feature_code) DO UPDATE SET
     execution_order = EXCLUDED.execution_order,
     is_active       = EXCLUDED.is_active,
@@ -87,7 +82,7 @@ COMMENT ON TABLE public.household_plan_config IS
      no_repeat_weeks: how many weeks back to check for recipe repetition (default=1).';
 
 -- STEP 5: Verify
-SELECT feature_code, feature_name, execution_order, is_active
+SELECT feature_code, feature_name, function_name, is_active
 FROM public.feature_registry
 WHERE feature_code LIKE 'RA-%'
-ORDER BY execution_order;
+ORDER BY feature_code;
