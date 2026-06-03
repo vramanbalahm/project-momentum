@@ -403,6 +403,63 @@ export default function App({ onBack }) {
     } catch { console.error("Audit failed"); }
   };
 
+  // ── Generate Plan (Bucket A recommendation engine) ──
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const generatePlan = async () => {
+    if (!isAdmin || weekOffset !== 0) return;
+    setIsGenerating(true);
+    try {
+      const monday = new Date();
+      monday.setDate(monday.getDate() - monday.getDay() + 1);
+      const weekStart = monday.toISOString().split("T")[0];
+
+      const resp = await axios.post(`${API_BASE}/recommendation/generate`, {
+        week_start: weekStart,
+        fill_empty_only: true,
+      });
+
+      const plan = resp.data.plan;
+      if (!plan) return;
+
+      // Map API response into blueprint format
+      const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+      const slots = ["Breakfast","Lunch","Dinner"];
+      const newBlueprint = { ...blueprint };
+
+      const mondayDate = new Date(weekStart);
+      days.forEach((day, dayIdx) => {
+        const d = new Date(mondayDate);
+        d.setDate(d.getDate() + dayIdx);
+        const dateKey = d.toISOString().split("T")[0];
+
+        slots.forEach(slot => {
+          const suggested = plan[day]?.[slot];
+          if (suggested && suggested.recipe_id) {
+            const bpKey = `${dateKey}_${slot}`;
+            // Only fill empty slots
+            const existing = newBlueprint[bpKey];
+            const hasMeal = existing?.mains?.length > 0 || existing?.main;
+            if (!hasMeal) {
+              newBlueprint[bpKey] = {
+                mains: [{ recipe_id: suggested.recipe_id, dish_name: suggested.dish_name }],
+                sides: [],
+              };
+            }
+          }
+        });
+      });
+
+      setBlueprint(newBlueprint);
+      setIsDirty(true);
+      setIsAudited(false);
+    } catch (e) {
+      console.error("Generate plan failed:", e);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const savePlan = async () => {
     const payload = {
       household_id: HH_ID,
@@ -605,6 +662,23 @@ export default function App({ onBack }) {
                   }}
                 >
                   {t("weeklyPlan.availability")}
+                </button>
+              )}
+              {/* Generate Plan button — admin only, current week only */}
+              {isAdmin && isCurrentWeek && (
+                <button
+                  onClick={generatePlan}
+                  disabled={isGenerating}
+                  style={{
+                    background: isGenerating ? "#B4B2A9" : "#1A3A2E",
+                    color: "#9FE1CB",
+                    border: "none",
+                    borderRadius: 12, padding: "8px 14px",
+                    fontSize: 12, fontWeight: 500,
+                    cursor: isGenerating ? "not-allowed" : "pointer"
+                  }}
+                >
+                  {isGenerating ? "..." : "✨ " + t("weeklyPlan.generatePlan")}
                 </button>
               )}
               {/* Save button in header — admin only, hidden when viewing past weeks */}
@@ -979,18 +1053,33 @@ export default function App({ onBack }) {
             </button>
           )}
           {isAdmin && isCurrentWeek && (
-            <button
-              onClick={cta.onClick}
-              style={{
-                background: cta.bg, color: cta.color,
-                border: cta.border || "none",
-                borderRadius: 14, padding: "11px 20px",
-                fontSize: 13, fontWeight: 500, cursor: "pointer",
-                boxShadow: !isSaved ? "0 0 0 3px rgba(239,159,39,0.3)" : "none"
-              }}
-            >
-              {cta.label}
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={generatePlan}
+                disabled={isGenerating}
+                style={{
+                  background: isGenerating ? "#B4B2A9" : "#1A3A2E",
+                  color: "#9FE1CB", border: "1px solid #5DCAA5",
+                  borderRadius: 14, padding: "11px 16px",
+                  fontSize: 13, fontWeight: 500,
+                  cursor: isGenerating ? "not-allowed" : "pointer"
+                }}
+              >
+                {isGenerating ? "..." : "✨ " + t("weeklyPlan.generatePlan")}
+              </button>
+              <button
+                onClick={cta.onClick}
+                style={{
+                  background: cta.bg, color: cta.color,
+                  border: cta.border || "none",
+                  borderRadius: 14, padding: "11px 20px",
+                  fontSize: 13, fontWeight: 500, cursor: "pointer",
+                  boxShadow: !isSaved ? "0 0 0 3px rgba(239,159,39,0.3)" : "none"
+                }}
+              >
+                {cta.label}
+              </button>
+            </div>
           )}
           {!isAdmin && (
             <div style={{ fontSize: 11, color: "#5DCAA5", fontStyle: "italic" }}>

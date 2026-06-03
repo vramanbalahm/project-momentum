@@ -266,7 +266,8 @@
       "dashboard": "முகப்பு",
       "changePassword": "கடவுச்சொல் மாற்று",
       "signOut": "வெளியேறு"
-    }
+    },
+    "generatePlan": "திட்டம் உருவாக்கு"
   },
   "myProfile": {
     "title": "என் விவரம்",

@@ -266,7 +266,8 @@
       "dashboard": "Dashboard",
       "changePassword": "Change Password",
       "signOut": "Sign out"
-    }
+    },
+    "generatePlan": "Generate plan"
   },
   "myProfile": {
     "title": "My Profile",
