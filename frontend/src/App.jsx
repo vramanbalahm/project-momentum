@@ -317,26 +317,9 @@ export default function App({ onBack }) {
         setHasNextWeekData(nextRes.data?.plan && nextRes.data.plan.length > 0);
 
         if (weekOffset === 0) {
-          // Current week: fill gaps with suggestions
-          let suggestionIdx = 0;
-          DAYS.forEach(day => {
-            MEAL_TYPES.forEach(type => {
-              const key = `${day}-${type}`;
-              if (!weekMap[key]) {
-                const sugg = suggestions[suggestionIdx % (suggestions.length || 1)];
-                if (sugg) {
-                  weekMap[key] = {
-                    main: { name: sugg.name, recipe_id: sugg.recipe_id, hero: sugg.hero, thumb: sugg.thumb, is_sattvic: sugg.is_sattvic, diet_type: sugg.diet_type },
-                    sides: []
-                  };
-                  suggestionIdx++;
-                }
-              }
-            });
-          });
           // Reset plan state flags when returning to current week
           setIsAudited(false);
-          setIsSaved(false);
+          setIsSaved(hasPlan);
           setIsDirty(false);
         }
 
@@ -416,7 +399,7 @@ export default function App({ onBack }) {
 
       const resp = await axios.post(`${API_BASE}/recommendation/generate`, {
         week_start: weekStart,
-        fill_empty_only: true,
+        fill_empty_only: false,
       });
 
       const plan = resp.data.plan;
@@ -682,7 +665,7 @@ export default function App({ onBack }) {
                 </button>
               )}
               {/* Generate Plan button — admin only, current week only */}
-              {isAdmin && isCurrentWeek && (
+              {isAdmin && isCurrentWeek && !isSaved && (
                 <button
                   onClick={generatePlan}
                   disabled={isGenerating}
@@ -1071,6 +1054,7 @@ export default function App({ onBack }) {
           )}
           {isAdmin && isCurrentWeek && (
             <div style={{ display: "flex", gap: 8 }}>
+              {!isSaved && (
               <button
                 onClick={generatePlan}
                 disabled={isGenerating}
@@ -1084,6 +1068,7 @@ export default function App({ onBack }) {
               >
                 {isGenerating ? "..." : "✨ " + t("weeklyPlan.generatePlan")}
               </button>
+              )}
               <button
                 onClick={cta.onClick}
                 style={{
