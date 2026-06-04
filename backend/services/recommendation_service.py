@@ -103,7 +103,7 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
         SELECT
             u.user_id,
             u.name,
-            u.dietary_preference,
+            COALESCE(mp.dietary_preference, 'Veg') as dietary_preference,
             COALESCE(
                 ARRAY(
                     SELECT mr.ingredient_id
@@ -113,15 +113,16 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
                 ), '{}'::integer[]
             ) as allergen_ids
         FROM users u
+        LEFT JOIN member_preferences mp ON mp.user_id = u.user_id
         WHERE u.house_id = CAST(:hid AS uuid)
         AND u.is_active = true
     """), {"hid": house_id}).fetchall()
 
     members = {
         str(r.user_id): {
-            "name":              r.name,
+            "name":               r.name,
             "dietary_preference": r.dietary_preference or "Veg",
-            "allergen_ids":      list(r.allergen_ids) if r.allergen_ids else [],
+            "allergen_ids":       list(r.allergen_ids) if r.allergen_ids else [],
         }
         for r in member_rows
     }
