@@ -73,7 +73,7 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
         SELECT
             r.recipe_id, r.dish_name, r.diet_type,
             r.intensity_level, r.is_sattvic,
-            rv.meal_slots,
+            r.meal_slots,
             COALESCE(
                 ARRAY(
                     SELECT ri.ingredient_id
@@ -82,9 +82,7 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
                 ), '{}'::integer[]
             ) as ingredient_ids
         FROM recipe_dna_master r
-        JOIN recipe_review_master rv ON rv.recipe_id = r.recipe_id
-        WHERE rv.review_status = 'approved'
-        AND (rv.is_side_dish = false OR rv.is_side_dish IS NULL)
+        WHERE r.review_status = 'approved'
     """)).fetchall()
 
     approved_recipes = [
@@ -185,11 +183,13 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
     # Query 5 — Recent recipes: what was served in past N weeks per slot
     cutoff = week_start - timedelta(weeks=no_repeat_weeks)
     recent_rows = db.execute(text("""
-        SELECT DISTINCT recipe_id, meal_slot
-        FROM weekly_plan_slots
-        WHERE house_id = CAST(:hid AS uuid)
-        AND week_start >= :cutoff
-        AND week_start < :ws
+        SELECT DISTINCT d.recipe_id, h.meal_slot
+        FROM meal_event_header h
+        JOIN meal_event_detail d ON d.event_id = h.event_id
+        WHERE h.house_id = CAST(:hid AS uuid)
+        AND h.event_date >= :cutoff
+        AND h.event_date < :ws
+        AND d.is_main = true
     """), {"hid": house_id, "cutoff": cutoff, "ws": week_start}).fetchall()
 
     recent_by_slot = {}
@@ -575,13 +575,22 @@ def generate_plan(
     existing = {}
     if fill_empty_only:
         rows = db.execute(text("""
-            SELECT day_name, meal_slot, recipe_id, dish_name
-            FROM weekly_plan_slots
-            WHERE house_id = CAST(:hid AS uuid)
-            AND week_start = :ws
-        """), {"hid": house_id, "ws": week_start}).fetchall()
+            SELECT
+                TO_CHAR(h.event_date, 'Day') as day_name,
+                TRIM(TO_CHAR(h.event_date, 'Day')) as day_trim,
+                h.meal_slot,
+                d.recipe_id,
+                r.dish_name
+            FROM meal_event_header h
+            JOIN meal_event_detail d ON d.event_id = h.event_id
+            JOIN recipe_dna_master r ON r.recipe_id = d.recipe_id
+            WHERE h.house_id = CAST(:hid AS uuid)
+            AND h.event_date >= :ws
+            AND h.event_date < :we
+            AND d.is_main = true
+        """), {"hid": house_id, "ws": week_start, "we": week_start + timedelta(days=7)}).fetchall()
         for r in rows:
-            existing.setdefault(r.day_name, {})[r.meal_slot] = {
+            existing.setdefault(r.day_trim, {})[r.meal_slot] = {
                 "recipe_id": str(r.recipe_id),
                 "dish_name": r.dish_name,
             }
