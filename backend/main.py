@@ -143,14 +143,24 @@ async def config_snapshot(
     """), {"hid": house_id}).fetchone()
 
     audit = db.execute(text("""
-        SELECT feature_code, AVG(recipes_in)::int as avg_in,
-               AVG(recipes_out)::int as avg_out, MIN(filter_reason) as reason
-        FROM plan_audit_log
-        WHERE house_id = CAST(:hid AS uuid)
-        AND created_at >= (
-            SELECT MAX(created_at) - INTERVAL '30 seconds'
-            FROM plan_audit_log WHERE house_id = CAST(:hid AS uuid)
+        WITH last_run AS (
+            SELECT MAX(created_at) as max_ts
+            FROM plan_audit_log
+            WHERE house_id = CAST(:hid AS uuid)
         )
+        SELECT
+            feature_code,
+            MIN(recipes_in)::int  as min_in,
+            MAX(recipes_in)::int  as max_in,
+            MIN(recipes_out)::int as min_out,
+            MAX(recipes_out)::int as max_out,
+            AVG(recipes_in)::int  as avg_in,
+            AVG(recipes_out)::int as avg_out,
+            MIN(filter_reason)    as reason,
+            COUNT(*)              as slot_count
+        FROM plan_audit_log, last_run
+        WHERE house_id = CAST(:hid AS uuid)
+        AND created_at >= last_run.max_ts - INTERVAL '5 seconds'
         GROUP BY feature_code ORDER BY feature_code
     """), {"hid": house_id}).fetchall()
 
@@ -180,7 +190,18 @@ async def config_snapshot(
             "allow_same_week_repeat": wc.allow_same_week_repeat,
             "allow_same_day_repeat": wc.allow_same_day_repeat, "prefer_millet": wc.prefer_millet,
         } if wc else None,
-        "last_audit": [{"formula": a.feature_code, "avg_in": a.avg_in, "avg_out": a.avg_out, "reason": a.reason} for a in audit],
+        "last_audit": [
+            {
+                "formula":     a.feature_code,
+                "avg_in":      a.avg_in,
+                "avg_out":     a.avg_out,
+                "min_out":     a.min_out,
+                "max_out":     a.max_out,
+                "slot_count":  a.slot_count,
+                "reason":      a.reason,
+            }
+            for a in audit
+        ],
         "bucket_a_formulas": [{"code": f.feature_code, "fn": f.function_name, "active": f.is_active} for f in formulas],
     }
 

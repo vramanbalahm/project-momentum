@@ -165,6 +165,9 @@ export default function ConfigSnapshot({ onBack }) {
                           <span style={{ fontSize: 11, fontWeight: 500, color: isFiltered ? "#E24B4A" : C.muted }}>
                             {a.avg_in} → {a.avg_out}
                             {isFiltered && <span style={{ color: "#E24B4A" }}> (−{filtered})</span>}
+                            {a.slot_count > 1 && a.min_out !== a.max_out && (
+                              <span style={{ color: C.muted, fontSize: 10 }}> [{a.min_out}–{a.max_out}]</span>
+                            )}
                           </span>
                         </div>
                         {/* Progress bar */}
