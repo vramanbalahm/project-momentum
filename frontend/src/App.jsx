@@ -591,9 +591,9 @@ export default function App({ onBack }) {
 
   useEffect(() => {
     if (!HH_ID) return;
-    const monday = new Date();
-    monday.setDate(monday.getDate() - monday.getDay() + 1 + weekOffset * 7);
-    const ws = monday.toISOString().split("T")[0];
+    const monday = getCurrentWeekMonday();
+    monday.setDate(monday.getDate() + weekOffset * 7);
+    const ws = toLocalDateString(monday);
     axios.get(`${API_BASE}/onboarding/week-events?week_start=${ws}`)
       .then(r => setWeekEvents(r.data.events || []))
       .catch(() => setWeekEvents([]));

@@ -6,7 +6,7 @@ const EventManagement = ({ householdId }) => {
   // 1. All State must be inside the component
   const [formData, setFormData] = useState({
     local_name: '',
-    event_date: new Date().toISOString().split('T')[0],
+    event_date: `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`,
     is_sattvic: false,
     icon: '🎂'
   });
