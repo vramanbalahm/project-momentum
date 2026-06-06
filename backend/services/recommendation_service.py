@@ -292,7 +292,7 @@ def filter_by_availability(recipes, day, slot, ctx, week_ctx, db, house_id, week
     return recipes, ctx
 
 
-def filter_by_allergies(recipes, day, slot, ctx, week_ctx, db, house_id, week_start):
+def filter_by_allergies(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     t0 = time.time()
     present_ids = ctx.get("present_ids", [])
     members = week_ctx["members"]
@@ -319,7 +319,7 @@ def filter_by_allergies(recipes, day, slot, ctx, week_ctx, db, house_id, week_st
     return filtered, ctx
 
 
-def calc_effective_diet(recipes, day, slot, ctx, week_ctx, db, house_id, week_start):
+def calc_effective_diet(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     t0 = time.time()
     present_ids = ctx.get("present_ids", [])
     members = week_ctx["members"]
@@ -332,7 +332,7 @@ def calc_effective_diet(recipes, day, slot, ctx, week_ctx, db, house_id, week_st
     return recipes, ctx
 
 
-def filter_by_diet(recipes, day, slot, ctx, week_ctx, db, house_id, week_start):
+def filter_by_diet(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     t0 = time.time()
     effective = ctx.get("effective_diet", "Veg")
     allowed   = DIET_COMPATIBLE.get(effective, ["Veg"])
@@ -344,7 +344,7 @@ def filter_by_diet(recipes, day, slot, ctx, week_ctx, db, house_id, week_start):
     return filtered, ctx
 
 
-def check_satvik_day(recipes, day, slot, ctx, week_ctx, db, house_id, week_start):
+def check_satvik_day(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     t0 = time.time()
     is_satvik = day in week_ctx["satvik_days"]
     ctx["is_satvik_day"] = is_satvik
@@ -355,7 +355,7 @@ def check_satvik_day(recipes, day, slot, ctx, week_ctx, db, house_id, week_start
     return recipes, ctx
 
 
-def filter_satvik_ingredients(recipes, day, slot, ctx, week_ctx, db, house_id, week_start):
+def filter_satvik_ingredients(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     t0 = time.time()
     if not ctx.get("is_satvik_day", False):
         _log(db, house_id, week_start, day, slot, "RA-F08", "filter_satvik_ingredients",
@@ -376,7 +376,7 @@ def filter_satvik_ingredients(recipes, day, slot, ctx, week_ctx, db, house_id, w
     return filtered, ctx
 
 
-def filter_by_meal_slot(recipes, day, slot, ctx, week_ctx, db, house_id, week_start):
+def filter_by_meal_slot(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     t0 = time.time()
     allowed_intensities = SLOT_INTENSITY.get(slot, ["Medium"])
     filtered = [
@@ -392,7 +392,7 @@ def filter_by_meal_slot(recipes, day, slot, ctx, week_ctx, db, house_id, week_st
     return filtered, ctx
 
 
-def filter_recent_recipes(recipes, day, slot, ctx, week_ctx, db, house_id, week_start):
+def filter_recent_recipes(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     t0 = time.time()
     recent = week_ctx["recent_by_slot"].get(slot, set())
     if not recent:
@@ -416,21 +416,21 @@ def filter_recent_recipes(recipes, day, slot, ctx, week_ctx, db, house_id, week_
     return filtered, ctx
 
 
-def apply_breakfast_model(recipes, day, slot, ctx, week_ctx, db, house_id, week_start):
+def apply_breakfast_model(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     if slot != "Breakfast": return recipes, ctx
     _log(db, house_id, week_start, day, slot, "RA-F13", "apply_breakfast_model",
          len(recipes, run_id=run_id), len(recipes), [], f"Breakfast pool: {len(recipes)}", None, 0)
     return recipes, ctx
 
 
-def apply_lunch_model(recipes, day, slot, ctx, week_ctx, db, house_id, week_start):
+def apply_lunch_model(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     if slot != "Lunch": return recipes, ctx
     _log(db, house_id, week_start, day, slot, "RA-F14", "apply_lunch_model",
          len(recipes, run_id=run_id), len(recipes), [], f"Lunch pool: {len(recipes)}", None, 0)
     return recipes, ctx
 
 
-def apply_dinner_model(recipes, day, slot, ctx, week_ctx, db, house_id, week_start):
+def apply_dinner_model(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     if slot != "Dinner": return recipes, ctx
     _log(db, house_id, week_start, day, slot, "RA-F15", "apply_dinner_model",
          len(recipes, run_id=run_id), len(recipes), [], f"Dinner pool: {len(recipes)}", None, 0)
