@@ -306,7 +306,9 @@
       "adding": "Adding...",
       "namePasswordRequired": "Name and password are required.",
       "addedSuccess": "✓ {{name}} added successfully!"
-    }
+    },
+    "ageGroupRequired": "Please select an age group.",
+    "genderRequired": "Please select a gender."
   },
   "familyProfile": {
     "title": "Family Profile",
@@ -390,7 +392,9 @@
     "deactivateTitle": "Deactivate member?",
     "deactivateDesc": "This member will lose access to the household.",
     "confirmBtn": "Yes, confirm",
-    "cancelBtn": "Cancel"
+    "cancelBtn": "Cancel",
+    "ageGroupRequired": "Please select an age group.",
+    "genderRequired": "Please select a gender."
   },
   "memberAvailability": {
     "title": "Member Availability",

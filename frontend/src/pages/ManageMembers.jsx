@@ -169,6 +169,15 @@ export default function ManageMembers({ onBack }) {
   };
 
   const handleSaveEdit = async () => {
+    // Validate required fields before saving
+    if (!editForm.age_group) {
+      setError(t("manageMembers.ageGroupRequired"));
+      return;
+    }
+    if (!editForm.gender) {
+      setError(t("manageMembers.genderRequired"));
+      return;
+    }
     setEditSaving(true);
     setError(null);
     try {

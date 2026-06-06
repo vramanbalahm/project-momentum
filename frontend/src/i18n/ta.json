@@ -306,7 +306,9 @@
       "adding": "சேர்க்கிறது...",
       "namePasswordRequired": "பெயர் மற்றும் கடவுச்சொல் தேவை.",
       "addedSuccess": "✓ {{name}} வெற்றிகரமாக சேர்க்கப்பட்டார்!"
-    }
+    },
+    "ageGroupRequired": "வயது பிரிவை தேர்ந்தெடுக்கவும்.",
+    "genderRequired": "பாலினத்தை தேர்ந்தெடுக்கவும்."
   },
   "familyProfile": {
     "title": "குடும்ப விவரம்",
@@ -390,7 +392,9 @@
     "deactivateTitle": "உறுப்பினரை நிறுத்தவா?",
     "deactivateDesc": "இந்த உறுப்பினர் குடும்ப அணுகலை இழப்பார்.",
     "confirmBtn": "ஆம், உறுதிப்படுத்து",
-    "cancelBtn": "ரத்து செய்"
+    "cancelBtn": "ரத்து செய்",
+    "ageGroupRequired": "வயது பிரிவை தேர்ந்தெடுக்கவும்.",
+    "genderRequired": "பாலினத்தை தேர்ந்தெடுக்கவும்."
   },
   "memberAvailability": {
     "title": "உறுப்பினர் கிடைக்கும் தன்மை",

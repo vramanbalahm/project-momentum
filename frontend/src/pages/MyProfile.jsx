@@ -113,6 +113,8 @@ export default function MyProfile({ onBack }) {
   };
 
   const handleSave = async () => {
+    if (!ageGroup) { setError(t("myProfile.ageGroupRequired")); return; }
+    if (!gender)   { setError(t("myProfile.genderRequired"));   return; }
     setSaving(true);
     setError(null);
     setSuccessMsg(null);
