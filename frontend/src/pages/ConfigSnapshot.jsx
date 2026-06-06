@@ -122,26 +122,52 @@ export default function ConfigSnapshot({ onBack }) {
                 )}
               </Section>
 
-              {/* Last plan generation audit */}
-              <Section title="Last Plan Generation Audit" emoji="🔍">
+              {/* Pipeline Debug — visual funnel */}
+              <Section title="Recipe Pipeline — Last Run" emoji="🔬">
                 {(data.last_audit || []).length === 0 ? (
                   <div style={{ fontSize: 12, color: C.muted, textAlign: "center", padding: "8px 0" }}>
-                    No plan generated yet
+                    No plan generated yet — click ✨ Generate plan first
                   </div>
-                ) : (
-                  (data.last_audit || []).map((a, i) => (
-                    <div key={i} style={{ padding: "6px 0", borderBottom: `0.5px solid ${C.border}` }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: C.deepTeal }}>{a.formula}</span>
-                        <span style={{ fontSize: 11, color: a.avg_in === a.avg_out ? C.muted : "#E24B4A", fontWeight: 500 }}>
-                          {a.avg_in} → {a.avg_out}
-                          {a.avg_in !== a.avg_out && ` (-${a.avg_in - a.avg_out})`}
-                        </span>
+                ) : (() => {
+                  // Order pipeline steps logically
+                  const ORDER = ["RA-F03","RA-FA01","RA-F02","RA-F01","RA-FA02","RA-F08","RA-F04","RA-F05","RA-F13","RA-F14","RA-F15","RA-SELECT"];
+                  const map = {};
+                  (data.last_audit || []).forEach(a => { map[a.formula] = a; });
+                  const steps = ORDER.map(k => map[k]).filter(Boolean);
+                  const maxIn = Math.max(...steps.map(s => s.avg_in || 0), 1);
+
+                  return steps.map((a, i) => {
+                    const barW = Math.max(4, Math.round((a.avg_out / maxIn) * 100));
+                    const filtered = a.avg_in - a.avg_out;
+                    const isFiltered = filtered > 0;
+                    const isSelect = a.formula === "RA-SELECT";
+                    return (
+                      <div key={i} style={{ marginBottom: 10 }}>
+                        {/* Formula label + counts */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: isSelect ? C.deepTeal : C.text }}>
+                            {a.formula}
+                          </span>
+                          <span style={{ fontSize: 11, fontWeight: 500, color: isFiltered ? "#E24B4A" : C.muted }}>
+                            {a.avg_in} → {a.avg_out}
+                            {isFiltered && <span style={{ color: "#E24B4A" }}> (−{filtered})</span>}
+                          </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div style={{ height: 8, background: C.border, borderRadius: 4, overflow: "hidden" }}>
+                          <div style={{
+                            height: "100%", borderRadius: 4,
+                            width: `${barW}%`,
+                            background: isSelect ? C.teal : isFiltered ? "#EF9F27" : C.teal,
+                            transition: "width 0.3s"
+                          }} />
+                        </div>
+                        {/* Reason */}
+                        <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>{a.reason}</div>
                       </div>
-                      <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>{a.reason}</div>
-                    </div>
-                  ))
-                )}
+                    );
+                  });
+                })()}
               </Section>
 
               {/* Bucket A formulas status */}
