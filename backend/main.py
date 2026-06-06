@@ -144,9 +144,10 @@ async def config_snapshot(
 
     audit = db.execute(text("""
         WITH last_run AS (
-            SELECT MAX(created_at) as max_ts
+            SELECT run_id
             FROM plan_audit_log
             WHERE house_id = CAST(:hid AS uuid)
+            ORDER BY created_at DESC LIMIT 1
         )
         SELECT
             feature_code,
@@ -158,9 +159,8 @@ async def config_snapshot(
             AVG(recipes_out)::int as avg_out,
             MIN(filter_reason)    as reason,
             COUNT(*)              as slot_count
-        FROM plan_audit_log, last_run
-        WHERE house_id = CAST(:hid AS uuid)
-        AND created_at >= last_run.max_ts - INTERVAL '5 seconds'
+        FROM plan_audit_log
+        WHERE run_id = (SELECT run_id FROM last_run)
         GROUP BY feature_code ORDER BY feature_code
     """), {"hid": house_id}).fetchall()
 

@@ -43,7 +43,7 @@ async def generate_recommendation(
         today = date.today()
         ws = today - timedelta(days=today.weekday())  # Monday
 
-    result = generate_plan(
+    result, run_id = generate_plan(
         db=db,
         house_id=house_id,
         week_start=ws,
@@ -57,6 +57,7 @@ async def generate_recommendation(
     return {
         "message":    f"Plan generated: {filled} slots filled, {empty} slots empty.",
         "week_start": str(ws),
+        "run_id":     run_id,
         "plan":       result,
         "filled":     filled,
         "empty":      empty,

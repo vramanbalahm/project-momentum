@@ -36,21 +36,25 @@ ON CONFLICT (feature_code) DO UPDATE SET
 -- STEP 3: Create plan_audit_log table (Bucket C)
 CREATE TABLE IF NOT EXISTS public.plan_audit_log (
     log_id          UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_id          UUID            NOT NULL DEFAULT gen_random_uuid(),  -- groups all logs from one generate_plan() call
     house_id        UUID            NOT NULL REFERENCES public.household_master(household_id) ON DELETE CASCADE,
     week_start      DATE            NOT NULL,
     day_name        VARCHAR(10)     NOT NULL,  -- Monday, Tuesday etc.
     meal_slot       VARCHAR(10)     NOT NULL,  -- Breakfast, Lunch, Dinner
-    feature_code    VARCHAR(20)     NOT NULL,  -- e.g. RA-F03, RA-SELECT (no FK — RA-SELECT not in registry)
+    feature_code    VARCHAR(20)     NOT NULL,  -- e.g. RA-F03, RA-SELECT (no FK)
     function_name   VARCHAR(100)    NOT NULL,
-    recipes_in      INTEGER         NOT NULL DEFAULT 0,  -- count before this filter
-    recipes_out     INTEGER         NOT NULL DEFAULT 0,  -- count after this filter
-    filtered_count  INTEGER         NOT NULL DEFAULT 0,  -- how many removed
-    filter_reason   TEXT,                                -- human readable reason
-    filtered_ids    UUID[]          DEFAULT '{}',        -- recipe_ids that were removed
-    selected_id     UUID,                                -- final selected recipe (last step only)
-    execution_ms    INTEGER,                             -- time taken in ms
+    recipes_in      INTEGER         NOT NULL DEFAULT 0,
+    recipes_out     INTEGER         NOT NULL DEFAULT 0,
+    filtered_count  INTEGER         NOT NULL DEFAULT 0,
+    filter_reason   TEXT,
+    filtered_ids    UUID[]          DEFAULT '{}',
+    selected_id     UUID,
+    execution_ms    INTEGER,
     created_at      TIMESTAMP       DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_run_id
+    ON public.plan_audit_log(run_id);
 
 COMMENT ON TABLE public.plan_audit_log IS
     'Bucket C — Audit log for recommendation engine formula execution.
