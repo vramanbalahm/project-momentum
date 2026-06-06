@@ -288,7 +288,7 @@ def filter_by_availability(recipes, day, slot, ctx, week_ctx, db, house_id, week
 
     ctx["present_ids"] = present_ids
     _log(db, house_id, week_start, day, slot, "RA-F03", "filter_by_availability",
-         len(recipes, run_id=run_id), len(recipes), [], reason, None, int((time.time()-t0)*1000))
+         len(recipes), len(recipes), [], reason, None, int((time.time()-t0)*1000))
     return recipes, ctx
 
 
@@ -308,13 +308,13 @@ def filter_by_allergies(recipes, day, slot, ctx, week_ctx, db, house_id, week_st
 
     if not allergen_ids:
         _log(db, house_id, week_start, day, slot, "RA-FA01", "filter_by_allergies",
-             len(recipes, run_id=run_id), len(recipes), [], "No allergens for present members", None, 0)
+             len(recipes), len(recipes), [], "No allergens for present members", None, 0, run_id=run_id)
         return recipes, ctx
 
     filtered = [r for r in recipes if not (set(r.get("ingredient_ids", [])) & allergen_ids)]
     removed  = [r["recipe_id"] for r in recipes if r not in filtered]
     _log(db, house_id, week_start, day, slot, "RA-FA01", "filter_by_allergies",
-         len(recipes, run_id=run_id), len(filtered), removed, f"Allergens: {', '.join(desc)}",
+         len(recipes), len(filtered), removed, f"Allergens: {', '.join(desc)}",
          None, int((time.time()-t0)*1000))
     return filtered, ctx
 
@@ -327,7 +327,7 @@ def calc_effective_diet(recipes, day, slot, ctx, week_ctx, db, house_id, week_st
     effective = max(diets, key=lambda d: DIET_ORDER.get(d, 0)) if diets else "Veg"
     ctx["effective_diet"] = effective
     _log(db, house_id, week_start, day, slot, "RA-F02", "calc_effective_diet",
-         len(recipes, run_id=run_id), len(recipes), [], f"Effective diet: {effective}",
+         len(recipes), len(recipes), [], f"Effective diet: {effective}",
          None, int((time.time()-t0)*1000))
     return recipes, ctx
 
@@ -339,7 +339,7 @@ def filter_by_diet(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, 
     filtered  = [r for r in recipes if r.get("diet_type") in allowed]
     removed   = [r["recipe_id"] for r in recipes if r not in filtered]
     _log(db, house_id, week_start, day, slot, "RA-F01", "filter_by_diet",
-         len(recipes, run_id=run_id), len(filtered), removed, f"Diet: {effective} — allowed: {allowed}",
+         len(recipes), len(filtered), removed, f"Diet: {effective} — allowed: {allowed}",
          None, int((time.time()-t0)*1000))
     return filtered, ctx
 
@@ -349,7 +349,7 @@ def check_satvik_day(recipes, day, slot, ctx, week_ctx, db, house_id, week_start
     is_satvik = day in week_ctx["satvik_days"]
     ctx["is_satvik_day"] = is_satvik
     _log(db, house_id, week_start, day, slot, "RA-FA02", "check_satvik_day",
-         len(recipes, run_id=run_id), len(recipes), [],
+         len(recipes), len(recipes), [],
          "Satvik day ✓" if is_satvik else "Not a Satvik day",
          None, int((time.time()-t0)*1000))
     return recipes, ctx
@@ -359,19 +359,19 @@ def filter_satvik_ingredients(recipes, day, slot, ctx, week_ctx, db, house_id, w
     t0 = time.time()
     if not ctx.get("is_satvik_day", False):
         _log(db, house_id, week_start, day, slot, "RA-F08", "filter_satvik_ingredients",
-             len(recipes, run_id=run_id), len(recipes), [], "Not Satvik day — skipped", None, 0)
+             len(recipes), len(recipes), [], "Not Satvik day — skipped", None, 0, run_id=run_id)
         return recipes, ctx
 
     avoided = week_ctx["satvik_avoided_ids"]
     if not avoided:
         _log(db, house_id, week_start, day, slot, "RA-F08", "filter_satvik_ingredients",
-             len(recipes, run_id=run_id), len(recipes), [], "Satvik day — no restrictions defined", None, 0)
+             len(recipes), len(recipes), [], "Satvik day — no restrictions defined", None, 0, run_id=run_id)
         return recipes, ctx
 
     filtered = [r for r in recipes if not (set(r.get("ingredient_ids", [])) & avoided)]
     removed  = [r["recipe_id"] for r in recipes if r not in filtered]
     _log(db, house_id, week_start, day, slot, "RA-F08", "filter_satvik_ingredients",
-         len(recipes, run_id=run_id), len(filtered), removed,
+         len(recipes), len(filtered), removed,
          f"Satvik: {len(removed)} recipes removed", None, int((time.time()-t0)*1000))
     return filtered, ctx
 
@@ -386,7 +386,7 @@ def filter_by_meal_slot(recipes, day, slot, ctx, week_ctx, db, house_id, week_st
     ]
     removed = [r["recipe_id"] for r in recipes if r not in filtered]
     _log(db, house_id, week_start, day, slot, "RA-F04", "filter_by_meal_slot",
-         len(recipes, run_id=run_id), len(filtered), removed,
+         len(recipes), len(filtered), removed,
          f"{slot}: intensity={allowed_intensities}, {len(filtered)} pass",
          None, int((time.time()-t0)*1000))
     return filtered, ctx
@@ -397,8 +397,8 @@ def filter_recent_recipes(recipes, day, slot, ctx, week_ctx, db, house_id, week_
     recent = week_ctx["recent_by_slot"].get(slot, set())
     if not recent:
         _log(db, house_id, week_start, day, slot, "RA-F05", "filter_recent_recipes",
-             len(recipes, run_id=run_id), len(recipes), [],
-             f"No recent recipes in past {week_ctx['no_repeat_weeks']} week(s)", None, 0)
+             len(recipes), len(recipes), [],
+             f"No recent recipes in past {week_ctx['no_repeat_weeks']} week(s)", None, 0, run_id=run_id)
         return recipes, ctx
 
     filtered = [r for r in recipes if r["recipe_id"] not in recent]
@@ -406,11 +406,11 @@ def filter_recent_recipes(recipes, day, slot, ctx, week_ctx, db, house_id, week_
 
     if not filtered:
         _log(db, house_id, week_start, day, slot, "RA-F05", "filter_recent_recipes",
-             len(recipes, run_id=run_id), len(recipes), [], "Pool empty — no-repeat constraint relaxed", None, 0)
+             len(recipes), len(recipes), [], "Pool empty — no-repeat constraint relaxed", None, 0, run_id=run_id)
         return recipes, ctx
 
     _log(db, house_id, week_start, day, slot, "RA-F05", "filter_recent_recipes",
-         len(recipes, run_id=run_id), len(filtered), removed,
+         len(recipes), len(filtered), removed,
          f"No-repeat: {len(removed)} excluded (past {week_ctx['no_repeat_weeks']} wk)",
          None, int((time.time()-t0)*1000))
     return filtered, ctx
@@ -419,21 +419,21 @@ def filter_recent_recipes(recipes, day, slot, ctx, week_ctx, db, house_id, week_
 def apply_breakfast_model(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     if slot != "Breakfast": return recipes, ctx
     _log(db, house_id, week_start, day, slot, "RA-F13", "apply_breakfast_model",
-         len(recipes, run_id=run_id), len(recipes), [], f"Breakfast pool: {len(recipes)}", None, 0)
+         len(recipes), len(recipes), [], f"Breakfast pool: {len(recipes)}", None, 0, run_id=run_id)
     return recipes, ctx
 
 
 def apply_lunch_model(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     if slot != "Lunch": return recipes, ctx
     _log(db, house_id, week_start, day, slot, "RA-F14", "apply_lunch_model",
-         len(recipes, run_id=run_id), len(recipes), [], f"Lunch pool: {len(recipes)}", None, 0)
+         len(recipes), len(recipes), [], f"Lunch pool: {len(recipes)}", None, 0, run_id=run_id)
     return recipes, ctx
 
 
 def apply_dinner_model(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     if slot != "Dinner": return recipes, ctx
     _log(db, house_id, week_start, day, slot, "RA-F15", "apply_dinner_model",
-         len(recipes, run_id=run_id), len(recipes), [], f"Dinner pool: {len(recipes)}", None, 0)
+         len(recipes), len(recipes), [], f"Dinner pool: {len(recipes)}", None, 0, run_id=run_id)
     return recipes, ctx
 
 
@@ -567,7 +567,7 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                 selected = random.choice(candidates)
                 _log(db, house_id, week_start, day, slot,
                      "RA-SELECT", "random_select",
-                     len(fresh_candidates, run_id=run_id), 1, [],
+                     len(fresh_candidates), 1, [],
                      f"Selected: {selected['dish_name']} from {len(fresh_candidates)} candidates",
                      selected["recipe_id"])
                 result[day][slot] = {
@@ -579,7 +579,7 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
             else:
                 _log(db, house_id, week_start, day, slot,
                      "RA-SELECT", "random_select",
-                     0, 0, [], "No candidates — slot left empty", None, run_id=run_id)
+                     0, 0, [], "No candidates — slot left empty", None, 0, run_id=run_id)
                 result[day][slot] = None
 
     db.commit()
