@@ -393,9 +393,7 @@ export default function App({ onBack }) {
     if (!isAdmin || weekOffset !== 0) return;
     setIsGenerating(true);
     try {
-      const monday = new Date();
-      monday.setDate(monday.getDate() - monday.getDay() + 1);
-      const weekStart = monday.toISOString().split("T")[0];
+      const weekStart = toLocalDateString(getCurrentWeekMonday());
 
       const resp = await axios.post(`${API_BASE}/recommendation/generate`, {
         week_start: weekStart,
@@ -406,21 +404,16 @@ export default function App({ onBack }) {
       if (!plan) return;
 
       // Map API response into blueprint format
-      // Use same local date logic as rest of app to avoid timezone issues
+      // Blueprint key format: "Monday-Breakfast" (same as loadWeekPlan)
       const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
       const slots = ["Breakfast","Lunch","Dinner"];
       const newBlueprint = {};
 
-      const planMonday = getCurrentWeekMonday();
-      days.forEach((day, dayIdx) => {
-        const d = new Date(planMonday);
-        d.setDate(d.getDate() + dayIdx);
-        const dateKey = toLocalDateString(d);
-
+      days.forEach(day => {
         slots.forEach(slot => {
           const suggested = plan[day]?.[slot];
           if (suggested && suggested.recipe_id) {
-            const bpKey = `${dateKey}_${slot}`;
+            const bpKey = `${day}-${slot}`;
             newBlueprint[bpKey] = {
               mains: [{ recipe_id: suggested.recipe_id, dish_name: suggested.dish_name }],
               sides: [],
