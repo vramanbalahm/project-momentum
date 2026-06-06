@@ -411,9 +411,9 @@ export default function App({ onBack }) {
       const slots = ["Breakfast","Lunch","Dinner"];
       const newBlueprint = {};
 
-      const monday = getCurrentWeekMonday();
+      const planMonday = getCurrentWeekMonday();
       days.forEach((day, dayIdx) => {
-        const d = new Date(monday);
+        const d = new Date(planMonday);
         d.setDate(d.getDate() + dayIdx);
         const dateKey = toLocalDateString(d);
 
