@@ -481,6 +481,12 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                 }
 
     result: Dict = {}
+    # Track selected recipe_ids per slot within this run to avoid intra-week repeats
+    selected_this_week: Dict[str, set] = {
+        "Breakfast": set(),
+        "Lunch":     set(),
+        "Dinner":    set(),
+    }
 
     for day in DAYS_OF_WEEK:
         result[day] = {}
@@ -510,13 +516,21 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                 except Exception as e:
                     print(f"[recommendation] {fn_name} failed: {e}")
 
+            # Exclude recipes already selected this week for this slot
+            fresh_candidates = [r for r in candidates if r["recipe_id"] not in selected_this_week[slot]]
+            if not fresh_candidates:
+                fresh_candidates = candidates  # relax if pool is empty
+
             # Select one recipe randomly
-            if candidates:
+            if fresh_candidates:
+                selected = random.choice(fresh_candidates)
+                selected_this_week[slot].add(selected["recipe_id"])
+            elif candidates:
                 selected = random.choice(candidates)
                 _log(db, house_id, week_start, day, slot,
                      "RA-SELECT", "random_select",
-                     len(candidates), 1, [],
-                     f"Selected: {selected['dish_name']} from {len(candidates)} candidates",
+                     len(fresh_candidates), 1, [],
+                     f"Selected: {selected['dish_name']} from {len(fresh_candidates)} candidates",
                      selected["recipe_id"])
                 result[day][slot] = {
                     "recipe_id": selected["recipe_id"],
