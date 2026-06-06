@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.plan_audit_log (
     week_start      DATE            NOT NULL,
     day_name        VARCHAR(10)     NOT NULL,  -- Monday, Tuesday etc.
     meal_slot       VARCHAR(10)     NOT NULL,  -- Breakfast, Lunch, Dinner
-    feature_code    VARCHAR(20)     NOT NULL REFERENCES public.feature_registry(feature_code),
+    feature_code    VARCHAR(20)     NOT NULL,  -- e.g. RA-F03, RA-SELECT (no FK — RA-SELECT not in registry)
     function_name   VARCHAR(100)    NOT NULL,
     recipes_in      INTEGER         NOT NULL DEFAULT 0,  -- count before this filter
     recipes_out     INTEGER         NOT NULL DEFAULT 0,  -- count after this filter

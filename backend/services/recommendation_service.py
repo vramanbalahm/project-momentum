@@ -239,6 +239,7 @@ def _log(
                  CAST(:fids AS uuid[]),
                  CAST(:sel AS uuid),
                  :ms)
+            ON CONFLICT DO NOTHING
         """), {
             "hid":    house_id, "ws": week_start, "day": day_name, "slot": meal_slot,
             "fc":     feature_code, "fn": function_name,
