@@ -415,13 +415,16 @@ export default function App({ onBack }) {
           if (suggested && suggested.recipe_id) {
             const bpKey = `${day}-${slot}`;
             newBlueprint[bpKey] = {
-              mains: [{ recipe_id: suggested.recipe_id, dish_name: suggested.dish_name }],
+              main: { name: suggested.dish_name, recipe_id: suggested.recipe_id },
+              mains: [{ recipe_id: suggested.recipe_id, dish_name: suggested.dish_name, name: suggested.dish_name }],
               sides: [],
             };
           }
         });
       });
 
+      console.log("[generatePlan] newBlueprint keys:", Object.keys(newBlueprint));
+      console.log("[generatePlan] sample:", newBlueprint["Monday-Breakfast"]);
       setBlueprint(newBlueprint);
       setIsDirty(true);
       setIsAudited(false);
