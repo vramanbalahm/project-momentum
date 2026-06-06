@@ -123,7 +123,9 @@
       "recipeReview": "சமையல் மதிப்பாய்வு",
       "recipeReviewDesc": "சமையல் குறிப்புகளை மதிப்பாய்வு செய்",
       "myPantry": "என் பண்டகசாலை",
-      "myPantryDesc": "என்ன கிடைக்கிறது"
+      "myPantryDesc": "என்ன கிடைக்கிறது",
+      "myConfig": "என் அமைப்பு",
+      "myConfigDesc": "அனைத்து அமைப்புகள்"
     },
     "menu": {
       "myProfile": "என் விவரம்",

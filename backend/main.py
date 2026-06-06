@@ -111,6 +111,80 @@ async def get_plan(
     plan = fetch_active_plan(db, current_user["house_id"], week_start=week_start)
     return plan
 
+@app.get("/config-snapshot")
+async def config_snapshot(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Single-view household configuration snapshot for troubleshooting."""
+    house_id = current_user["house_id"]
+
+    house = db.execute(text("""
+        SELECT hm.house_name, hm.dietary_preference, hm.preferred_language,
+               pt.display_name as panchangam
+        FROM household_master hm
+        LEFT JOIN panchangam_types pt ON pt.id = hm.panchangam_type_id
+        WHERE hm.household_id = CAST(:hid AS uuid)
+    """), {"hid": house_id}).fetchone()
+
+    members = db.execute(text("""
+        SELECT u.name, COALESCE(mp.dietary_preference::text,'Not set') as diet,
+               COALESCE(mp.age_group,'Not set') as age, COALESCE(mp.gender,'Not set') as gender
+        FROM users u
+        LEFT JOIN member_preferences mp ON mp.user_id = u.user_id
+        WHERE u.house_id = CAST(:hid AS uuid) AND u.is_active = true ORDER BY u.name
+    """), {"hid": house_id}).fetchall()
+
+    wc = db.execute(text("""
+        SELECT week_start, continental_days, allow_same_week_repeat,
+               allow_same_day_repeat, prefer_millet
+        FROM weekly_generation_config
+        WHERE house_id = CAST(:hid AS uuid) ORDER BY week_start DESC LIMIT 1
+    """), {"hid": house_id}).fetchone()
+
+    audit = db.execute(text("""
+        SELECT feature_code, AVG(recipes_in)::int as avg_in,
+               AVG(recipes_out)::int as avg_out, MIN(filter_reason) as reason
+        FROM plan_audit_log
+        WHERE house_id = CAST(:hid AS uuid)
+        AND created_at >= (
+            SELECT MAX(created_at) - INTERVAL '30 seconds'
+            FROM plan_audit_log WHERE house_id = CAST(:hid AS uuid)
+        )
+        GROUP BY feature_code ORDER BY feature_code
+    """), {"hid": house_id}).fetchall()
+
+    formulas = db.execute(text("""
+        SELECT feature_code, function_name, is_active FROM feature_registry
+        WHERE feature_code LIKE 'RA-%' ORDER BY feature_code
+    """)).fetchall()
+
+    satvik_count = db.execute(text(
+        "SELECT COUNT(*) FROM satvik_restrictions WHERE house_id = CAST(:hid AS uuid)"
+    ), {"hid": house_id}).scalar()
+
+    pantry_items = db.execute(text(
+        "SELECT COUNT(*) FROM household_pantry WHERE house_id = CAST(:hid AS uuid) AND is_available = true"
+    ), {"hid": house_id}).scalar()
+
+    return {
+        "house_name":        house.house_name if house else "",
+        "household_diet":    str(house.dietary_preference) if house else "",
+        "preferred_language":house.preferred_language if house else "en",
+        "panchangam":        house.panchangam if house else None,
+        "satvik_count":      satvik_count,
+        "pantry_items":      pantry_items,
+        "members": [{"name": m.name, "diet": m.diet, "age": m.age, "gender": m.gender} for m in members],
+        "latest_weekly_config": {
+            "week_start": str(wc.week_start), "continental_days": wc.continental_days,
+            "allow_same_week_repeat": wc.allow_same_week_repeat,
+            "allow_same_day_repeat": wc.allow_same_day_repeat, "prefer_millet": wc.prefer_millet,
+        } if wc else None,
+        "last_audit": [{"formula": a.feature_code, "avg_in": a.avg_in, "avg_out": a.avg_out, "reason": a.reason} for a in audit],
+        "bucket_a_formulas": [{"code": f.feature_code, "fn": f.function_name, "active": f.is_active} for f in formulas],
+    }
+
+
 # --- 4. MARKET SIGNALS & CONTENT VAULT ---
 
 @app.get("/market/signals")

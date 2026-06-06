@@ -97,6 +97,14 @@ export default function Dashboard({ onNavigate }) {
       available: isAdmin,
     },
     {
+      id: "my_config",
+      label: t("dashboard.tiles.myConfig"),
+      desc: t("dashboard.tiles.myConfigDesc"),
+      icon: "🔍",
+      color: "#EEF0FE",
+      available: true,
+    },
+    {
       id: "my_pantry",
       label: t("dashboard.tiles.myPantry"),
       desc: t("dashboard.tiles.myPantryDesc"),

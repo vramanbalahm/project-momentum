@@ -123,7 +123,9 @@
       "recipeReview": "Recipe Review",
       "recipeReviewDesc": "Review and approve recipes",
       "myPantry": "My Pantry",
-      "myPantryDesc": "What's available"
+      "myPantryDesc": "What's available",
+      "myConfig": "My Config",
+      "myConfigDesc": "View all settings"
     },
     "menu": {
       "myProfile": "My Profile",
