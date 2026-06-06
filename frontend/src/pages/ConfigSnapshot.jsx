@@ -130,6 +130,20 @@ export default function ConfigSnapshot({ onBack }) {
                   </div>
                 ) : (() => {
                   // Order pipeline steps logically
+                  const LABELS = {
+                    "RA-F03":    "F03 — Who is home today?",
+                    "RA-FA01":   "FA01 — Allergy hard block",
+                    "RA-F02":    "F02 — Effective diet calculation",
+                    "RA-F01":    "F01 — Diet filter on vault",
+                    "RA-FA02":   "FA02 — Is today a Satvik day?",
+                    "RA-F08":    "F08 — Satvik ingredient filter",
+                    "RA-F04":    "F04 — Meal slot + intensity",
+                    "RA-F05":    "F05 — No repeat this week",
+                    "RA-F13":    "F13 — Breakfast model",
+                    "RA-F14":    "F14 — Lunch model",
+                    "RA-F15":    "F15 — Dinner model",
+                    "RA-SELECT": "Final — Random selection from pool",
+                  };
                   const ORDER = ["RA-F03","RA-FA01","RA-F02","RA-F01","RA-FA02","RA-F08","RA-F04","RA-F05","RA-F13","RA-F14","RA-F15","RA-SELECT"];
                   const map = {};
                   (data.last_audit || []).forEach(a => { map[a.formula] = a; });
@@ -146,7 +160,7 @@ export default function ConfigSnapshot({ onBack }) {
                         {/* Formula label + counts */}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
                           <span style={{ fontSize: 11, fontWeight: 600, color: isSelect ? C.deepTeal : C.text }}>
-                            {a.formula}
+                            {LABELS[a.formula] || a.formula}
                           </span>
                           <span style={{ fontSize: 11, fontWeight: 500, color: isFiltered ? "#E24B4A" : C.muted }}>
                             {a.avg_in} → {a.avg_out}
