@@ -11,6 +11,7 @@ import SwapCopyBar from './components/SwapCopyBar';
 import { swapSlots, swapDays, auditBlueprint, persistSwap } from './services/swapService';
 import { useAuth } from './context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import WeeklyQuestionnaire from './components/WeeklyQuestionnaire';
 import MemberAvailability from './pages/MemberAvailability';
 import ChangePassword from './pages/ChangePassword';
 
@@ -388,9 +389,16 @@ export default function App({ onBack }) {
 
   // ── Generate Plan (Bucket A recommendation engine) ──
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showQuestionnaire, setShowQuestionnaire] = useState(false);
 
-  const generatePlan = async () => {
+  // Show questionnaire first, then generate
+  const handleGenerateClick = () => {
     if (!isAdmin || weekOffset !== 0) return;
+    setShowQuestionnaire(true);
+  };
+
+  const generatePlan = async (weeklyConfig = {}) => {
+    setShowQuestionnaire(false);
     setIsGenerating(true);
     try {
       const weekStart = toLocalDateString(getCurrentWeekMonday());
@@ -657,7 +665,7 @@ export default function App({ onBack }) {
               {/* Generate Plan button — admin only, current week only */}
               {isAdmin && isCurrentWeek && !isSaved && (
                 <button
-                  onClick={generatePlan}
+                  onClick={handleGenerateClick}
                   disabled={isGenerating}
                   style={{
                     background: isGenerating ? "#B4B2A9" : "#1A3A2E",
@@ -1046,7 +1054,7 @@ export default function App({ onBack }) {
             <div style={{ display: "flex", gap: 8 }}>
               {!isSaved && (
               <button
-                onClick={generatePlan}
+                onClick={handleGenerateClick}
                 disabled={isGenerating}
                 style={{
                   background: isGenerating ? "#B4B2A9" : "#1A3A2E",
@@ -1221,6 +1229,14 @@ export default function App({ onBack }) {
             />
           </div>
         )}
+
+      {/* Weekly questionnaire modal */}
+      {showQuestionnaire && (
+        <WeeklyQuestionnaire
+          onGenerate={(cfg) => generatePlan(cfg)}
+          onClose={() => setShowQuestionnaire(false)}
+        />
+      )}
     </>
   );
 }

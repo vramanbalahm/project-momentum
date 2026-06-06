@@ -183,6 +183,9 @@ app.include_router(pantry_router)
 from routers.recommendation import router as recommendation_router
 app.include_router(recommendation_router)
 
+from routers.weekly_config import router as weekly_config_router
+app.include_router(weekly_config_router)
+
 # --- RECIPE REVIEW ENDPOINTS ---
 
 @app.get("/recipes/review")

@@ -176,6 +176,22 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
 
     satvik_avoided_ids = {r.ingredient_id for r in satvik_restr_rows}
 
+    # Query 5a — Weekly generation config (questionnaire answers)
+    wc_row = db.execute(text("""
+        SELECT continental_days, allow_same_day_repeat,
+               allow_same_week_repeat, prefer_millet
+        FROM weekly_generation_config
+        WHERE house_id = CAST(:hid AS uuid)
+        AND week_start = :ws
+    """), {"hid": house_id, "ws": week_start}).fetchone()
+
+    weekly_config = {
+        "continental_days":       wc_row.continental_days      if wc_row else 0,
+        "allow_same_day_repeat":  wc_row.allow_same_day_repeat  if wc_row else False,
+        "allow_same_week_repeat": wc_row.allow_same_week_repeat if wc_row else True,
+        "prefer_millet":          wc_row.prefer_millet          if wc_row else False,
+    }
+
     # Query 5 — Recent recipes (past N weeks) to avoid repetition
     cutoff = week_start - timedelta(weeks=no_repeat_weeks)
     recent_rows = db.execute(text("""
@@ -200,6 +216,7 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
         "satvik_avoided_ids": satvik_avoided_ids,
         "recent_by_slot":     recent_by_slot,
         "no_repeat_weeks":    no_repeat_weeks,
+        "weekly_config":      weekly_config,
     }
 
 
@@ -481,7 +498,12 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                 }
 
     result: Dict = {}
-    # Track selected recipe_ids per slot within this run to avoid intra-week repeats
+    # Track selected recipe_ids per slot within this run
+    # Controlled by weekly_config.allow_same_week_repeat
+    weekly_config = week_ctx.get("weekly_config", {})
+    allow_same_week_repeat = weekly_config.get("allow_same_week_repeat", True)
+    prefer_millet          = weekly_config.get("prefer_millet", False)
+
     selected_this_week: Dict[str, set] = {
         "Breakfast": set(),
         "Lunch":     set(),
@@ -516,10 +538,20 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                 except Exception as e:
                     print(f"[recommendation] {fn_name} failed: {e}")
 
+            # Apply millet boost — move millet recipes to front if preferred
+            if prefer_millet:
+                millet_tags = {"millet", "ragi", "kambu", "thinai", "varagu", "kuthiraivali", "samai"}
+                millet_recipes = [r for r in candidates if any(t in millet_tags for t in r.get("tags", []))]
+                other_recipes  = [r for r in candidates if r not in millet_recipes]
+                candidates = millet_recipes + other_recipes
+
             # Exclude recipes already selected this week for this slot
-            fresh_candidates = [r for r in candidates if r["recipe_id"] not in selected_this_week[slot]]
-            if not fresh_candidates:
-                fresh_candidates = candidates  # relax if pool is empty
+            if allow_same_week_repeat:
+                fresh_candidates = candidates  # allow repeats
+            else:
+                fresh_candidates = [r for r in candidates if r["recipe_id"] not in selected_this_week[slot]]
+                if not fresh_candidates:
+                    fresh_candidates = candidates  # relax if pool is empty
 
             # Select one recipe randomly
             if fresh_candidates:
