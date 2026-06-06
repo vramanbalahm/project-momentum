@@ -406,29 +406,25 @@ export default function App({ onBack }) {
       if (!plan) return;
 
       // Map API response into blueprint format
+      // Use same local date logic as rest of app to avoid timezone issues
       const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
       const slots = ["Breakfast","Lunch","Dinner"];
-      const newBlueprint = { ...blueprint };
+      const newBlueprint = {};
 
-      const mondayDate = new Date(weekStart);
+      const monday = getCurrentWeekMonday();
       days.forEach((day, dayIdx) => {
-        const d = new Date(mondayDate);
+        const d = new Date(monday);
         d.setDate(d.getDate() + dayIdx);
-        const dateKey = d.toISOString().split("T")[0];
+        const dateKey = toLocalDateString(d);
 
         slots.forEach(slot => {
           const suggested = plan[day]?.[slot];
           if (suggested && suggested.recipe_id) {
             const bpKey = `${dateKey}_${slot}`;
-            // Only fill empty slots
-            const existing = newBlueprint[bpKey];
-            const hasMeal = existing?.mains?.length > 0 || existing?.main;
-            if (!hasMeal) {
-              newBlueprint[bpKey] = {
-                mains: [{ recipe_id: suggested.recipe_id, dish_name: suggested.dish_name }],
-                sides: [],
-              };
-            }
+            newBlueprint[bpKey] = {
+              mains: [{ recipe_id: suggested.recipe_id, dish_name: suggested.dish_name }],
+              sides: [],
+            };
           }
         });
       });
