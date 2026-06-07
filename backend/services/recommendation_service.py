@@ -560,16 +560,19 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                     fresh_candidates = candidates  # relax if pool is empty
 
             # Select one recipe randomly
+            selected = None
             if fresh_candidates:
                 selected = random.choice(fresh_candidates)
                 selected_this_week[slot].add(selected["recipe_id"])
             elif candidates:
                 selected = random.choice(candidates)
+
+            if selected:
                 _log(db, house_id, week_start, day, slot,
                      "RA-SELECT", "random_select",
-                     len(fresh_candidates), 1, [],
-                     f"Selected: {selected['dish_name']} from {len(fresh_candidates)} candidates",
-                     selected["recipe_id"], run_id=run_id)
+                     len(fresh_candidates or candidates), 1, [],
+                     f"Selected: {selected['dish_name']} from {len(fresh_candidates or candidates)} candidates",
+                     selected["recipe_id"], 0, run_id=run_id)
                 result[day][slot] = {
                     "recipe_id": selected["recipe_id"],
                     "dish_name": selected["dish_name"],
