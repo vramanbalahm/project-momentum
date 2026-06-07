@@ -25,7 +25,7 @@ def fetch_active_plan(db: Session, h_id: str, week_start: str = None):
             r.dish_name as name, 
             r.recipe_code as code, 
             v.hero_image_url as hero, 
-            v.carousel_thumb_url as thumb,
+            COALESCE(v.carousel_thumb_url, v.hero_image_url) as thumb,
             v.prep_steps as steps,
             d.recipe_id,
             COALESCE(d.dish_type, 'Main') as dish_type,
@@ -90,7 +90,7 @@ def get_suggestions(db: Session, pref: str, h_id: str):
             r.dish_name, 
             r.recipe_code, 
             v.hero_image_url, 
-            v.carousel_thumb_url,
+            COALESCE(v.carousel_thumb_url, v.hero_image_url) as carousel_thumb_url,
             (100 + 
                 CASE WHEN inv.stock_status = 'In-Stock' THEN 50 ELSE 0 END - 
                 CASE WHEN lp.recorded_price >= s.peak_threshold AND s.peak_threshold > 0 THEN 80 ELSE 0 END

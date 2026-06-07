@@ -928,15 +928,15 @@ def search_recipes(
 
     return [
         {
-            "recipe_id":      str(row[0]),
-            "name":           row[1],
-            "diet_type":      str(row[2]) if row[2] else None,
-            "is_sattvic":     row[3],
-            "intensity_level":row[4],
-            "sub_region":     row[5],
-            "thumb":          row[6],
-            "hero":           row[7],
-            "prep_steps":     row[8],
+            "recipe_id":       str(row[0]),
+            "name":            row[1],
+            "diet_type":       str(row[2]) if row[2] else None,
+            "is_sattvic":      row[3],
+            "intensity_level": row[4],
+            "sub_region":      row[5],
+            "thumb":           row[6] or row[7],  # fallback to hero if no thumb
+            "hero":            row[7],
+            "prep_steps":      row[8],
             "ingredients_json":row[9],
         }
         for row in rows
