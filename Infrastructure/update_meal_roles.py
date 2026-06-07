@@ -61,24 +61,31 @@ def load_file(path):
             print(f"ERROR: Excel must have columns 'dish_name' and 'meal_role'. Found: {headers}")
             sys.exit(1)
 
-        name_idx = headers.index("dish_name")
-        role_idx = headers.index("meal_role")
+        name_idx   = headers.index("dish_name")
+        role_idx   = headers.index("meal_role")
+        region_idx = headers.index("sub_region") if "sub_region" in headers else None
 
         for row in ws.iter_rows(min_row=2, values_only=True):
             name = row[name_idx]
             role = row[role_idx]
             if name and role:
-                records.append({"dish_name": str(name).strip(), "meal_role": str(role).strip()})
+                rec = {"dish_name": str(name).strip(), "meal_role": str(role).strip()}
+                if region_idx is not None and row[region_idx]:
+                    rec["sub_region"] = str(row[region_idx]).strip()
+                records.append(rec)
 
     elif ext == "json":
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         for item in data:
             if "dish_name" in item and "meal_role" in item:
-                records.append({
+                rec = {
                     "dish_name": str(item["dish_name"]).strip(),
                     "meal_role": str(item["meal_role"]).strip()
-                })
+                }
+                if "sub_region" in item and item["sub_region"]:
+                    rec["sub_region"] = str(item["sub_region"]).strip()
+                records.append(rec)
     else:
         print(f"ERROR: Unsupported file type .{ext}. Use .xlsx or .json")
         sys.exit(1)
@@ -120,7 +127,11 @@ def generate_sql(records):
     for r in records:
         name = r["dish_name"].replace("'", "''")  # escape single quotes
         pg_array = r["meal_role_pg"]
-        lines.append(f"UPDATE recipe_dna_master SET meal_role = '{pg_array}' WHERE dish_name = '{name}';")
+        if "sub_region" in r:
+            region = r["sub_region"].replace("'", "''")
+            lines.append(f"UPDATE recipe_dna_master SET meal_role = '{pg_array}', sub_region = '{region}' WHERE dish_name = '{name}';")
+        else:
+            lines.append(f"UPDATE recipe_dna_master SET meal_role = '{pg_array}' WHERE dish_name = '{name}';")
 
     lines += [
         "",
@@ -149,10 +160,16 @@ def apply(records, db_url):
     not_found = []
 
     for r in records:
-        cur.execute(
-            "UPDATE recipe_dna_master SET meal_role = %s WHERE dish_name = %s",
-            ([r["meal_role_norm"]], r["dish_name"])
-        )
+        if "sub_region" in r:
+            cur.execute(
+                "UPDATE recipe_dna_master SET meal_role = %s, sub_region = %s WHERE dish_name = %s",
+                ([r["meal_role_norm"]], r["sub_region"], r["dish_name"])
+            )
+        else:
+            cur.execute(
+                "UPDATE recipe_dna_master SET meal_role = %s WHERE dish_name = %s",
+                ([r["meal_role_norm"]], r["dish_name"])
+            )
         if cur.rowcount == 0:
             not_found.append(r["dish_name"])
         else:
@@ -274,10 +291,11 @@ if __name__ == "__main__":
 
     # Show preview
     print("\nChanges to apply:")
-    print(f"{'Dish name':<50} {'New meal_role'}")
-    print("-" * 65)
+    print(f"{'Dish name':<50} {'meal_role':<15} {'sub_region'}")
+    print("-" * 80)
     for r in records:
-        print(f"{r['dish_name']:<50} {r['meal_role_norm']}")
+        region = r.get("sub_region", "")
+        print(f"{r['dish_name']:<50} {r['meal_role_norm']:<15} {region}")
 
     # Generate SQL file
     sql = generate_sql(records)
