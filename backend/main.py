@@ -946,31 +946,21 @@ def search_recipes(
 @app.get("/recipes/sub-regions")
 def get_sub_regions(db: Session = Depends(get_db)):
     """Returns distinct sub_region values from approved recipes for filter chips."""
+    # Only return known valid cuisine sub-regions
+    # sub_region data needs cleaning — ingredient names incorrectly stored
+    VALID_REGIONS = [
+        "Chettinad", "Kongu Nadu", "Tirunelveli", "Madurai",
+        "Udupi", "Malabar", "Salem", "Coimbatore", "Thanjavur",
+        "Palakkad", "Nellai", "Continental", "General"
+    ]
     rows = db.execute(text("""
-        SELECT DISTINCT
-            CASE
-                WHEN sub_region ILIKE '%veg%'
-                  OR sub_region ILIKE '%non-veg%'
-                  OR sub_region ILIKE '%vegan%'
-                  OR sub_region ILIKE '%egg%'
-                  OR sub_region ILIKE '%general%'
-                THEN 'General'
-                ELSE sub_region
-            END as sub_region
+        SELECT DISTINCT sub_region
         FROM recipe_dna_master
-        WHERE sub_region IS NOT NULL
-        AND sub_region != ''
+        WHERE sub_region = ANY(:regions)
         AND review_status = 'approved'
-        ORDER BY 1
-    """)).fetchall()
-    # Deduplicate and exclude None
-    seen = set()
-    result = []
-    for r in rows:
-        if r[0] and r[0] not in seen:
-            seen.add(r[0])
-            result.append(r[0])
-    return {"sub_regions": result}
+        ORDER BY sub_region
+    """), {"regions": VALID_REGIONS}).fetchall()
+    return {"sub_regions": [r[0] for r in rows]}
 
 # --- 8. FT-041: MEAL SLOT EDIT ---
 @app.post("/meal-slot/edit")
