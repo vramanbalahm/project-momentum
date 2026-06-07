@@ -76,6 +76,7 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
             r.intensity_level,
             r.is_sattvic,
             r.meal_slots,
+            r.meal_role,
             COALESCE(
                 ARRAY(
                     SELECT ri.ingredient_id
@@ -85,6 +86,7 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
             ) AS ingredient_ids
         FROM recipe_dna_master r
         WHERE r.review_status = 'approved'
+        AND r.meal_role @> ARRAY['main']::text[]
     """)).fetchall()
 
     approved_recipes = [
@@ -95,6 +97,7 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
             "intensity_level": r.intensity_level or "Medium",
             "is_sattvic":      r.is_sattvic or False,
             "meal_slots":      list(r.meal_slots) if r.meal_slots else [],
+            "meal_role":       list(r.meal_role) if r.meal_role else ["main"],
             "ingredient_ids":  list(r.ingredient_ids) if r.ingredient_ids else [],
         }
         for r in vault_rows

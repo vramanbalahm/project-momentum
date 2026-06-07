@@ -10,7 +10,8 @@ const C = {
   successBg: "#E1F5EE", successText: "#085041",
 };
 
-const MEAL_SLOTS   = ["Breakfast", "Lunch", "Dinner", "Side Dish"];
+const MEAL_SLOTS   = ["Breakfast", "Lunch", "Dinner"];
+const MEAL_ROLES   = ["main", "side"];
 const DIETS        = ["Veg", "Non-Veg", "Vegan", "Eggitarian"];
 const INTENSITIES  = ["Light", "Medium", "Heavy"];
 const STATUSES     = ["under_review", "saved", "approved", "rejected"];
@@ -451,6 +452,26 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
                               background: active ? C.green : "#F0EFEC",
                               color: active ? C.mint : C.muted,
                             }}>{s}</div>
+                        );
+                      })}
+                    </div>
+                  </EditField>
+                  <EditField label="Meal role">
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {MEAL_ROLES.map(r => {
+                        const active = (editRecipe.meal_role || ["main"]).includes(r);
+                        return (
+                          <div key={r} onClick={() => {
+                            const roles = editRecipe.meal_role || ["main"];
+                            const newRoles = active ? roles.filter(x => x !== r) : [...roles, r];
+                            if (newRoles.length === 0) return; // must have at least one
+                            setEditRecipe(p => ({ ...p, meal_role: newRoles }));
+                          }}
+                            style={{
+                              padding: "6px 16px", borderRadius: 10, fontSize: 12, fontWeight: 500, cursor: "pointer",
+                              background: active ? C.green : "#F0EFEC",
+                              color: active ? C.mint : C.muted,
+                            }}>{r === "main" ? "Main dish" : "Side dish"}</div>
                         );
                       })}
                     </div>

@@ -364,6 +364,7 @@ async def get_recipes_for_review(
             "is_vegan":         r.is_vegan,
             "intensity_level":  r.intensity_level,
             "meal_slots":       r.meal_slots,
+            "meal_role":        list(r.meal_role) if r.meal_role else ["main"],
             "review_status":    r.review_status,
             "reviewed_at":      str(r.reviewed_at) if r.reviewed_at else None,
             "review_notes":     r.review_notes,
@@ -422,6 +423,7 @@ async def get_recipe_detail(
         "is_vegan":             r.is_vegan,
         "intensity_level":      r.intensity_level,
         "meal_slots":           r.meal_slots,
+        "meal_role":            list(r.meal_role) if r.meal_role else ["main"],
         "is_scalable":          r.is_scalable,
         "is_regional_specific": r.is_regional_specific,
         "prep_time_mins":       r.prep_time_mins,
@@ -488,6 +490,11 @@ async def update_recipe_review(
     if payload.get("meal_slots") is not None:
         set_clauses.append("meal_slots = :meal_slots")
         params["meal_slots"] = payload["meal_slots"]
+
+    # meal_role — list, cast to text array
+    if payload.get("meal_role") is not None:
+        set_clauses.append("meal_role = :meal_role")
+        params["meal_role"] = payload["meal_role"]
 
     # diet_type — enum, must be cast as literal (cannot use parameter with ::enum)
     if payload.get("diet_type"):
@@ -884,9 +891,9 @@ def search_recipes(
         filters.append("(r.sub_region ILIKE '%veg%' OR r.sub_region ILIKE '%general%' OR r.sub_region IS NULL OR r.sub_region = '')")
 
     if is_side_dish:
-        filters.append("r.meal_slots @> ARRAY['Side Dish']::text[]")
+        filters.append("r.meal_role @> ARRAY['side']::text[]")
     else:
-        filters.append("NOT (r.meal_slots @> ARRAY['Side Dish']::text[]) OR r.meal_slots IS NULL")
+        filters.append("r.meal_role @> ARRAY['main']::text[]")
 
     where = " AND ".join(filters)
 
@@ -896,7 +903,7 @@ def search_recipes(
                 r.recipe_id, r.dish_name, r.diet_type, r.is_sattvic,
                 r.intensity_level, r.sub_region,
                 v.carousel_thumb_url, v.hero_image_url,
-                v.prep_steps, v.ingredients_json
+                v.prep_steps, v.ingredients_json, r.meal_role
             FROM recipe_dna_master r
             LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
             WHERE {where}
@@ -912,7 +919,7 @@ def search_recipes(
                 r.recipe_id, r.dish_name, r.diet_type, r.is_sattvic,
                 r.intensity_level, r.sub_region,
                 v.carousel_thumb_url, v.hero_image_url,
-                v.prep_steps, v.ingredients_json,
+                v.prep_steps, v.ingredients_json, r.meal_role,
                 similarity(LOWER(r.dish_name), LOWER(:q)) AS sim_score
             FROM recipe_dna_master r
             LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
@@ -938,6 +945,7 @@ def search_recipes(
             "hero":            row[7],
             "prep_steps":      row[8],
             "ingredients_json":row[9],
+            "meal_role":       list(row[10]) if row[10] else ["main"],
         }
         for row in rows
     ]
