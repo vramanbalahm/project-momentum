@@ -288,7 +288,7 @@ def filter_by_availability(recipes, day, slot, ctx, week_ctx, db, house_id, week
 
     ctx["present_ids"] = present_ids
     _log(db, house_id, week_start, day, slot, "RA-F03", "filter_by_availability",
-         len(recipes), len(recipes), [], reason, None, int((time.time()-t0)*1000))
+         len(recipes), len(recipes), [], reason, None, int((time.time()-t0)*1000), run_id=run_id)
     return recipes, ctx
 
 
@@ -315,7 +315,7 @@ def filter_by_allergies(recipes, day, slot, ctx, week_ctx, db, house_id, week_st
     removed  = [r["recipe_id"] for r in recipes if r not in filtered]
     _log(db, house_id, week_start, day, slot, "RA-FA01", "filter_by_allergies",
          len(recipes), len(filtered), removed, f"Allergens: {', '.join(desc)}",
-         None, int((time.time()-t0)*1000))
+         None, int((time.time()-t0)*1000), run_id=run_id)
     return filtered, ctx
 
 
@@ -328,7 +328,7 @@ def calc_effective_diet(recipes, day, slot, ctx, week_ctx, db, house_id, week_st
     ctx["effective_diet"] = effective
     _log(db, house_id, week_start, day, slot, "RA-F02", "calc_effective_diet",
          len(recipes), len(recipes), [], f"Effective diet: {effective}",
-         None, int((time.time()-t0)*1000))
+         None, int((time.time()-t0)*1000), run_id=run_id)
     return recipes, ctx
 
 
@@ -340,7 +340,7 @@ def filter_by_diet(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, 
     removed   = [r["recipe_id"] for r in recipes if r not in filtered]
     _log(db, house_id, week_start, day, slot, "RA-F01", "filter_by_diet",
          len(recipes), len(filtered), removed, f"Diet: {effective} — allowed: {allowed}",
-         None, int((time.time()-t0)*1000))
+         None, int((time.time()-t0)*1000), run_id=run_id)
     return filtered, ctx
 
 
@@ -351,7 +351,7 @@ def check_satvik_day(recipes, day, slot, ctx, week_ctx, db, house_id, week_start
     _log(db, house_id, week_start, day, slot, "RA-FA02", "check_satvik_day",
          len(recipes), len(recipes), [],
          "Satvik day ✓" if is_satvik else "Not a Satvik day",
-         None, int((time.time()-t0)*1000))
+         None, int((time.time()-t0)*1000), run_id=run_id)
     return recipes, ctx
 
 
@@ -372,7 +372,7 @@ def filter_satvik_ingredients(recipes, day, slot, ctx, week_ctx, db, house_id, w
     removed  = [r["recipe_id"] for r in recipes if r not in filtered]
     _log(db, house_id, week_start, day, slot, "RA-F08", "filter_satvik_ingredients",
          len(recipes), len(filtered), removed,
-         f"Satvik: {len(removed)} recipes removed", None, int((time.time()-t0)*1000))
+         f"Satvik: {len(removed)} recipes removed", None, int((time.time()-t0)*1000), run_id=run_id)
     return filtered, ctx
 
 
@@ -388,7 +388,7 @@ def filter_by_meal_slot(recipes, day, slot, ctx, week_ctx, db, house_id, week_st
     _log(db, house_id, week_start, day, slot, "RA-F04", "filter_by_meal_slot",
          len(recipes), len(filtered), removed,
          f"{slot}: intensity={allowed_intensities}, {len(filtered)} pass",
-         None, int((time.time()-t0)*1000))
+         None, int((time.time()-t0)*1000), run_id=run_id)
     return filtered, ctx
 
 
@@ -412,7 +412,7 @@ def filter_recent_recipes(recipes, day, slot, ctx, week_ctx, db, house_id, week_
     _log(db, house_id, week_start, day, slot, "RA-F05", "filter_recent_recipes",
          len(recipes), len(filtered), removed,
          f"No-repeat: {len(removed)} excluded (past {week_ctx['no_repeat_weeks']} wk)",
-         None, int((time.time()-t0)*1000))
+         None, int((time.time()-t0)*1000), run_id=run_id)
     return filtered, ctx
 
 
@@ -569,7 +569,7 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                      "RA-SELECT", "random_select",
                      len(fresh_candidates), 1, [],
                      f"Selected: {selected['dish_name']} from {len(fresh_candidates)} candidates",
-                     selected["recipe_id"])
+                     selected["recipe_id"], run_id=run_id)
                 result[day][slot] = {
                     "recipe_id": selected["recipe_id"],
                     "dish_name": selected["dish_name"],
