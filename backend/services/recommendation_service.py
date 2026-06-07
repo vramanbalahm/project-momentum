@@ -39,7 +39,7 @@ DIET_COMPATIBLE = {
 SLOT_INTENSITY = {
     "Breakfast": ["Light"],
     "Lunch":     ["Medium", "Heavy"],
-    "Dinner":    ["Medium", "Heavy"],
+    "Dinner":    ["Light", "Medium"],  # Tamil Nadu dinner is often lighter — idli/dosa/chapati at night
 }
 
 # Pipeline sequence — owned here, not in DB
