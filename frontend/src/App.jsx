@@ -392,9 +392,17 @@ export default function App({ onBack }) {
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
 
   // Show questionnaire first, then generate
+  const [showRegenWarning, setShowRegenWarning] = useState(false);
+
   const handleGenerateClick = () => {
     if (!isAdmin || weekOffset !== 0) return;
-    setShowQuestionnaire(true);
+    // Check if plan already has meals
+    const hasMeals = Object.keys(blueprint).length > 0;
+    if (hasMeals && isSaved) {
+      setShowRegenWarning(true);
+    } else {
+      setShowQuestionnaire(true);
+    }
   };
 
   const generatePlan = async (weeklyConfig = {}) => {
@@ -1229,6 +1237,26 @@ export default function App({ onBack }) {
             />
           </div>
         )}
+
+      {/* Re-generate warning modal */}
+      {showRegenWarning && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
+          <div style={{ background: "#FFF9F2", borderRadius: 16, padding: "24px 20px", width: "100%", maxWidth: 360 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#2C2C2A", marginBottom: 8 }}>Re-generate plan?</div>
+            <div style={{ fontSize: 13, color: "#888780", marginBottom: 24 }}>This will replace your saved plan with new suggestions. This cannot be undone.</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setShowRegenWarning(false)}
+                style={{ flex: 1, padding: "10px", borderRadius: 10, border: "0.5px solid #EDE8E0", background: "transparent", fontSize: 13, color: "#888780", cursor: "pointer" }}>
+                Cancel
+              </button>
+              <button onClick={() => { setShowRegenWarning(false); setShowQuestionnaire(true); }}
+                style={{ flex: 1, padding: "10px", borderRadius: 10, border: "none", background: "#1A3A2E", color: "#9FE1CB", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+                Yes, re-generate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Weekly questionnaire modal */}
       {showQuestionnaire && (

@@ -855,15 +855,16 @@ def audit_meal_slot(
 # --- 7. FT-040: RECIPE SEARCH ---
 @app.get("/recipes/search")
 def search_recipes(
-    q:             str = "",
-    intensity:     str = "",   # Light | Medium | Heavy
-    diet_type:     str = "",   # Veg | Vegan | Eggitarian | Non-Veg
-    sub_region:    str = "",   # Chettinad | Kongu Nadu | Continental etc.
+    q:             str  = "",
+    intensity:     str  = "",      # Light | Medium | Heavy
+    diet_type:     str  = "",      # Veg | Vegan | Eggitarian | Non-Veg
+    sub_region:    str  = "",      # Chettinad | Kongu Nadu | Continental etc.
+    is_side_dish:  bool = False,   # True = side dishes only
     db: Session = Depends(get_db)
 ):
     """
     Fuzzy search on recipe_dna_master with optional AND filters.
-    Filters: intensity, diet_type, sub_region (all optional, combined with AND).
+    Filters: intensity, diet_type, sub_region, is_side_dish (all optional, AND logic).
     """
     filters = ["r.review_status = 'approved'"]
     params  = {}
@@ -876,9 +877,16 @@ def search_recipes(
         filters.append("r.diet_type::text = :diet_type")
         params["diet_type"] = diet_type
 
-    if sub_region:
+    if sub_region and sub_region.lower() != "general":
         filters.append("r.sub_region ILIKE :sub_region")
         params["sub_region"] = sub_region
+    elif sub_region and sub_region.lower() == "general":
+        filters.append("(r.sub_region ILIKE '%veg%' OR r.sub_region ILIKE '%general%' OR r.sub_region IS NULL OR r.sub_region = '')")
+
+    if is_side_dish:
+        filters.append("r.meal_slots @> ARRAY['Side Dish']::text[]")
+    else:
+        filters.append("NOT (r.meal_slots @> ARRAY['Side Dish']::text[]) OR r.meal_slots IS NULL")
 
     where = " AND ".join(filters)
 
@@ -939,14 +947,30 @@ def search_recipes(
 def get_sub_regions(db: Session = Depends(get_db)):
     """Returns distinct sub_region values from approved recipes for filter chips."""
     rows = db.execute(text("""
-        SELECT DISTINCT sub_region
+        SELECT DISTINCT
+            CASE
+                WHEN sub_region ILIKE '%veg%'
+                  OR sub_region ILIKE '%non-veg%'
+                  OR sub_region ILIKE '%vegan%'
+                  OR sub_region ILIKE '%egg%'
+                  OR sub_region ILIKE '%general%'
+                THEN 'General'
+                ELSE sub_region
+            END as sub_region
         FROM recipe_dna_master
         WHERE sub_region IS NOT NULL
         AND sub_region != ''
         AND review_status = 'approved'
-        ORDER BY sub_region
+        ORDER BY 1
     """)).fetchall()
-    return {"sub_regions": [r[0] for r in rows]}
+    # Deduplicate and exclude None
+    seen = set()
+    result = []
+    for r in rows:
+        if r[0] and r[0] not in seen:
+            seen.add(r[0])
+            result.append(r[0])
+    return {"sub_regions": result}
 
 # --- 8. FT-041: MEAL SLOT EDIT ---
 @app.post("/meal-slot/edit")

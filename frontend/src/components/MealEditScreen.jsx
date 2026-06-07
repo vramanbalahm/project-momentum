@@ -177,6 +177,7 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
   const [dietType, setDietType]     = useState('');
   const [subRegion, setSubRegion]   = useState('');
   const [subRegions, setSubRegions] = useState([]);
+  const [showSides, setShowSides]   = useState(context === 'add-side');
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -195,6 +196,7 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
       if (intens) params.intensity  = intens;
       if (diet)   params.diet_type  = diet;
       if (region) params.sub_region = region;
+      if (showSides) params.is_side_dish = true;
       const res = await axios.get(`${API_BASE}/recipes/search`, { params });
       setResults(res.data);
     } catch { setResults([]); }
@@ -214,6 +216,12 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
     if (type === 'diet')       setDietType(val);
     if (type === 'subRegion')  setSubRegion(val);
     fetchResults(query, newIntens, newDiet, newRegion);
+  };
+
+  const toggleSides = () => {
+    const newShowSides = !showSides;
+    setShowSides(newShowSides);
+    fetchResults(query, intensity, dietType, subRegion);
   };
 
   const clearFilters = () => {
@@ -265,6 +273,23 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
 
       {/* Filter chips */}
       <div style={{ background: "#F7F4EE", borderBottom: "0.5px solid #EDE8E0", flexShrink: 0 }}>
+        {/* Main / Side toggle */}
+        <div style={{ padding: "6px 12px 2px", display: "flex", gap: 5 }}>
+          <div onClick={() => { if(showSides) toggleSides(); }}
+            style={{ padding: "3px 14px", borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: "pointer",
+              background: !showSides ? "#1A3A2E" : "transparent",
+              color: !showSides ? "#9FE1CB" : "#888780",
+              border: `0.5px solid ${!showSides ? "#5DCAA5" : "#EDE8E0"}` }}>
+            Main dish
+          </div>
+          <div onClick={() => { if(!showSides) toggleSides(); }}
+            style={{ padding: "3px 14px", borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: "pointer",
+              background: showSides ? "#1A3A2E" : "transparent",
+              color: showSides ? "#9FE1CB" : "#888780",
+              border: `0.5px solid ${showSides ? "#5DCAA5" : "#EDE8E0"}` }}>
+            Side dish
+          </div>
+        </div>
         {/* Intensity */}
         <div style={{ padding: "6px 12px 2px", display: "flex", gap: 5, overflowX: "auto", scrollbarWidth: "none" }}>
           {["", "Light", "Medium", "Heavy"].map(v => (
