@@ -169,21 +169,33 @@ function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
 
 // ── SEARCH PANEL ───────────────────────────────────────────────────────────
 function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarning }) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [query, setQuery]           = useState('');
+  const [results, setResults]       = useState([]);
+  const [loading, setLoading]       = useState(false);
   const [detailRecipe, setDetailRecipe] = useState(null);
+  const [intensity, setIntensity]   = useState('');
+  const [dietType, setDietType]     = useState('');
+  const [subRegion, setSubRegion]   = useState('');
+  const [subRegions, setSubRegions] = useState([]);
   const inputRef = useRef(null);
 
   useEffect(() => {
     inputRef.current?.focus();
-    fetchResults('');
+    fetchResults('', '', '', '');
+    // Load sub-regions dynamically
+    axios.get(`${API_BASE}/recipes/sub-regions`)
+      .then(r => setSubRegions(r.data.sub_regions || []))
+      .catch(() => {});
   }, []);
 
-  const fetchResults = async (q) => {
+  const fetchResults = async (q, intens, diet, region) => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_BASE}/recipes/search`, { params: { q } });
+      const params = { q };
+      if (intens) params.intensity  = intens;
+      if (diet)   params.diet_type  = diet;
+      if (region) params.sub_region = region;
+      const res = await axios.get(`${API_BASE}/recipes/search`, { params });
       setResults(res.data);
     } catch { setResults([]); }
     finally { setLoading(false); }
@@ -191,8 +203,25 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
 
   const handleSearch = (val) => {
     setQuery(val);
-    fetchResults(val);
+    fetchResults(val, intensity, dietType, subRegion);
   };
+
+  const setFilter = (type, val) => {
+    const newIntens  = type === 'intensity'  ? val : intensity;
+    const newDiet    = type === 'diet'       ? val : dietType;
+    const newRegion  = type === 'subRegion'  ? val : subRegion;
+    if (type === 'intensity')  setIntensity(val);
+    if (type === 'diet')       setDietType(val);
+    if (type === 'subRegion')  setSubRegion(val);
+    fetchResults(query, newIntens, newDiet, newRegion);
+  };
+
+  const clearFilters = () => {
+    setIntensity(''); setDietType(''); setSubRegion('');
+    fetchResults(query, '', '', '');
+  };
+
+  const hasFilters = intensity || dietType || subRegion;
 
   if (detailRecipe) {
     return (
@@ -219,7 +248,7 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
       </div>
 
       {/* Search input */}
-      <div style={{ padding: "12px 16px", borderBottom: "0.5px solid #EDE8E0", flexShrink: 0 }}>
+      <div style={{ padding: "12px 16px 8px", borderBottom: "0.5px solid #EDE8E0", flexShrink: 0 }}>
         <input
           ref={inputRef}
           value={query}
@@ -232,6 +261,55 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
             {duplicateWarning} is already in this meal slot.
           </div>
         )}
+      </div>
+
+      {/* Filter chips */}
+      <div style={{ background: "#F7F4EE", borderBottom: "0.5px solid #EDE8E0", flexShrink: 0 }}>
+        {/* Intensity */}
+        <div style={{ padding: "6px 12px 2px", display: "flex", gap: 5, overflowX: "auto", scrollbarWidth: "none" }}>
+          {["", "Light", "Medium", "Heavy"].map(v => (
+            <div key={v} onClick={() => setFilter('intensity', v)}
+              style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: "pointer", flexShrink: 0,
+                background: intensity === v ? "#1A3A2E" : "transparent",
+                color: intensity === v ? "#9FE1CB" : "#888780",
+                border: `0.5px solid ${intensity === v ? "#5DCAA5" : "#EDE8E0"}` }}>
+              {v || "All intensity"}
+            </div>
+          ))}
+        </div>
+        {/* Diet */}
+        <div style={{ padding: "3px 12px 2px", display: "flex", gap: 5, overflowX: "auto", scrollbarWidth: "none" }}>
+          {["", "Veg", "Vegan", "Eggitarian", "Non-Veg"].map(v => (
+            <div key={v} onClick={() => setFilter('diet', v)}
+              style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: "pointer", flexShrink: 0,
+                background: dietType === v ? "#1A3A2E" : "transparent",
+                color: dietType === v ? "#9FE1CB" : "#888780",
+                border: `0.5px solid ${dietType === v ? "#5DCAA5" : "#EDE8E0"}` }}>
+              {v || "All diets"}
+            </div>
+          ))}
+        </div>
+        {/* Sub-region */}
+        {subRegions.length > 0 && (
+          <div style={{ padding: "3px 12px 4px", display: "flex", gap: 5, overflowX: "auto", scrollbarWidth: "none" }}>
+            {["", ...subRegions].map(v => (
+              <div key={v} onClick={() => setFilter('subRegion', v)}
+                style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: "pointer", flexShrink: 0,
+                  background: subRegion === v ? "#1A3A2E" : "transparent",
+                  color: subRegion === v ? "#9FE1CB" : "#888780",
+                  border: `0.5px solid ${subRegion === v ? "#5DCAA5" : "#EDE8E0"}` }}>
+                {v || "All regions"}
+              </div>
+            ))}
+          </div>
+        )}
+        {/* Count + clear */}
+        <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 14px 6px" }}>
+          <span style={{ fontSize: 10, color: "#B4B2A9" }}>{results.length} dishes</span>
+          {hasFilters && (
+            <span onClick={clearFilters} style={{ fontSize: 10, color: "#0F6E56", cursor: "pointer", fontWeight: 500 }}>Clear filters</span>
+          )}
+        </div>
       </div>
 
       {/* Results */}
@@ -260,7 +338,7 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
               <div style={{ fontSize: 13, fontWeight: 500, color: recipe.diet_type === "Non-Veg" ? "#712B13" : "#2C2C2A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{recipe.name}</div>
               {recipe.diet_type === "Non-Veg" && !recipe.is_sattvic
                 ? <div style={{ fontSize: 10, color: "#993C1D" }}>⚠ Not Satvik today</div>
-                : <div style={{ fontSize: 10, color: "#888780" }}>{recipe.diet_type}{recipe.is_sattvic ? " · Satvik" : ""}</div>
+                : <div style={{ fontSize: 10, color: "#888780" }}>{recipe.diet_type}{recipe.is_sattvic ? " · Satvik" : ""}{recipe.intensity_level ? ` · ${recipe.intensity_level}` : ""}{recipe.sub_region ? ` · ${recipe.sub_region}` : ""}</div>
               }
             </div>
             {/* Badge + info button */}

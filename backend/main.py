@@ -854,54 +854,99 @@ def audit_meal_slot(
 
 # --- 7. FT-040: RECIPE SEARCH ---
 @app.get("/recipes/search")
-def search_recipes(q: str = "", db: Session = Depends(get_db)):
+def search_recipes(
+    q:             str = "",
+    intensity:     str = "",   # Light | Medium | Heavy
+    diet_type:     str = "",   # Veg | Vegan | Eggitarian | Non-Veg
+    sub_region:    str = "",   # Chettinad | Kongu Nadu | Continental etc.
+    db: Session = Depends(get_db)
+):
     """
-    Fuzzy search on recipe_dna_master using pg_trgm trigram similarity.
-    Handles misspellings, partial words, and phonetically close inputs.
-    Empty query returns all recipes ordered by name.
+    Fuzzy search on recipe_dna_master with optional AND filters.
+    Filters: intensity, diet_type, sub_region (all optional, combined with AND).
     """
+    filters = ["r.review_status = 'approved'"]
+    params  = {}
+
+    if intensity:
+        filters.append("r.intensity_level = :intensity")
+        params["intensity"] = intensity
+
+    if diet_type:
+        filters.append("r.diet_type::text = :diet_type")
+        params["diet_type"] = diet_type
+
+    if sub_region:
+        filters.append("r.sub_region ILIKE :sub_region")
+        params["sub_region"] = sub_region
+
+    where = " AND ".join(filters)
+
     if not q:
-        query = text("""
+        sql = text(f"""
             SELECT
                 r.recipe_id, r.dish_name, r.diet_type, r.is_sattvic,
-                r.intensity_level, v.carousel_thumb_url, v.hero_image_url,
+                r.intensity_level, r.sub_region,
+                v.carousel_thumb_url, v.hero_image_url,
                 v.prep_steps, v.ingredients_json
             FROM recipe_dna_master r
             LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
+            WHERE {where}
             ORDER BY r.dish_name
-            LIMIT 30
+            LIMIT 50
         """)
-        rows = db.execute(query).fetchall()
+        rows = db.execute(sql, params).fetchall()
     else:
-        query = text("""
+        params["q"] = q
+        params["pattern"] = f"%{q}%"
+        sql = text(f"""
             SELECT
                 r.recipe_id, r.dish_name, r.diet_type, r.is_sattvic,
-                r.intensity_level, v.carousel_thumb_url, v.hero_image_url,
+                r.intensity_level, r.sub_region,
+                v.carousel_thumb_url, v.hero_image_url,
                 v.prep_steps, v.ingredients_json,
                 similarity(LOWER(r.dish_name), LOWER(:q)) AS sim_score
             FROM recipe_dna_master r
             LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
-            WHERE
+            WHERE {where}
+            AND (
                 similarity(LOWER(r.dish_name), LOWER(:q)) > 0.1
                 OR LOWER(r.dish_name) LIKE LOWER(:pattern)
+            )
             ORDER BY sim_score DESC, r.dish_name
-            LIMIT 30
+            LIMIT 50
         """)
-        rows = db.execute(query, {"q": q, "pattern": f"%{q}%"}).fetchall()
+        rows = db.execute(sql, params).fetchall()
+
     return [
         {
-            "recipe_id": str(row[0]),
-            "name": row[1],
-            "diet_type": row[2],
-            "is_sattvic": row[3],
-            "intensity_level": row[4],
-            "thumb": row[5],
-            "hero": row[6],
-            "prep_steps": row[7],
-            "ingredients_json": row[8]
+            "recipe_id":      str(row[0]),
+            "name":           row[1],
+            "diet_type":      str(row[2]) if row[2] else None,
+            "is_sattvic":     row[3],
+            "intensity_level":row[4],
+            "sub_region":     row[5],
+            "thumb":          row[6],
+            "hero":           row[7],
+            "prep_steps":     row[8],
+            "ingredients_json":row[9],
         }
         for row in rows
     ]
+
+
+@app.get("/recipes/sub-regions")
+def get_sub_regions(db: Session = Depends(get_db)):
+    """Returns distinct sub_region values from approved recipes for filter chips."""
+    rows = db.execute(text("""
+        SELECT DISTINCT sub_region
+        FROM recipe_dna_master
+        WHERE sub_region IS NOT NULL
+        AND sub_region != ''
+        AND review_status = 'approved'
+        ORDER BY sub_region
+    """)).fetchall()
+    return {"sub_regions": [r[0] for r in rows]}
 
 # --- 8. FT-041: MEAL SLOT EDIT ---
 @app.post("/meal-slot/edit")
