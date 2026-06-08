@@ -498,12 +498,15 @@ def recommend_sides(
             r.recipe_id, r.dish_name, r.diet_type,
             r.intensity_level, r.dish_category, r.meal_slots,
             r.meal_role, r.is_sattvic,
+            v.carousel_thumb_url as thumb,
+            v.hero_image_url as hero,
             COALESCE(
                 ARRAY(SELECT ri.ingredient_id FROM recipe_ingredients ri
                       WHERE ri.recipe_id = r.recipe_id),
                 '{}'::integer[]
             ) AS ingredient_ids
         FROM recipe_dna_master r
+        LEFT JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
         WHERE r.review_status = 'approved'
         AND r.meal_role @> ARRAY['side']::text[]
         AND r.dish_category = ANY(:cats)
@@ -524,6 +527,8 @@ def recommend_sides(
             "dish_category":   r.dish_category,
             "meal_slots":      list(r.meal_slots) if r.meal_slots else [],
             "is_sattvic":      r.is_sattvic or False,
+            "thumb":           r.thumb or r.hero,
+            "hero":            r.hero or r.thumb,
             "ingredient_ids":  list(r.ingredient_ids) if r.ingredient_ids else [],
         }
         for r in side_rows
@@ -722,9 +727,12 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                     "hero":  selected.get("thumb"),
                     "sides": [
                         {
-                            "recipe_id": s["recipe_id"],
-                            "dish_name": s["dish_name"],
+                            "recipe_id":     s["recipe_id"],
+                            "dish_name":     s["dish_name"],
+                            "name":          s["dish_name"],
                             "dish_category": s["dish_category"],
+                            "thumb":         s.get("thumb"),
+                            "hero":          s.get("hero"),
                         }
                         for s in sides
                     ],
