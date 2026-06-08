@@ -25,7 +25,7 @@ def fetch_active_plan(db: Session, h_id: str, week_start: str = None):
             r.dish_name as name, 
             r.recipe_code as code, 
             v.hero_image_url as hero, 
-            COALESCE(v.carousel_thumb_url, v.hero_image_url) as thumb,
+            v.carousel_thumb_url as thumb,
             v.prep_steps as steps,
             d.recipe_id,
             COALESCE(d.dish_type, 'Main') as dish_type,
