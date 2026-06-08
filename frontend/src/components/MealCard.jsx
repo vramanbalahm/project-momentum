@@ -2,6 +2,7 @@ import React from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 
 // FT-041: MealCard supports multiple main dishes (split hero) + horizontal sides with names
+import { getDishImage } from '../utils/imageUtils';
 // DnD enabled for day view slot reordering
 export default function MealCard({ day, type, meal, auditResult, onClick, isEditable = true, isHighlighted = false }) {
   const slotId = `${day}-${type}`;
@@ -24,11 +25,7 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
   const sides = meal?.sides || [];
 
   const getImgUrl = (dish) => {
-    let url = dish?.thumb || dish?.hero || dish?.carousel_thumb_url || dish?.hero_image_url;
-    if (!url && dish?.name) {
-      url = `/assets/meals/${dish.name.toLowerCase().replace(/\s+/g, "_")}.png`;
-    }
-    return decodeURIComponent(url || "/assets/meals/placeholder.png");
+    return getDishImage(dish) || null;
   };
 
   const auditColor = auditResult?.status === "Success" ? "#1D9E75"

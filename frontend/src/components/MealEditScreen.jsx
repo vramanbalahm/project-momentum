@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getDishImage } from '../utils/imageUtils';
 import axios from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
@@ -605,8 +606,8 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
           {localMeal.mains.map((dish, idx) => (
             <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10, background: "#F1EFE8", borderRadius: 10, padding: 10, marginBottom: 6 }}>
               <div style={{ width: 52, height: 52, borderRadius: 8, background: "#EDE8E0", flexShrink: 0, overflow: "hidden" }}>
-                {(dish.thumb || dish.hero) && (
-                  <img src={dish.thumb || dish.hero} alt={dish.name}
+                {getDishImage(dish) && (
+                  <img src={getDishImage(dish)} alt={dish.name}
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     onError={e => { e.target.style.display = "none"; }} />
                 )}
