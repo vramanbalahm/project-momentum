@@ -433,7 +433,10 @@ export default function App({ onBack }) {
             newBlueprint[bpKey] = {
               main:  { name: suggested.dish_name, recipe_id: suggested.recipe_id, diet_type: suggested.diet_type },
               mains: [{ name: suggested.dish_name, dish_name: suggested.dish_name, recipe_id: suggested.recipe_id, diet_type: suggested.diet_type }],
-              sides: [],
+              sides: (suggested.sides || []).map(s => ({
+                name: s.dish_name, dish_name: s.dish_name,
+                recipe_id: s.recipe_id, dish_category: s.dish_category
+              })),
             };
           }
         });
