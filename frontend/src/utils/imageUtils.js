@@ -1,7 +1,7 @@
 // utils/imageUtils.js
 // Central image URL resolver — handles local dev and production GCS
 
-const IMAGE_BASE = import.meta.env.VITE_IMAGE_BASE || "http://localhost:8000/static/meals";
+const IMAGE_BASE = import.meta.env.VITE_IMAGE_BASE || "/assets/meals";
 
 /**
  * Resolve a recipe image URL.

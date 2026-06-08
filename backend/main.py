@@ -26,12 +26,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # app = FastAPI()
 
-# Serve local meal images in development
-import os
-from fastapi.staticfiles import StaticFiles
-static_dir = os.path.join(os.path.dirname(__file__), "static", "meals")
-os.makedirs(static_dir, exist_ok=True)
-app.mount("/static/meals", StaticFiles(directory=static_dir), name="meals")
 app = FastAPI(title="Momentum Food Scheduler — MVP")
 
 # Serve recipe images as static files — http://localhost:8000/recipe_images/{recipe_id}.jpg
