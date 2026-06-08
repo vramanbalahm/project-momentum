@@ -78,6 +78,7 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
             r.meal_slots,
             r.meal_role,
             r.dish_category,
+            COALESCE(v.carousel_thumb_url, v.hero_image_url) as thumb,
             COALESCE(
                 ARRAY(
                     SELECT ri.ingredient_id
@@ -86,6 +87,7 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
                 ), '{}'::integer[]
             ) AS ingredient_ids
         FROM recipe_dna_master r
+        LEFT JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
         WHERE r.review_status = 'approved'
         AND r.meal_role @> ARRAY['main']::text[]
     """)).fetchall()
@@ -100,6 +102,7 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
             "meal_slots":      list(r.meal_slots) if r.meal_slots else [],
             "meal_role":       list(r.meal_role) if r.meal_role else ["main"],
             "dish_category":   r.dish_category or "other",
+            "thumb":           r.thumb or None,
             "ingredient_ids":  list(r.ingredient_ids) if r.ingredient_ids else [],
         }
         for r in vault_rows
@@ -715,6 +718,8 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                     "diet_type": selected["diet_type"],
                     "intensity": selected["intensity_level"],
                     "dish_category": selected.get("dish_category", "other"),
+                    "thumb": selected.get("thumb"),
+                    "hero":  selected.get("thumb"),
                     "sides": [
                         {
                             "recipe_id": s["recipe_id"],
