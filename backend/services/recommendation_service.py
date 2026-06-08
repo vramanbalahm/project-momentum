@@ -505,9 +505,11 @@ def recommend_sides(
         AND r.meal_role @> ARRAY['side']::text[]
         AND r.dish_category = ANY(:cats)
         AND r.diet_type::text = ANY(:diets)
+        AND r.meal_slots @> ARRAY[:slot]::text[]
     """), {
         "cats":  compatible_categories,
         "diets": allowed_diets,
+        "slot":  slot,
     }).fetchall()
 
     sides = [
@@ -528,8 +530,8 @@ def recommend_sides(
     if is_satvik and satvik_avoided:
         sides = [s for s in sides if not (set(s["ingredient_ids"]) & satvik_avoided)]
 
-    # Filter by meal slot
-    sides = [s for s in sides if not s["meal_slots"] or slot in s["meal_slots"]]
+    # Filter by meal slot — side must be valid for this slot
+    sides = [s for s in sides if slot in s["meal_slots"]]
 
     if not sides:
         _log(db, house_id, week_start, day, slot, "RA-F16", "pair_side_dishes",
