@@ -90,6 +90,24 @@ def main():
     sides = cur.fetchall()
     print(f"Loaded {len(sides)} side dishes\n")
 
+    # Load primary ingredients per recipe (for overlap check)
+    # Primary = not optional, category in Vegetable/Lentil/Grain/Fruit/Meat/Seafood
+    cur.execute("""
+        SELECT ri.recipe_id, ri.ingredient_id
+        FROM recipe_ingredients ri
+        JOIN ingredient_catalog ic ON ic.id = ri.ingredient_id
+        WHERE ri.is_optional = false
+        AND ic.category IN ('Vegetable','Lentil','Grain','Fruit','Meat','Seafood')
+    """)
+    recipe_ingredients = {}
+    for recipe_id, ingredient_id in cur.fetchall():
+        rid = str(recipe_id)
+        if rid not in recipe_ingredients:
+            recipe_ingredients[rid] = set()
+        recipe_ingredients[rid].add(ingredient_id)
+    print(f"Loaded primary ingredients for {len(recipe_ingredients)} recipes
+")
+
     # Group sides by category
     sides_by_cat = {}
     for recipe_id, dish_name, dish_category in sides:
@@ -128,6 +146,13 @@ def main():
 
         for main_id, main_name in main_dishes:
             for side_id, side_name in side_dishes:
+
+                # Skip if main and side share primary ingredients
+                main_ings = recipe_ingredients.get(str(main_id), set())
+                side_ings = recipe_ingredients.get(str(side_id), set())
+                if main_ings and side_ings and main_ings & side_ings:
+                    skipped += 1
+                    continue
 
                 if args.preview:
                     pairs_preview.append({
