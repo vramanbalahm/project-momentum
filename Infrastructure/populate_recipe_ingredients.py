@@ -103,7 +103,9 @@ def main():
             if confidence >= 0.85 and ing_id:
                 if not args.preview:
                     try:
-                        cur.execute("INSERT INTO recipe_ingredients (recipe_id, ingredient_id, is_mandatory) VALUES (CAST(%s AS uuid), %s, true) ON CONFLICT (recipe_id, ingredient_id) DO NOTHING", (str(recipe_id), ing_id))
+                        qty  = ing.get("quantity", "")
+                        unit = ing.get("unit", "")
+                        cur.execute("INSERT INTO recipe_ingredients (recipe_id, ingredient_id, quantity, unit, is_optional) VALUES (CAST(%s AS uuid), %s, %s, %s, false) ON CONFLICT (recipe_id, ingredient_id) DO NOTHING", (str(recipe_id), ing_id, str(qty), str(unit)))
                         inserted += cur.rowcount
                     except Exception as e:
                         print(f"  ERROR: {name_en}: {e}")
