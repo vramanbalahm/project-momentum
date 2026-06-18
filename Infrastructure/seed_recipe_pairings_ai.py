@@ -133,7 +133,21 @@ def main():
     all_missing     = {}  # missing_side_name → [main_dishes that need it]
     all_reasoning   = []
 
+    # Load already processed main dishes
+    cur.execute("""
+        SELECT DISTINCT main_recipe_id FROM recipe_pairing
+        WHERE source = 'seeded'
+    """)
+    already_done = {str(r[0]) for r in cur.fetchall()}
+    print(f"Already processed: {len(already_done)} main dishes — skipping these
+")
+
     for idx, (main_id, main_name, main_cat) in enumerate(mains):
+        # Skip if already processed
+        if str(main_id) in already_done:
+            print(f"[{idx+1}/{len(mains)}] SKIP {main_name} (already seeded)")
+            continue
+
         print(f"[{idx+1}/{len(mains)}] {main_name} ({main_cat})")
 
         if args.preview and idx >= 3:
