@@ -139,8 +139,7 @@ def main():
         WHERE source = 'seeded'
     """)
     already_done = {str(r[0]) for r in cur.fetchall()}
-    print(f"Already processed: {len(already_done)} main dishes — skipping these
-")
+    print(f"Already processed: {len(already_done)} main dishes - skipping these")
 
     for idx, (main_id, main_name, main_cat) in enumerate(mains):
         # Skip if already processed
