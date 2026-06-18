@@ -19,8 +19,12 @@ import argparse
 import json
 import os
 import time
-import requests
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load .env from backend folder
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', 'backend', '.env'))
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--db",       required=True)
@@ -28,8 +32,7 @@ parser.add_argument("--preview",  action="store_true")
 parser.add_argument("--category", default=None, help="tiffin|rice|bread|millet — run for one category only")
 args = parser.parse_args()
 
-ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-MODEL             = "claude-sonnet-4-6"
+MODEL = "claude-sonnet-4-6"
 
 def get_conn():
     try:
@@ -71,21 +74,23 @@ Rules:
 - missing list: only truly important traditional sides not in our list
 - keep reasons concise (under 10 words)"""
 
-    response = requests.post(
-        ANTHROPIC_API_URL,
-        headers={"Content-Type": "application/json"},
-        json={
-            "model": MODEL,
-            "max_tokens": 1000,
-            "messages": [{"role": "user", "content": prompt}]
-        }
-    )
+    try:
+        import anthropic
+    except ImportError:
+        os.system("pip install anthropic --break-system-packages -q")
+        import anthropic
 
-    if response.status_code != 200:
-        print(f"  API error {response.status_code}: {response.text[:200]}")
+    if not ANTHROPIC_API_KEY:
+        print("  ERROR: ANTHROPIC_API_KEY not set in backend/.env")
         return None
 
-    content = response.json()["content"][0]["text"]
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    message = client.messages.create(
+        model=MODEL,
+        max_tokens=1000,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    content = message.content[0].text
 
     # Parse JSON response
     try:
