@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS public.recipe_pairing (
     house_id        UUID            REFERENCES public.household_master(household_id) ON DELETE CASCADE,
     -- NULL house_id = global seed (applies to all households)
     -- UUID house_id = household-specific learning
+    notes           TEXT,           -- AI reasoning for this pairing
     created_at      TIMESTAMP       DEFAULT NOW(),
     updated_at      TIMESTAMP       DEFAULT NOW(),
     UNIQUE (main_recipe_id, side_recipe_id, house_id)
