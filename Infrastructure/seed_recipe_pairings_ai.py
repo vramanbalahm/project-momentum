@@ -42,37 +42,17 @@ def get_conn():
         import psycopg2
     return psycopg2.connect(args.db)
 
-def call_claude(main_dish, main_category, available_sides):
+def call_claude(main_dish, main_category, available_sides, compatible_cats):
     """Ask Claude to evaluate side dish pairings for a main dish."""
 
-    sides_list = "\n".join([f"- {s}" for s in available_sides])
-
-    prompt = f"""You are an expert in Tamil Nadu cuisine with deep knowledge of regional cooking traditions.
-
-Main dish: {main_dish} (category: {main_category})
-
-From the following list of available side dishes, identify which ones pair well with {main_dish}:
-
-{sides_list}
-
-Also identify any important traditional side dishes that are missing from our list.
-
-Respond ONLY with a valid JSON object in this exact format:
-{{
-  "matched": [
-    {{"name": "exact side dish name from list", "confidence": 0.95, "reason": "one line explanation"}},
-    {{"name": "exact side dish name from list", "confidence": 0.85, "reason": "one line explanation"}}
-  ],
-  "missing": ["Side dish name not in list", "Another missing side"],
-  "overall_reasoning": "Brief explanation of pairing principles for this main dish"
-}}
-
-Rules:
-- matched names MUST be exactly as written in the available list above
-- confidence: 0.90-1.0 = perfect, 0.75-0.89 = good, 0.60-0.74 = acceptable
-- suggest 3-8 matched sides maximum
-- missing list: only truly important traditional sides not in our list
-- keep reasons concise (under 10 words)"""
+    # Only send sides from compatible categories — reduces tokens significantly
+    relevant_sides = [s for s in available_sides if s[2] in compatible_cats]
+    sides_list = ", ".join([s[1] for s in relevant_sides])
+    prompt = f"""Tamil Nadu cuisine expert. Main: {main_dish} ({main_category}).
+Sides available: {sides_list}
+Return JSON only, no explanation:
+{{"matched":[{{"name":"exact name","confidence":0.9,"reason":"brief"}}],"missing":["missing name"],"overall_reasoning":"brief"}}
+Rules: exact names from list, 3-6 matches, confidence 0.6-1.0, missing=important traditional sides not in list."""
 
     try:
         import anthropic
@@ -87,7 +67,7 @@ Rules:
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     message = client.messages.create(
         model=MODEL,
-        max_tokens=1000,
+        max_tokens=500,
         messages=[{"role": "user", "content": prompt}]
     )
     content = message.content[0].text
@@ -145,7 +125,6 @@ def main():
     """)
     sides = cur.fetchall()
     side_name_to_id = {row[1]: row[0] for row in sides}
-    side_names = list(side_name_to_id.keys())
     print(f"Available sides for matching: {len(side_names)}\n")
 
     # Stats
@@ -162,7 +141,13 @@ def main():
             break
 
         # Call Claude
-        result = call_claude(main_name, main_cat, side_names)
+        # Get compatible side categories from matrix
+            cur.execute("""
+                SELECT side_category FROM dish_pairing_matrix
+                WHERE main_category = %s AND compatibility != 'never'
+            """, (main_cat,))
+            compatible_cats = {r[0] for r in cur.fetchall()}
+            result = call_claude(main_name, main_cat, sides, compatible_cats)
 
         if not result:
             print(f"  ✗ Failed to get AI response")
@@ -192,9 +177,14 @@ def main():
 
             side_id = side_name_to_id.get(side_name)
             if not side_id:
-                # Try case-insensitive match
                 for sn, sid in side_name_to_id.items():
                     if sn.lower() == side_name.lower():
+                        side_id = sid
+                        break
+            if not side_id:
+                # Partial match
+                for sn, sid in side_name_to_id.items():
+                    if side_name.lower() in sn.lower() or sn.lower() in side_name.lower():
                         side_id = sid
                         break
 
