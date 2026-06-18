@@ -125,7 +125,7 @@ def main():
     """)
     sides = cur.fetchall()
     side_name_to_id = {row[1]: row[0] for row in sides}
-    print(f"Available sides for matching: {len(side_names)}\n")
+    print(f"Available sides for matching: {len(sides)}\n")
 
     # Stats
     total_inserted  = 0
