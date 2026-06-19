@@ -24,8 +24,9 @@ import argparse
 import os
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--db",      required=True)
-parser.add_argument("--preview", action="store_true")
+parser.add_argument("--db",       required=True)
+parser.add_argument("--preview",  action="store_true")
+parser.add_argument("--category", default=None, help="tiffin|rice|bread|millet — run for one category only")
 args = parser.parse_args()
 
 CONFIDENCE_MAP = {
@@ -67,14 +68,24 @@ def main():
     print(f"Loaded {len(matrix)} pairing rules from matrix\n")
 
     # Load all approved main dishes
-    cur.execute("""
-        SELECT recipe_id, dish_name, dish_category
-        FROM recipe_dna_master
-        WHERE review_status = 'approved'
-        AND meal_role @> ARRAY['main']::text[]
-        AND dish_category IS NOT NULL
-        ORDER BY dish_category, dish_name
-    """)
+    if args.category:
+        cur.execute("""
+            SELECT recipe_id, dish_name, dish_category
+            FROM recipe_dna_master
+            WHERE review_status = 'approved'
+            AND meal_role @> ARRAY['main']::text[]
+            AND dish_category = %s
+            ORDER BY dish_name
+        """, (args.category,))
+    else:
+        cur.execute("""
+            SELECT recipe_id, dish_name, dish_category
+            FROM recipe_dna_master
+            WHERE review_status = 'approved'
+            AND meal_role @> ARRAY['main']::text[]
+            AND dish_category IS NOT NULL
+            ORDER BY dish_category, dish_name
+        """)
     mains = cur.fetchall()
     print(f"Loaded {len(mains)} main dishes\n")
 
