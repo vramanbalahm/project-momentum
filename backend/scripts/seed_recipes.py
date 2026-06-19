@@ -673,6 +673,15 @@ def main():
 
     for batch_num, count in enumerate(batches, 1):
         print(f"⏳ Calling {args.ai} — batch {batch_num}/{len(batches)} ({count} recipes)...")
+        # Use specific dishes for this batch if provided
+        if specific_dishes:
+            batch_start = (batch_num - 1) * BATCH_SIZE
+            batch_dishes = specific_dishes[batch_start:batch_start + count]
+            dishes_str = "\n".join(f"- {d}" for d in batch_dishes)
+            batch_specific = f"\n\nIMPORTANT: Generate ONLY these exact dishes:\n{dishes_str}\nUse exact dish names as given. Do NOT generate any other dishes."
+        else:
+            batch_specific = ""
+
         batch_prompt = PROMPT_TEMPLATE.format(
             count=count,
             meal_label=args.meal.replace("_", " "),
@@ -682,7 +691,7 @@ def main():
             diet_instruction=DIET_INSTRUCTIONS[args.diet],
             diet_type=args.diet,
             allowed_slots_example=allowed_slots_example,
-            exclusion_clause=exclusion_clause,
+            exclusion_clause=exclusion_clause + batch_specific,
         )
         try:
             raw = call_ai(batch_prompt, count)
