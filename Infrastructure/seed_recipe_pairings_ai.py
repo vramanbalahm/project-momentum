@@ -155,12 +155,12 @@ def main():
 
         # Call Claude
         # Get compatible side categories from matrix
-            cur.execute("""
-                SELECT side_category FROM dish_pairing_matrix
-                WHERE main_category = %s AND compatibility != 'never'
-            """, (main_cat,))
-            compatible_cats = {r[0] for r in cur.fetchall()}
-            result = call_claude(main_name, main_cat, sides, compatible_cats)
+        cur.execute("""
+            SELECT side_category FROM dish_pairing_matrix
+            WHERE main_category = %s AND compatibility != 'never'
+        """, (main_cat,))
+        compatible_cats = {r[0] for r in cur.fetchall()}
+        result = call_claude(main_name, main_cat, sides, compatible_cats)
 
         if not result:
             print(f"  ✗ Failed to get AI response")
