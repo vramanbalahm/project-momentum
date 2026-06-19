@@ -229,6 +229,9 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
         "last_effective_diet": "Veg",   # updated by F02 per slot
         "sides_used_this_week": set(),  # updated by F16 per slot
         "allergen_ids":        set(),   # updated by FA01
+        "lunch_intensity":     {},      # updated by apply_lunch_post per day
+        "lunch_sides":         {},      # updated by apply_lunch_post per day
+        "house_id":            house_id,  # for dinner model leftover boost
     }
 
 
@@ -444,10 +447,71 @@ def apply_lunch_model(recipes, day, slot, ctx, week_ctx, db, house_id, week_star
     return recipes, ctx
 
 
+def apply_lunch_post(selected_main: Dict, sides: list, day: str, week_ctx: Dict):
+    """Called after lunch is selected — stores intensity and sides for dinner model."""
+    if not selected_main:
+        return
+    intensity = selected_main.get("intensity_level", "Medium")
+    # Store lunch intensity per day for dinner model
+    if "lunch_intensity" not in week_ctx:
+        week_ctx["lunch_intensity"] = {}
+    week_ctx["lunch_intensity"][day] = intensity
+    # Store lunch side recipe IDs for leftover boost in dinner
+    if "lunch_sides" not in week_ctx:
+        week_ctx["lunch_sides"] = {}
+    week_ctx["lunch_sides"][day] = [s["recipe_id"] for s in sides]
+
+
 def apply_dinner_model(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     if slot != "Dinner": return recipes, ctx
+    t0 = time.time()
+    original_count = len(recipes)
+
+    # Rule 1: If lunch was Heavy/Medium → enforce Light dinner
+    lunch_intensity = week_ctx.get("lunch_intensity", {}).get(day, "Medium")
+    if lunch_intensity in ("Heavy", "Medium"):
+        light_recipes = [r for r in recipes if r.get("intensity_level") == "Light"]
+        if light_recipes:
+            recipes = light_recipes
+            reason = f"Lunch was {lunch_intensity} → dinner restricted to Light ({len(recipes)} recipes)"
+        else:
+            reason = f"Lunch was {lunch_intensity} but no Light dinner recipes found — keeping full pool"
+    else:
+        reason = f"Lunch was Light — dinner pool unrestricted"
+
+    # Rule 2: Boost mains that pair with today's lunch sides (leftover linking)
+    lunch_side_ids = week_ctx.get("lunch_sides", {}).get(day, [])
+    boosted = []
+    normal  = []
+    if lunch_side_ids:
+        # Find mains that have high-confidence pairings with today's lunch sides
+        boosted_ids = set()
+        try:
+            from sqlalchemy import text as sqla_text
+            rows = db.execute(sqla_text("""
+                SELECT DISTINCT main_recipe_id
+                FROM recipe_pairing
+                WHERE side_recipe_id = ANY(:side_ids)
+                AND confidence >= 0.85
+                AND (house_id IS NULL OR house_id = CAST(:house_id AS uuid))
+            """), {
+                "side_ids": [str(s) for s in lunch_side_ids],
+                "house_id": str(week_ctx.get("house_id", ""))
+            }).fetchall()
+            boosted_ids = {str(r.main_recipe_id) for r in rows}
+        except Exception:
+            pass
+
+        if boosted_ids:
+            boosted = [r for r in recipes if r.get("recipe_id") in boosted_ids]
+            normal  = [r for r in recipes if r.get("recipe_id") not in boosted_ids]
+            # Put boosted mains at front of pool
+            recipes = boosted + normal
+            reason += f" | Leftover boost: {len(boosted)} mains match lunch sides"
+
+    ms = int((time.time()-t0)*1000)
     _log(db, house_id, week_start, day, slot, "RA-F15", "apply_dinner_model",
-         len(recipes), len(recipes), [], f"Dinner pool: {len(recipes)}", None, 0, run_id=run_id)
+         original_count, len(recipes), [], reason, None, ms, run_id=run_id)
     return recipes, ctx
 
 
@@ -507,14 +571,22 @@ def recommend_sides(
         AND r.review_status = 'approved'
         AND r.diet_type::text = ANY(:diets)
         AND r.meal_slots @> ARRAY[:slot]::text[]
+        AND (
+            -- Continental mains only get continental/neutral sides
+            CASE WHEN :main_category = 'continental'
+                THEN r.sub_region IN ('Continental','General') OR r.sub_region IS NULL
+                ELSE TRUE
+            END
+        )
         ORDER BY
             CASE WHEN rp.house_id IS NOT NULL THEN 0 ELSE 1 END,
             rp.confidence DESC
     """), {
-        "main_id":  str(main_recipe_id),
-        "house_id": str(house_id),
-        "diets":    allowed_diets,
-        "slot":     slot,
+        "main_id":       str(main_recipe_id),
+        "house_id":      str(house_id),
+        "diets":         allowed_diets,
+        "slot":          slot,
+        "main_category": main_category,
     }).fetchall()
 
     sides = [
@@ -799,6 +871,10 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                     db, house_id, week_start, day, slot,
                     selected, week_ctx, run_id=run_id
                 )
+
+                # Store lunch result for dinner model (intensity + sides)
+                if slot == "Lunch":
+                    apply_lunch_post(selected, sides, day, week_ctx)
 
                 result[day][slot] = {
                     "recipe_id": selected["recipe_id"],
