@@ -226,6 +226,9 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
         "recent_by_slot":     recent_by_slot,
         "no_repeat_weeks":    no_repeat_weeks,
         "weekly_config":      weekly_config,
+        "last_effective_diet": "Veg",   # updated by F02 per slot
+        "sides_used_this_week": set(),  # updated by F16 per slot
+        "allergen_ids":        set(),   # updated by FA01
     }
 
 
@@ -335,6 +338,8 @@ def calc_effective_diet(recipes, day, slot, ctx, week_ctx, db, house_id, week_st
     effective = max(diets, key=lambda d: DIET_ORDER.get(d, 0)) if diets else "Veg"
     ctx["effective_diet"] = effective
     week_ctx["last_effective_diet"] = effective  # store for F16
+    # Store allergen IDs for F16
+    week_ctx["allergen_ids"] = week_ctx.get("allergen_ids", set()) | ctx.get("allergen_ids", set())
     _log(db, house_id, week_start, day, slot, "RA-F02", "calc_effective_diet",
          len(recipes), len(recipes), [], f"Effective diet: {effective}",
          None, int((time.time()-t0)*1000), run_id=run_id)
@@ -454,73 +459,67 @@ def recommend_sides(
     run_id: Optional[str] = None
 ) -> List[Dict]:
     """
-    F16 — Side dish recommendation using pairing matrix.
-    1. Get main dish category
-    2. Query matrix for compatible side categories (perfect > good > acceptable)
-    3. Filter by diet + Satvik
-    4. Pick up to 2 sides
+    F16 — Side dish recommendation using recipe_pairing table.
+    Pipeline:
+    1. Query recipe_pairing for this main — household-specific first, then global seeds
+    2. Filter by: diet, Satvik, meal slot, allergens, no-repeat (week)
+    3. Reject sides previously rejected by this household (behavioral_tracker)
+    4. Pick up to 2 sides — different dish_category, no ingredient overlap
+    Falls back to matrix-based selection if no pairings found.
     """
     t0 = time.time()
 
-    main_category = selected_main.get("dish_category", "other")
-    effective_diet = week_ctx.get("last_effective_diet", "Veg")
-    is_satvik      = day in week_ctx.get("satvik_days", set())
-    satvik_avoided = week_ctx.get("satvik_avoided_ids", set())
-    allowed_diets  = DIET_COMPATIBLE.get(effective_diet, ["Veg"])
+    main_recipe_id  = selected_main.get("recipe_id")
+    main_category   = selected_main.get("dish_category", "other")
+    effective_diet  = week_ctx.get("last_effective_diet", "Veg")
+    is_satvik       = day in week_ctx.get("satvik_days", set())
+    satvik_avoided  = week_ctx.get("satvik_avoided_ids", set())
+    allowed_diets   = DIET_COMPATIBLE.get(effective_diet, ["Veg"])
+    allergen_ids    = week_ctx.get("allergen_ids", set())
+    used_this_week  = week_ctx.get("sides_used_this_week", set())
 
-    # Query pairing matrix for compatible side categories
-    matrix_rows = db.execute(text("""
-        SELECT side_category, compatibility
-        FROM dish_pairing_matrix
-        WHERE main_category = :mc
-        AND compatibility != 'never'
-        ORDER BY CASE compatibility
-            WHEN 'perfect'    THEN 1
-            WHEN 'good'       THEN 2
-            WHEN 'acceptable' THEN 3
-            ELSE 4
-        END
-    """), {"mc": main_category}).fetchall()
-
-    if not matrix_rows:
-        _log(db, house_id, week_start, day, slot, "RA-F16", "pair_side_dishes",
-             0, 0, [], f"No matrix rules for main_category={main_category}", None,
-             int((time.time()-t0)*1000), run_id=run_id)
-        return []
-
-    # Build ordered list of compatible side categories
-    compatible_categories = [r.side_category for r in matrix_rows]
-    best_compatibility    = matrix_rows[0].compatibility if matrix_rows else "good"
-
-    # Query approved side dishes in compatible categories
-    side_rows = db.execute(text("""
+    # ── Step 1: Query recipe_pairing table ────────────────────────────────────
+    # Household-specific rows override global seeds (higher confidence wins)
+    pairing_rows = db.execute(text("""
         SELECT
-            r.recipe_id, r.dish_name, r.diet_type,
-            r.intensity_level, r.dish_category, r.meal_slots,
-            r.meal_role, r.is_sattvic,
+            rp.side_recipe_id,
+            rp.confidence,
+            rp.source,
+            r.dish_name,
+            r.diet_type,
+            r.intensity_level,
+            r.dish_category,
+            r.meal_slots,
+            r.is_sattvic,
             v.carousel_thumb_url as thumb,
-            v.hero_image_url as hero,
+            v.hero_image_url     as hero,
             COALESCE(
                 ARRAY(SELECT ri.ingredient_id FROM recipe_ingredients ri
                       WHERE ri.recipe_id = r.recipe_id),
                 '{}'::integer[]
             ) AS ingredient_ids
-        FROM recipe_dna_master r
+        FROM recipe_pairing rp
+        JOIN recipe_dna_master r ON r.recipe_id = rp.side_recipe_id
         LEFT JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
-        WHERE r.review_status = 'approved'
-        AND r.meal_role @> ARRAY['side']::text[]
-        AND r.dish_category = ANY(:cats)
+        WHERE rp.main_recipe_id = CAST(:main_id AS uuid)
+        AND rp.source != 'user_rejected'
+        AND (rp.house_id IS NULL OR rp.house_id = CAST(:house_id AS uuid))
+        AND r.review_status = 'approved'
         AND r.diet_type::text = ANY(:diets)
         AND r.meal_slots @> ARRAY[:slot]::text[]
+        ORDER BY
+            CASE WHEN rp.house_id IS NOT NULL THEN 0 ELSE 1 END,
+            rp.confidence DESC
     """), {
-        "cats":  compatible_categories,
-        "diets": allowed_diets,
-        "slot":  slot,
+        "main_id":  str(main_recipe_id),
+        "house_id": str(house_id),
+        "diets":    allowed_diets,
+        "slot":     slot,
     }).fetchall()
 
     sides = [
         {
-            "recipe_id":       str(r.recipe_id),
+            "recipe_id":       str(r.side_recipe_id),
             "dish_name":       r.dish_name,
             "diet_type":       str(r.diet_type) if r.diet_type else "Veg",
             "intensity_level": r.intensity_level or "Light",
@@ -530,42 +529,126 @@ def recommend_sides(
             "thumb":           r.thumb or r.hero,
             "hero":            r.hero or r.thumb,
             "ingredient_ids":  list(r.ingredient_ids) if r.ingredient_ids else [],
+            "confidence":      float(r.confidence),
+            "source":          r.source,
         }
-        for r in side_rows
+        for r in pairing_rows
     ]
 
-    # Apply Satvik filter if needed
+    # ── Step 2: Apply filters ─────────────────────────────────────────────────
+
+    # Satvik filter
     if is_satvik and satvik_avoided:
         sides = [s for s in sides if not (set(s["ingredient_ids"]) & satvik_avoided)]
 
-    # Filter by meal slot — side must be valid for this slot
-    sides = [s for s in sides if slot in s["meal_slots"]]
+    # Allergen filter
+    if allergen_ids:
+        sides = [s for s in sides if not (set(s["ingredient_ids"]) & allergen_ids)]
+
+    # No-repeat filter — exclude sides used this week
+    sides = [s for s in sides if s["recipe_id"] not in used_this_week]
+
+    # ── Step 3: Fall back to matrix if no pairings found ─────────────────────
+    if not sides:
+        matrix_rows = db.execute(text("""
+            SELECT side_category, compatibility
+            FROM dish_pairing_matrix
+            WHERE main_category = :mc
+            AND compatibility != 'never'
+            ORDER BY CASE compatibility
+                WHEN 'perfect'    THEN 1
+                WHEN 'good'       THEN 2
+                WHEN 'acceptable' THEN 3
+                ELSE 4 END
+        """), {"mc": main_category}).fetchall()
+
+        if matrix_rows:
+            compatible_cats = [r.side_category for r in matrix_rows]
+            fb_rows = db.execute(text("""
+                SELECT r.recipe_id, r.dish_name, r.diet_type,
+                       r.intensity_level, r.dish_category, r.meal_slots,
+                       r.is_sattvic,
+                       v.carousel_thumb_url as thumb, v.hero_image_url as hero,
+                       COALESCE(
+                           ARRAY(SELECT ri.ingredient_id FROM recipe_ingredients ri
+                                 WHERE ri.recipe_id = r.recipe_id),
+                           '{}'::integer[]
+                       ) AS ingredient_ids
+                FROM recipe_dna_master r
+                LEFT JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
+                WHERE r.review_status = 'approved'
+                AND r.meal_role @> ARRAY['side']::text[]
+                AND r.dish_category = ANY(:cats)
+                AND r.diet_type::text = ANY(:diets)
+                AND r.meal_slots @> ARRAY[:slot]::text[]
+            """), {"cats": compatible_cats, "diets": allowed_diets, "slot": slot}).fetchall()
+
+            sides = [
+                {
+                    "recipe_id":       str(r.recipe_id),
+                    "dish_name":       r.dish_name,
+                    "diet_type":       str(r.diet_type) if r.diet_type else "Veg",
+                    "intensity_level": r.intensity_level or "Light",
+                    "dish_category":   r.dish_category,
+                    "meal_slots":      list(r.meal_slots) if r.meal_slots else [],
+                    "is_sattvic":      r.is_sattvic or False,
+                    "thumb":           r.thumb or r.hero,
+                    "hero":            r.hero or r.thumb,
+                    "ingredient_ids":  list(r.ingredient_ids) if r.ingredient_ids else [],
+                    "confidence":      0.65,
+                    "source":          "matrix_fallback",
+                }
+                for r in fb_rows
+            ]
+
+            if is_satvik and satvik_avoided:
+                sides = [s for s in sides if not (set(s["ingredient_ids"]) & satvik_avoided)]
+            if allergen_ids:
+                sides = [s for s in sides if not (set(s["ingredient_ids"]) & allergen_ids)]
+            sides = [s for s in sides if s["recipe_id"] not in used_this_week]
 
     if not sides:
         _log(db, house_id, week_start, day, slot, "RA-F16", "pair_side_dishes",
-             0, 0, [], f"No sides found for main_category={main_category}", None,
-             int((time.time()-t0)*1000), run_id=run_id)
+             0, 0, [], f"No sides found for main={selected_main.get('dish_name')}",
+             None, int((time.time()-t0)*1000), run_id=run_id)
         return []
 
-    # Pick up to 2 sides — try to get one 'perfect' category first
-    perfect_cats = [r.side_category for r in matrix_rows if r.compatibility == "perfect"]
-    perfect_sides = [s for s in sides if s["dish_category"] in perfect_cats]
-    other_sides   = [s for s in sides if s["dish_category"] not in perfect_cats]
+    # ── Step 4: Pick up to 2 sides ────────────────────────────────────────────
+    # Rule 1: max 1 per dish_category
+    # Rule 2: no ingredient overlap between selected sides
+    selected_sides  = []
+    used_categories = set()
+    used_ingredients = set()
 
-    selected_sides = []
-    if perfect_sides:
-        selected_sides.append(random.choice(perfect_sides))
-    if other_sides and len(selected_sides) < 2:
-        # Pick a different category if possible
-        remaining = [s for s in other_sides
-                     if not selected_sides or s["dish_category"] != selected_sides[0]["dish_category"]]
-        if remaining:
-            selected_sides.append(random.choice(remaining))
-        elif other_sides:
-            selected_sides.append(random.choice(other_sides))
+    # Sort by confidence descending
+    sides.sort(key=lambda x: -x["confidence"])
 
-    reason = (f"main={main_category} → sides={[s['dish_name'] for s in selected_sides]} "
-              f"(best={best_compatibility})")
+    for side in sides:
+        if len(selected_sides) >= 2:
+            break
+
+        # Rule 1: skip if category already used
+        if side["dish_category"] in used_categories:
+            continue
+
+        # Rule 2: skip if shares primary vegetable ingredient with already selected side
+        side_veg_ings = {i for i in side["ingredient_ids"]} & used_ingredients
+        if side_veg_ings and used_ingredients:
+            continue
+
+        selected_sides.append(side)
+        used_categories.add(side["dish_category"])
+        used_ingredients.update(side["ingredient_ids"])
+
+        # Track used sides for no-repeat
+        used_this_week.add(side["recipe_id"])
+
+    # Update week context
+    week_ctx["sides_used_this_week"] = used_this_week
+
+    reason = (f"main={selected_main.get('dish_name')} → "
+              f"sides={[s['dish_name'] for s in selected_sides]} "
+              f"(pool={len(sides)}, source={selected_sides[0]['source'] if selected_sides else 'none'})")
     ms = int((time.time()-t0)*1000)
     _log(db, house_id, week_start, day, slot, "RA-F16", "pair_side_dishes",
          len(sides), len(selected_sides), [], reason,
