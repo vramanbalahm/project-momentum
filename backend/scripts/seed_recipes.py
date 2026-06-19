@@ -552,6 +552,23 @@ def insert_recipes(recipes, args, ai_model, dry_run=False):
     cur.close()
     conn.close()
 
+    # Fix meal_role and meal_slots for side dishes
+    if args.meal == "side_dish" and inserted > 0:
+        conn2 = get_connection()
+        cur2  = conn2.cursor()
+        cur2.execute("""
+            UPDATE recipe_dna_master
+            SET meal_role  = ARRAY['side']::text[],
+                meal_slots = ARRAY['Breakfast','Lunch','Dinner']::text[]
+            WHERE meal_slots @> ARRAY['Side Dish']::text[]
+            AND review_status = 'under_review'
+        """)
+        fixed_roles = cur2.rowcount
+        conn2.commit()
+        cur2.close()
+        conn2.close()
+        print(f"  Role fixed  : {fixed_roles} side dishes tagged with meal_role=side")
+
     print(f"\n{'='*50}")
     print(f"  Inserted    : {inserted}")
     print(f"  Skipped     : {skipped}")
