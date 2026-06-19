@@ -142,9 +142,10 @@ def main():
     print()
 
     # Generate pairings
-    inserted = 0
-    skipped  = 0
-    pairs_preview = []
+    inserted        = 0
+    skipped         = 0
+    overlap_skipped = 0
+    pairs_preview   = []
 
     for main_cat, side_cat, compatibility in matrix:
         confidence = CONFIDENCE_MAP.get(compatibility, 0.65)
@@ -161,7 +162,7 @@ def main():
                 main_ings = recipe_ingredients.get(str(main_id), set())
                 side_ings = recipe_ingredients.get(str(side_id), set())
                 if main_ings and side_ings and main_ings & side_ings:
-                    skipped += 1
+                    overlap_skipped += 1
                     continue
 
                 if args.preview:
@@ -198,6 +199,8 @@ def main():
     print(f"\n{'='*60}")
     print(f"Summary:")
     print(f"  Pairings {'would be' if args.preview else ''} inserted: {inserted}")
+    if overlap_skipped:
+        print(f"  Skipped (ingredient overlap): {overlap_skipped}")
     if skipped:
         print(f"  Skipped (errors):  {skipped}")
     print(f"{'='*60}\n")
