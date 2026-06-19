@@ -18,7 +18,7 @@ funnel AS (
         al.recipes_out,
         al.recipes_in - al.recipes_out as dropped,
         al.filter_reason,
-        al.selected_recipe_id,
+        al.selected_id,
         al.execution_ms
     FROM plan_audit_log al
     JOIN latest_run lr ON al.run_id = lr.run_id
