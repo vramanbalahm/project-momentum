@@ -105,8 +105,7 @@ def main():
         if rid not in recipe_ingredients:
             recipe_ingredients[rid] = set()
         recipe_ingredients[rid].add(ingredient_id)
-    print(f"Loaded primary ingredients for {len(recipe_ingredients)} recipes
-")
+    print(f"Loaded primary ingredients for {len(recipe_ingredients)} recipes")
 
     # Group sides by category
     sides_by_cat = {}
