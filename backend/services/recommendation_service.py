@@ -577,7 +577,7 @@ def recommend_sides(
         AND (rp.house_id IS NULL OR rp.house_id = CAST(:house_id AS uuid))
         AND r.review_status = 'approved'
         AND r.diet_type::text = ANY(:diets)
-        AND r.meal_slots @> ARRAY[:slot]::text[]
+        AND (r.meal_slots = '{}'::text[] OR r.meal_slots IS NULL OR r.meal_slots @> ARRAY[:slot]::text[])
         AND (
             -- Continental mains ONLY get continental-appropriate sides
             -- (condiment category with continental sub_region, or dry/wet that are continental)
