@@ -412,6 +412,13 @@ def filter_by_meal_slot(recipes, day, slot, ctx, week_ctx, db, house_id, week_st
 def filter_recent_recipes(recipes, day, slot, ctx, week_ctx, db, house_id, week_start, run_id=None):
     t0 = time.time()
     recent = week_ctx["recent_by_slot"].get(slot, set())
+
+    # Also exclude dishes already selected THIS week (cross-slot within week)
+    this_week_all = set()
+    for slot_set in week_ctx.get("selected_this_week", {}).values():
+        this_week_all.update(slot_set)
+    recent = recent | this_week_all
+
     if not recent:
         _log(db, house_id, week_start, day, slot, "RA-F05", "filter_recent_recipes",
              len(recipes), len(recipes), [],
@@ -573,8 +580,14 @@ def recommend_sides(
         AND r.meal_slots @> ARRAY[:slot]::text[]
         AND (
             -- Continental mains only get continental/neutral sides
+            -- Exclude Indian regional sides (kuzhambu, theeyal, gojju, rasam etc.)
             CASE WHEN :main_category = 'continental'
-                THEN r.sub_region IN ('Continental','General') OR r.sub_region IS NULL
+                THEN (
+                    r.sub_region IN ('Continental','General')
+                    OR r.sub_region IS NULL
+                )
+                AND LOWER(r.dish_name) NOT SIMILAR TO
+                    '%(kuzhambu|kozhambu|kulambu|theeyal|gojju|rasam|sambar|kootu|poriyal|thoran|aviyal|pachadi|kuzhambu|dal|thogayal|pickle|oorugai|poricha|vathal|puli|milagu|vatha)%'
                 ELSE TRUE
             END
         )
@@ -807,6 +820,7 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
         "Lunch":     set(),
         "Dinner":    set(),
     }
+    week_ctx["selected_this_week"] = selected_this_week  # share with F05
 
     for day in DAYS_OF_WEEK:
         result[day] = {}
