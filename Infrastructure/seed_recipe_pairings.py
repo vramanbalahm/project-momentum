@@ -186,7 +186,8 @@ def main():
                     """, (str(main_id), str(side_id), confidence))
                     inserted += cur.rowcount
                 except Exception as e:
-                    print(f"  ERROR: {main_name} → {side_name}: {e}")
+                    if skipped < 3:  # Only print first 3 errors
+                        print(f"  ERROR sample: {main_name} -> {side_name}: {e}")
                     conn.rollback()
                     skipped += 1
                     continue
