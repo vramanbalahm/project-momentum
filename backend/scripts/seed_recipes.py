@@ -578,6 +578,8 @@ def main():
                         help="claude (default) | gemini")
     parser.add_argument("--dry-run",    action="store_true",
                         help="Print JSON only, do not insert into DB")
+    parser.add_argument("--dishes",     default="",
+                        help="Comma-separated specific dish names to generate e.g. 'Coconut Chutney,Tomato Chutney'")
     args = parser.parse_args()
 
     # Validate args
@@ -626,6 +628,18 @@ def main():
     else:
         exclusion_clause = ""
 
+    # Parse specific dishes from --dishes arg
+    specific_dishes = [d.strip() for d in args.dishes.split(",") if d.strip()] if args.dishes else []
+    if specific_dishes:
+        args.count = len(specific_dishes)
+        print(f"   Specific dishes: {specific_dishes}")
+
+    # Build specific dishes clause if --dishes provided
+    specific_clause = ""
+    if specific_dishes:
+        dishes_str = "\n".join(f"- {d}" for d in specific_dishes)
+        specific_clause = f"\n\nIMPORTANT: Generate ONLY these specific dishes (in this exact order):\n{dishes_str}\nDo NOT generate any other dishes. Use exact dish names as given."
+
     # Build prompt
     prompt = PROMPT_TEMPLATE.format(
         count=args.count,
@@ -636,7 +650,7 @@ def main():
         diet_instruction=DIET_INSTRUCTIONS[args.diet],
         diet_type=args.diet,
         allowed_slots_example=allowed_slots_example,
-        exclusion_clause=exclusion_clause,
+        exclusion_clause=exclusion_clause + specific_clause,
     )
 
     print(f"\n🌿 Momentum Recipe Seeder")
