@@ -108,7 +108,7 @@ def main():
         FROM recipe_ingredients ri
         JOIN ingredient_catalog ic ON ic.id = ri.ingredient_id
         WHERE ri.is_optional = false
-        AND ic.category IN ('Vegetable','Lentil','Grain','Fruit','Meat','Seafood')
+        AND ic.category IN ('Vegetable','Fruit','Meat','Seafood')
     """)
     recipe_ingredients = {}
     for recipe_id, ingredient_id in cur.fetchall():
