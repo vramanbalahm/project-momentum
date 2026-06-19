@@ -579,15 +579,10 @@ def recommend_sides(
         AND r.diet_type::text = ANY(:diets)
         AND r.meal_slots @> ARRAY[:slot]::text[]
         AND (
-            -- Continental mains only get continental/neutral sides
-            -- Exclude Indian regional sides (kuzhambu, theeyal, gojju, rasam etc.)
+            -- Continental mains ONLY get continental-appropriate sides
+            -- (condiment category with continental sub_region, or dry/wet that are continental)
             CASE WHEN :main_category = 'continental'
-                THEN (
-                    r.sub_region IN ('Continental','General')
-                    OR r.sub_region IS NULL
-                )
-                AND LOWER(r.dish_name) NOT SIMILAR TO
-                    '%(kuzhambu|kozhambu|kulambu|theeyal|gojju|rasam|sambar|kootu|poriyal|thoran|aviyal|pachadi|kuzhambu|dal|thogayal|pickle|oorugai|poricha|vathal|puli|milagu|vatha)%'
+                THEN r.sub_region = 'Continental'
                 ELSE TRUE
             END
         )
