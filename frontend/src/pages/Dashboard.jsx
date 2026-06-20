@@ -65,6 +65,14 @@ export default function Dashboard({ onNavigate }) {
 
   const tiles = [
     {
+      id: "dish_search",
+      icon: "🍽️",
+      label: "Dish Search",
+      desc: "Search and filter our recipe vault",
+      color: "#FFF3DC",
+      available: true,
+    },
+    {
       id: "weekly_plan",
       icon: "📅",
       label: t("dashboard.tiles.weeklyPlan"),
@@ -137,14 +145,6 @@ export default function Dashboard({ onNavigate }) {
       color: "#E6F1FB",
       available: user?.role === "platform_admin",
       hidden: user?.role !== "platform_admin",
-    },
-    {
-      id: "dish_search",
-      icon: "🍽️",
-      label: "Dish Search",
-      desc: "Search and filter our recipe vault",
-      color: "#FFF3DC",
-      available: true,
     },
     {
       id: "coming_soon_1",
