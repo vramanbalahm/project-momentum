@@ -100,6 +100,8 @@ export default function DishSearch({ onBack }) {
   const rowStyle = {
     padding: "5px 12px 2px", display: "flex", gap: 5,
     overflowX: "auto", scrollbarWidth: "none",
+    WebkitOverflowScrolling: "touch",  // smooth scroll on iOS
+    msOverflowStyle: "none",           // hide scrollbar on IE
   };
 
   const catLabel = (c) => c.replace("_", " ");

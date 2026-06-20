@@ -292,7 +292,7 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
           </div>
         </div>
         {/* Intensity */}
-        <div style={{ padding: "6px 12px 2px", display: "flex", gap: 5, overflowX: "auto", scrollbarWidth: "none" }}>
+        <div style={{ padding: "6px 12px 2px", display: "flex", gap: 5, overflowX: "auto", scrollbarWidth: "none", WebkitOverflowScrolling: "touch", msOverflowStyle: "none" }}>
           {["", "Light", "Medium", "Heavy"].map(v => (
             <div key={v} onClick={() => setFilter('intensity', v)}
               style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: "pointer", flexShrink: 0,
@@ -304,7 +304,7 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
           ))}
         </div>
         {/* Diet */}
-        <div style={{ padding: "3px 12px 2px", display: "flex", gap: 5, overflowX: "auto", scrollbarWidth: "none" }}>
+        <div style={{ padding: "3px 12px 2px", display: "flex", gap: 5, overflowX: "auto", scrollbarWidth: "none", WebkitOverflowScrolling: "touch", msOverflowStyle: "none" }}>
           {["", "Veg", "Vegan", "Eggitarian", "Non-Veg"].map(v => (
             <div key={v} onClick={() => setFilter('diet', v)}
               style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: "pointer", flexShrink: 0,
@@ -317,7 +317,7 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
         </div>
         {/* Sub-region */}
         {subRegions.length > 0 && (
-          <div style={{ padding: "3px 12px 4px", display: "flex", gap: 5, overflowX: "auto", scrollbarWidth: "none" }}>
+          <div style={{ padding: "3px 12px 4px", display: "flex", gap: 5, overflowX: "auto", scrollbarWidth: "none", WebkitOverflowScrolling: "touch", msOverflowStyle: "none" }}>
             {["", ...subRegions].map(v => (
               <div key={v} onClick={() => setFilter('subRegion', v)}
                 style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: "pointer", flexShrink: 0,
