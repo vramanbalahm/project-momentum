@@ -977,9 +977,10 @@ def get_sub_regions(db: Session = Depends(get_db)):
     # Only return known valid cuisine sub-regions
     # sub_region data needs cleaning — ingredient names incorrectly stored
     VALID_REGIONS = [
-        "Chettinad", "Kongu Nadu", "Tirunelveli", "Madurai",
-        "Udupi", "Malabar", "Salem", "Coimbatore", "Thanjavur",
-        "Palakkad", "Nellai", "Continental", "General"
+        "Tamil Nadu", "Chettinad", "Kongu Nadu", "Tirunelveli", "Thanjavur",
+        "Madurai", "Salem", "Vellore", "Coastal", "Kumbakonam",
+        "Continental", "Virudhunagar", "Puducherry", "Coimbatore",
+        "Kanchipuram", "Chennai", "Karnataka"
     ]
     rows = db.execute(text("""
         SELECT DISTINCT sub_region
