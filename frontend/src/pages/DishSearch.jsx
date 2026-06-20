@@ -36,6 +36,7 @@ export default function DishSearch({ onBack }) {
   const [dishCat,     setDishCat]     = useState('');
 
   const inputRef = useRef(null);
+  const [detailDish, setDetailDish] = useState(null);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -215,12 +216,18 @@ export default function DishSearch({ onBack }) {
                   {[recipe.diet_type, recipe.intensity_level, recipe.sub_region].filter(Boolean).join(" · ")}
                 </div>
               </div>
-              {/* Category badge */}
-              {recipe.dish_category && (
-                <div style={{ padding: "2px 8px", borderRadius: 10, background: "#E1F5EE", color: C.accent, fontSize: 10, fontWeight: 500, flexShrink: 0 }}>
-                  {catLabel(recipe.dish_category)}
+              {/* Right side — category + ? button */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                {recipe.dish_category && (
+                  <div style={{ padding: "2px 8px", borderRadius: 10, background: "#E1F5EE", color: C.accent, fontSize: 10, fontWeight: 500 }}>
+                    {catLabel(recipe.dish_category)}
+                  </div>
+                )}
+                <div onClick={() => setDetailDish(recipe)}
+                  style={{ width: 22, height: 22, borderRadius: "50%", background: C.green, color: C.mint, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                  ?
                 </div>
-              )}
+              </div>
             </div>
           );
         })}
@@ -228,6 +235,80 @@ export default function DishSearch({ onBack }) {
           <div style={{ textAlign: "center", padding: 40, color: C.muted, fontSize: 13 }}>No dishes found</div>
         )}
       </div>
+
+      {/* Detail modal */}
+      {detailDish && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
+          onClick={() => setDetailDish(null)}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: C.card, borderRadius: "16px 16px 0 0", width: "100%", maxWidth: 480, margin: "0 auto", maxHeight: "75vh", display: "flex", flexDirection: "column" }}>
+
+            {/* Modal header */}
+            <div style={{ padding: "14px 16px 10px", borderBottom: `0.5px solid ${C.border}`, display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{detailDish.name}</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+                  {[detailDish.diet_type, detailDish.intensity_level, detailDish.sub_region].filter(Boolean).join(" · ")}
+                </div>
+              </div>
+              <span onClick={() => setDetailDish(null)} style={{ color: C.muted, fontSize: 18, cursor: "pointer" }}>✕</span>
+            </div>
+
+            {/* Modal content */}
+            <div style={{ overflowY: "auto", padding: "14px 16px", flex: 1 }}>
+
+              {/* Ingredients */}
+              {detailDish.ingredients_json && (() => {
+                try {
+                  const ings = typeof detailDish.ingredients_json === 'string'
+                    ? JSON.parse(detailDish.ingredients_json)
+                    : detailDish.ingredients_json;
+                  return ings.length > 0 ? (
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em" }}>Ingredients</div>
+                      {ings.map((ing, i) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: `0.5px solid ${C.border}`, fontSize: 12 }}>
+                          <span style={{ color: C.text }}>{ing.name}{ing.name_ta ? ` (${ing.name_ta})` : ""}</span>
+                          <span style={{ color: C.muted }}>{ing.quantity} {ing.unit}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null;
+                } catch { return null; }
+              })()}
+
+              {/* Prep steps */}
+              {detailDish.prep_steps && (() => {
+                try {
+                  const steps = typeof detailDish.prep_steps === 'string'
+                    ? JSON.parse(detailDish.prep_steps)
+                    : detailDish.prep_steps;
+                  const stepList = Array.isArray(steps) ? steps : steps?.steps || [];
+                  return stepList.length > 0 ? (
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em" }}>Preparation</div>
+                      {stepList.map((step, i) => (
+                        <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+                          <div style={{ width: 20, height: 20, borderRadius: "50%", background: C.green, color: C.mint, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            {i + 1}
+                          </div>
+                          <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5 }}>
+                            {typeof step === "string" ? step : step.instruction || step.step || JSON.stringify(step)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null;
+                } catch { return null; }
+              })()}
+
+              {!detailDish.ingredients_json && !detailDish.prep_steps && (
+                <div style={{ textAlign: "center", color: C.muted, fontSize: 13, padding: 20 }}>No details available</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
