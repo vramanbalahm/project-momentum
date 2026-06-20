@@ -40,7 +40,7 @@ class DishDetailErrorBoundary extends React.Component {
   }
 }
 
-function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
+export function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
   const [vault, setVault] = useState(null);
 
   useEffect(() => {

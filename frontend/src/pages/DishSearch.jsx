@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { getDishImage } from '../utils/imageUtils';
+import { DishDetailPanel } from '../components/MealEditScreen';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
@@ -236,77 +237,15 @@ export default function DishSearch({ onBack }) {
         )}
       </div>
 
-      {/* Detail modal */}
+      {/* Detail view — reuse DishDetailPanel */}
       {detailDish && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "flex-end" }}
-          onClick={() => setDetailDish(null)}>
-          <div onClick={e => e.stopPropagation()}
-            style={{ background: C.card, borderRadius: "16px 16px 0 0", width: "100%", maxWidth: 480, margin: "0 auto", maxHeight: "75vh", display: "flex", flexDirection: "column" }}>
-
-            {/* Modal header */}
-            <div style={{ padding: "14px 16px 10px", borderBottom: `0.5px solid ${C.border}`, display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{detailDish.name}</div>
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
-                  {[detailDish.diet_type, detailDish.intensity_level, detailDish.sub_region].filter(Boolean).join(" · ")}
-                </div>
-              </div>
-              <span onClick={() => setDetailDish(null)} style={{ color: C.muted, fontSize: 18, cursor: "pointer" }}>✕</span>
-            </div>
-
-            {/* Modal content */}
-            <div style={{ overflowY: "auto", padding: "14px 16px", flex: 1 }}>
-
-              {/* Ingredients */}
-              {detailDish.ingredients_json && (() => {
-                try {
-                  const ings = typeof detailDish.ingredients_json === 'string'
-                    ? JSON.parse(detailDish.ingredients_json)
-                    : detailDish.ingredients_json;
-                  return ings.length > 0 ? (
-                    <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em" }}>Ingredients</div>
-                      {ings.map((ing, i) => (
-                        <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: `0.5px solid ${C.border}`, fontSize: 12 }}>
-                          <span style={{ color: C.text }}>{ing.name}{ing.name_ta ? ` (${ing.name_ta})` : ""}</span>
-                          <span style={{ color: C.muted }}>{ing.quantity} {ing.unit}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null;
-                } catch { return null; }
-              })()}
-
-              {/* Prep steps */}
-              {detailDish.prep_steps && (() => {
-                try {
-                  const steps = typeof detailDish.prep_steps === 'string'
-                    ? JSON.parse(detailDish.prep_steps)
-                    : detailDish.prep_steps;
-                  const stepList = Array.isArray(steps) ? steps : steps?.steps || [];
-                  return stepList.length > 0 ? (
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em" }}>Preparation</div>
-                      {stepList.map((step, i) => (
-                        <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-                          <div style={{ width: 20, height: 20, borderRadius: "50%", background: C.green, color: C.mint, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            {i + 1}
-                          </div>
-                          <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5 }}>
-                            {typeof step === "string" ? step : step.instruction || step.step || JSON.stringify(step)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null;
-                } catch { return null; }
-              })()}
-
-              {!detailDish.ingredients_json && !detailDish.prep_steps && (
-                <div style={{ textAlign: "center", color: C.muted, fontSize: 13, padding: 20 }}>No details available</div>
-              )}
-            </div>
-          </div>
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: C.bg, maxWidth: 480, margin: "0 auto" }}>
+          <DishDetailPanel
+            recipe={detailDish}
+            onBack={() => setDetailDish(null)}
+            onSelect={null}
+            selectLabel={null}
+          />
         </div>
       )}
     </div>
