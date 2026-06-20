@@ -139,6 +139,14 @@ export default function Dashboard({ onNavigate }) {
       hidden: user?.role !== "platform_admin",
     },
     {
+      id: "dish_search",
+      icon: "🍽️",
+      label: "Dish Search",
+      desc: "Search and filter our recipe vault",
+      color: "#FFF3DC",
+      available: true,
+    },
+    {
       id: "coming_soon_1",
       icon: "🛒",
       label: "Market Prices",

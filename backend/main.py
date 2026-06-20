@@ -876,6 +876,8 @@ def search_recipes(
     diet_type:     str  = "",      # Veg | Vegan | Eggitarian | Non-Veg
     sub_region:    str  = "",      # Chettinad | Kongu Nadu | Continental etc.
     is_side_dish:  bool = False,   # True = side dishes only
+    meal_slot:     str  = "",      # Breakfast | Lunch | Dinner
+    dish_category: str  = "",      # tiffin | rice | bread | millet | continental | wet | dry etc.
     db: Session = Depends(get_db)
 ):
     """
@@ -904,6 +906,14 @@ def search_recipes(
     else:
         filters.append("r.meal_role @> ARRAY['main']::text[]")
 
+    if meal_slot:
+        filters.append("(r.meal_slots @> ARRAY[:meal_slot]::text[] OR r.meal_slots = '{}'::text[])")
+        params["meal_slot"] = meal_slot
+
+    if dish_category:
+        filters.append("r.dish_category = :dish_category")
+        params["dish_category"] = dish_category
+
     where = " AND ".join(filters)
 
     if not q:
@@ -912,7 +922,7 @@ def search_recipes(
                 r.recipe_id, r.dish_name, r.diet_type, r.is_sattvic,
                 r.intensity_level, r.sub_region,
                 v.carousel_thumb_url, v.hero_image_url,
-                v.prep_steps, v.ingredients_json, r.meal_role
+                v.prep_steps, v.ingredients_json, r.meal_role, r.dish_category
             FROM recipe_dna_master r
             LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
             WHERE {where}
@@ -928,7 +938,7 @@ def search_recipes(
                 r.recipe_id, r.dish_name, r.diet_type, r.is_sattvic,
                 r.intensity_level, r.sub_region,
                 v.carousel_thumb_url, v.hero_image_url,
-                v.prep_steps, v.ingredients_json, r.meal_role,
+                v.prep_steps, v.ingredients_json, r.meal_role, r.dish_category,
                 similarity(LOWER(r.dish_name), LOWER(:q)) AS sim_score
             FROM recipe_dna_master r
             LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
@@ -955,6 +965,7 @@ def search_recipes(
             "prep_steps":      row[8],
             "ingredients_json":row[9],
             "meal_role":       list(row[10]) if row[10] else ["main"],
+            "dish_category":   row[11] if len(row) > 11 else None,
         }
         for row in rows
     ]
