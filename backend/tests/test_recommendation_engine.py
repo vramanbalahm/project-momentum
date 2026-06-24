@@ -189,21 +189,26 @@ class TestFA01Allergies:
                    for rid in allergic_ids]
 
         test_house_id = str(uuid.uuid4())
+        # members must have allergen_ids — filter reads from members dict
         week_ctx = {"allergen_ids": {allergen_id}, "satvik_days": set(),
-                    "satvik_avoided_ids": set(), "members": [],
-                    "all_member_ids": [], "availability": {},
+                    "satvik_avoided_ids": set(),
+                    "members": {"m1": {"name": "Test", "dietary_preference": "Veg",
+                                       "allergen_ids": [allergen_id]}},
+                    "all_member_ids": ["m1"],
+                    "availability": {"Monday": {"Lunch": ["m1"]}},
                     "recent_by_slot": {}, "no_repeat_weeks": 1,
                     "weekly_config": {}, "last_effective_diet": "Veg",
                     "sides_used_this_week": set(), "lunch_intensity": {},
                     "lunch_sides": {}, "house_id": test_house_id,
                     "selected_this_week": {}}
-        ctx = {}
+        # Set present_ids in ctx so filter knows who is home
+        ctx = {"present_ids": ["m1"]}
         result, _ = filter_by_allergies(
             recipes, "Monday", "Lunch", ctx, week_ctx,
             db, test_house_id, "2025-01-01"
         )
-        result_ids = {r["recipe_id"] for r in result}
-        assert not result_ids.intersection(allergic_ids), "Allergic recipes should be removed"
+        # All test recipes contain allergen_id in ingredient_ids → should all be removed
+        assert len(result) == 0, f"All allergic recipes should be removed, got {len(result)}"
 
 
 # ── F02: calc_effective_diet ──────────────────────────────────────────────────
@@ -365,7 +370,7 @@ class TestSatvik:
              "meal_role": ["main"], "dish_category": "rice",
              "is_sattvic": False, "ingredient_ids": [99]},  # 99 = avoided ingredient
         ]
-        ctx = {"is_satvik": True}
+        ctx = {"is_satvik": True, "is_satvik_day": True}
         week_ctx = {
             "members": [], "all_member_ids": [], "availability": {},
             "allergen_ids": set(), "satvik_days": {"Monday"},
@@ -375,11 +380,13 @@ class TestSatvik:
             "lunch_intensity": {}, "lunch_sides": {},
             "house_id": str(uuid.uuid4()), "selected_this_week": {},
         }
+        test_house_id2 = str(uuid.uuid4())
         result, _ = filter_satvik_ingredients(
             recipes, "Monday", "Lunch", ctx, week_ctx,
-            db, "house1", "2025-01-01"
+            db, test_house_id2, "2025-01-01"
         )
-        assert len(result) == 1
+        # filter_satvik_ingredients checks ingredient_ids in recipe dict against satvik_avoided_ids
+        assert len(result) == 1, f"Expected 1 satvik recipe, got {len(result)}: {[r['dish_name'] for r in result]}"
         assert result[0]["recipe_id"] == "r1"
 
 
