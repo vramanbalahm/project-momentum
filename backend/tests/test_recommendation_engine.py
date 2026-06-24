@@ -188,18 +188,19 @@ class TestFA01Allergies:
                     "is_sattvic": False, "ingredient_ids": [allergen_id]}
                    for rid in allergic_ids]
 
+        test_house_id = str(uuid.uuid4())
         week_ctx = {"allergen_ids": {allergen_id}, "satvik_days": set(),
                     "satvik_avoided_ids": set(), "members": [],
                     "all_member_ids": [], "availability": {},
                     "recent_by_slot": {}, "no_repeat_weeks": 1,
                     "weekly_config": {}, "last_effective_diet": "Veg",
                     "sides_used_this_week": set(), "lunch_intensity": {},
-                    "lunch_sides": {}, "house_id": str(uuid.uuid4()),
+                    "lunch_sides": {}, "house_id": test_house_id,
                     "selected_this_week": {}}
         ctx = {}
         result, _ = filter_by_allergies(
             recipes, "Monday", "Lunch", ctx, week_ctx,
-            db, "house1", "2025-01-01"
+            db, test_house_id, "2025-01-01"
         )
         result_ids = {r["recipe_id"] for r in result}
         assert not result_ids.intersection(allergic_ids), "Allergic recipes should be removed"
@@ -673,9 +674,9 @@ class TestFullPlanGeneration:
 
             # Generate plan
             from datetime import date, timedelta
-            today = date.today()
-            day = today.weekday()
-            monday = today - timedelta(days=day)
+            # Use a unique past Monday to avoid conflicts with existing plans
+            unique_offset = hash(email) % 520  # up to 10 years back
+            monday = date(2020, 1, 6) - timedelta(weeks=unique_offset % 52)
             week_start = monday.strftime("%Y-%m-%d")
 
             resp = c.post("/recommendation/generate", json={
@@ -709,8 +710,8 @@ class TestFullPlanGeneration:
             headers = {"Authorization": f"Bearer {token}"}
 
             from datetime import date, timedelta
-            today = date.today()
-            monday = today - timedelta(days=today.weekday())
+            unique_offset = hash(email) % 520
+            monday = date(2021, 1, 4) - timedelta(weeks=unique_offset % 52)
             week_start = monday.strftime("%Y-%m-%d")
 
             resp = c.post("/recommendation/generate", json={
