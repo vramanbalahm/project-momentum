@@ -44,14 +44,19 @@ client = TestClient(app)
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def db():
+    """Fresh DB session per test — rolls back on failure to prevent transaction cascade."""
     session = SessionLocal()
     yield session
+    try:
+        session.rollback()
+    except Exception:
+        pass
     session.close()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def sample_recipes(db):
     """Load a small sample of approved recipes for testing."""
     rows = db.execute(text("""
@@ -78,18 +83,19 @@ def sample_recipes(db):
     ]
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def veg_recipes(sample_recipes):
     return [r for r in sample_recipes if r["diet_type"] == "Veg"]
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def week_ctx_default(db):
     """Default week context for testing."""
     return {
         "members":            [{"member_id": "m1", "diet": "Veg", "is_home": True}],
         "all_member_ids":     ["m1"],
-        "availability":       {"Monday": ["m1"], "Tuesday": ["m1"]},
+        "availability":       {"Monday": {"Breakfast": ["m1"], "Lunch": ["m1"], "Dinner": ["m1"]},
+                               "Tuesday": {"Breakfast": ["m1"], "Lunch": ["m1"], "Dinner": ["m1"]}},
         "allergen_ids":       set(),
         "satvik_days":        set(),
         "satvik_avoided_ids": set(),
@@ -124,7 +130,7 @@ class TestF03Availability:
         week_ctx = {
             "members":        [],
             "all_member_ids": [],
-            "availability":   {"Monday": []},
+            "availability":   {"Monday": {"Breakfast": [], "Lunch": [], "Dinner": []}},
             "allergen_ids":   set(),
             "satvik_days":    set(),
             "satvik_avoided_ids": set(),
@@ -209,7 +215,7 @@ class TestF02EffectiveDiet:
         week_ctx = {
             "members": [{"member_id": "m1", "diet": "Veg", "is_home": True}],
             "all_member_ids": ["m1"],
-            "availability": {"Monday": ["m1"]},
+            "availability": {"Monday": {"Breakfast": ["m1"], "Lunch": ["m1"], "Dinner": ["m1"]}},
             "allergen_ids": set(), "satvik_days": set(),
             "satvik_avoided_ids": set(),
             "recent_by_slot": {}, "no_repeat_weeks": 1,
@@ -233,7 +239,7 @@ class TestF02EffectiveDiet:
                 {"member_id": "m2", "diet": "Non-Veg", "is_home": True},
             ],
             "all_member_ids": ["m1", "m2"],
-            "availability": {"Monday": ["m1", "m2"]},
+            "availability": {"Monday": {"Breakfast": ["m1","m2"], "Lunch": ["m1","m2"], "Dinner": ["m1","m2"]}},
             "allergen_ids": set(), "satvik_days": set(),
             "satvik_avoided_ids": set(),
             "recent_by_slot": {}, "no_repeat_weeks": 1,
@@ -249,10 +255,10 @@ class TestF02EffectiveDiet:
         assert ctx.get("effective_diet") == "Veg"
 
     def test_diet_order_strictness(self):
-        """Veg is strictest, Non-Veg is least strict."""
-        assert DIET_ORDER.index("Veg") < DIET_ORDER.index("Vegan")
-        assert DIET_ORDER.index("Vegan") < DIET_ORDER.index("Eggitarian")
-        assert DIET_ORDER.index("Eggitarian") < DIET_ORDER.index("Non-Veg")
+        """Veg has highest order value (strictest), Non-Veg has lowest."""
+        assert DIET_ORDER["Veg"] > DIET_ORDER["Non-Veg"]
+        assert DIET_ORDER["Veg"] > DIET_ORDER["Eggitarian"]
+        assert DIET_ORDER["Eggitarian"] > DIET_ORDER["Non-Veg"]
 
 
 # ── F01: filter_by_diet ───────────────────────────────────────────────────────
@@ -326,7 +332,7 @@ class TestSatvik:
             sample_recipes, "Monday", "Lunch", ctx, week_ctx,
             db, "house1", "2025-01-01"
         )
-        assert ctx.get("is_satvik") == True
+        assert ctx.get("is_satvik_day") == True
 
     def test_non_satvik_day_no_restriction(self, sample_recipes, db):
         """On non-Satvik day, Satvik flag should be False."""
@@ -344,7 +350,7 @@ class TestSatvik:
             sample_recipes, "Tuesday", "Lunch", ctx, week_ctx,
             db, "house1", "2025-01-01"
         )
-        assert ctx.get("is_satvik") == False
+        assert ctx.get("is_satvik_day") == False
 
     def test_satvik_filter_removes_non_satvik(self, db):
         """On Satvik day, non-Satvik recipes should be removed."""
