@@ -74,11 +74,12 @@ TABLES = [
     },
     {
         "table":    "recipe_pairing",
-        "conflict": "main_recipe_id, side_recipe_id",
-        "update":   ["confidence", "source", "notes"],
+        "conflict": "",
+        "update":   None,
         "order_by": "main_recipe_id",
         "filter":   "house_id IS NULL AND source = 'seeded'",
-        "do_nothing": True,  # use ON CONFLICT DO NOTHING for partial index
+        "do_nothing": True,
+        "no_conflict": True,  # use plain INSERT, skip on duplicate key error
     },
     {
         "table":    "feature_registry",
@@ -125,9 +126,13 @@ def get_dst_columns(cur, table):
     """, (table,))
     return {r[0] for r in cur.fetchall()}
 
-def build_upsert(table, columns, conflict, update_cols, do_nothing=False, constraint=None):
+def build_upsert(table, columns, conflict, update_cols, do_nothing=False, constraint=None, no_conflict=False):
     col_list    = ", ".join(columns)
     placeholder = ", ".join(["%s"] * len(columns))
+
+    # No conflict clause — plain INSERT, handle duplicates row by row
+    if no_conflict:
+        return f"INSERT INTO {table} ({col_list}) VALUES ({placeholder})"
 
     if constraint:
         conflict_clause = f"ON CONFLICT ON CONSTRAINT {constraint}"
@@ -187,6 +192,7 @@ def migrate_table(src_cur, dst_cur, cfg, batch_size):
         update_cols,
         do_nothing=cfg.get("do_nothing", False),
         constraint=cfg.get("constraint"),
+        no_conflict=cfg.get("no_conflict", False),
     )
 
     inserted = errors = 0
