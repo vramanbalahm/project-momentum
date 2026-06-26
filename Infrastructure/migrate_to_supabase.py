@@ -64,7 +64,7 @@ TABLES = [
         "update":   ["quantity", "unit", "is_optional"],
         "order_by": "recipe_id",
         "filter":   "recipe_id IN (SELECT recipe_id FROM recipe_dna_master WHERE review_status = 'approved')",
-        "constraint": "uq_recipe_ingredient",  # named constraint
+        "constraint": "uq_recipe_ingredient",
     },
     {
         "table":    "dish_pairing_matrix",
