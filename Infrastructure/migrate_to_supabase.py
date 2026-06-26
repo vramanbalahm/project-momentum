@@ -182,7 +182,12 @@ def migrate_table(src_cur, dst_cur, cfg, batch_size):
     print(f"\n  📦 {cfg['table']}")
 
     # Fetch source data
-    rows, columns = fetch_rows(src_cur, cfg)
+    try:
+        rows, columns = fetch_rows(src_cur, cfg)
+    except Exception as e:
+        src_cur.connection.rollback()
+        print(f"     Skipped — table not found: {e}")
+        return 0, 0
     print(f"     Source rows: {len(rows)}")
 
     if not rows:
@@ -274,9 +279,13 @@ def main():
                 print(f"  {cfg['table']:<28} {'(skipped)':>8}")
                 continue
             where = f"WHERE {cfg['filter']}" if cfg.get("filter") else ""
-            src_cur.execute(f"SELECT COUNT(*) FROM {cfg['table']} {where}")
-            count = src_cur.fetchone()[0]
-            print(f"  {cfg['table']:<28} {count:>8}")
+            try:
+                src_cur.execute(f"SELECT COUNT(*) FROM {cfg['table']} {where}")
+                count = src_cur.fetchone()[0]
+                print(f"  {cfg['table']:<28} {count:>8}")
+            except Exception:
+                src_conn.rollback()
+                print(f"  {cfg['table']:<28} {'(not found)':>8}")
         print("\nRun without --preview to migrate.")
         return
 
