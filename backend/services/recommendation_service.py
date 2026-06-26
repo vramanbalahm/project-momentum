@@ -284,6 +284,10 @@ def _log(
         })
     except Exception as e:
         print(f"[audit_log] {e}")
+        try:
+            db.rollback()  # Reset aborted transaction so subsequent queries work
+        except Exception:
+            pass
 
 
 # ── Formula functions (pure in-memory) ───────────────────────────────────────
