@@ -33,12 +33,6 @@ except ImportError:
 
 TABLES = [
     {
-        "table":    "cuisine_regions",
-        "conflict": "id",
-        "update":   ["state", "region", "sub_region", "is_active", "sort_order"],
-        "order_by": "id",
-    },
-    {
         "table":    "ingredient_catalog",
         "conflict": "id",
         "update":   ["name_en", "name_ta", "category", "is_common_allergen"],
