@@ -19,8 +19,7 @@ Tables migrated (in dependency order):
     6.  dish_pairing_matrix
     7.  recipe_pairing
     8.  feature_registry
-    9.  tamil_panchangam
-    10. household_plan_config (defaults only)
+    9.  household_plan_config (defaults only)
 """
 
 import argparse
@@ -117,13 +116,6 @@ TABLES = [
         "conflict": "feature_code",
         "update":   ["feature_name", "function_name", "is_active", "description"],
         "order_by": "feature_code",
-    },
-    # Panchangam
-    {
-        "table":    "tamil_panchangam",
-        "conflict": "observation_date",
-        "update":   ["day_type", "notes"],
-        "order_by": "observation_date",
     },
     # Household plan config — defaults only (no household-specific data)
     {
