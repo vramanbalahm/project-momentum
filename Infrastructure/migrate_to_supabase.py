@@ -77,7 +77,7 @@ TABLES = [
         "conflict": "",
         "update":   None,
         "order_by": "main_recipe_id",
-        "filter":   "house_id IS NULL AND source = 'seeded'",
+        "filter":   "house_id IS NULL AND source IN ('seeded','ai_seeded','matrix_seeded')",
         "do_nothing": True,
         "no_conflict": True,  # use plain INSERT, skip on duplicate key error
     },
