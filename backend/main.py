@@ -986,11 +986,15 @@ def get_sub_regions(db: Session = Depends(get_db)):
 }
 
 VALID_REGIONS = [
-        "Tamil Nadu", "Chettinad", "Kongu Nadu", "Tirunelveli", "Thanjavur",
-        "Madurai", "Salem", "Vellore", "Coastal", "Kumbakonam",
-        "Continental", "Virudhunagar", "Puducherry", "Coimbatore",
-        "Kanchipuram", "Chennai", "Karnataka"
-    ]
+    "Tamil Nadu", "Chettinad", "Kongu Nadu", "Tirunelveli", "Thanjavur",
+    "Madurai", "Salem", "Vellore", "Coastal", "Kumbakonam",
+    "Continental", "Virudhunagar", "Puducherry", "Coimbatore",
+    "Kanchipuram", "Chennai", "Karnataka"
+]
+
+
+@app.get("/recipes/sub-regions")
+def get_sub_regions(db: Session = Depends(get_db)):
     rows = db.execute(text("""
         SELECT DISTINCT sub_region
         FROM recipe_dna_master
