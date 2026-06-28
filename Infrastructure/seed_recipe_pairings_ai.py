@@ -30,7 +30,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--db",       required=True)
 parser.add_argument("--preview",  action="store_true")
 parser.add_argument("--limit",    type=int, default=0, help="Process only N dishes (0=all). Free check before full run.")
-parser.add_argument("--category", default=None, help="tiffin|rice|bread|millet — run for one category only")
+parser.add_argument("--category",  default=None, help="tiffin|rice|bread|millet — run for one category only")
+parser.add_argument("--new-sides", default=None, help="Comma-separated new side dish names — only process mains missing these sides")
 args = parser.parse_args()
 
 MODEL = "claude-haiku-4-5-20251001"  # Haiku — ~20x cheaper than Sonnet, sufficient for pairing
@@ -146,17 +147,40 @@ def main():
     all_reasoning   = []
 
     # Load already processed main dishes
-    cur.execute("""
-        SELECT DISTINCT main_recipe_id FROM recipe_pairing
-        WHERE source = 'seeded'
-    """)
-    already_done = {str(r[0]) for r in cur.fetchall()}
-    print(f"Already processed: {len(already_done)} main dishes - skipping these")
+    if args.new_sides:
+        # --new-sides mode: only skip mains already paired with these specific sides
+        side_names = [s.strip() for s in args.new_sides.split(",")]
+        cur.execute("""
+            SELECT recipe_id FROM recipe_dna_master
+            WHERE dish_name = ANY(%s)
+            AND meal_role @> ARRAY['side']::text[]
+        """, (side_names,))
+        new_side_ids = [str(r[0]) for r in cur.fetchall()]
+        if not new_side_ids:
+            print(f"  WARNING: No sides found matching: {side_names}")
+            already_done = set()
+        else:
+            print(f"  New sides to pair: {side_names}")
+            cur.execute("""
+                SELECT DISTINCT main_recipe_id::text FROM recipe_pairing
+                WHERE house_id IS NULL
+                AND side_recipe_id = ANY(%s)
+            """, (new_side_ids,))
+            already_done = {r[0] for r in cur.fetchall()}
+            print(f"  Mains already paired with these sides: {len(already_done)} - skipping")
+    else:
+        cur.execute("""
+            SELECT DISTINCT main_recipe_id FROM recipe_pairing
+            WHERE source IN ('ai_seeded', 'matrix_seeded', 'seeded')
+        """)
+        already_done = {str(r[0]) for r in cur.fetchall()}
+        print(f"Already processed: {len(already_done)} main dishes - skipping these")
 
     for idx, (main_id, main_name, main_cat) in enumerate(mains):
         # Skip if already processed
         if str(main_id) in already_done:
-            print(f"[{idx+1}/{len(mains)}] SKIP {main_name} (already seeded)")
+            if not args.new_sides:
+                print(f"[{idx+1}/{len(mains)}] SKIP {main_name} (already seeded)")
             continue
 
         print(f"[{idx+1}/{len(mains)}] {main_name} ({main_cat})")
