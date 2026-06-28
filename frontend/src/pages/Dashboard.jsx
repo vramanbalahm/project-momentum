@@ -226,7 +226,18 @@ export default function Dashboard({ onNavigate }) {
                   }}>
                     {/* User info header */}
                     <div style={{ padding: "12px 16px", borderBottom: `0.5px solid ${COLORS.border}`, background: "#F7F4EE" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>{user?.name}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        {user?.name}
+                        {import.meta.env.VITE_ENV && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 10,
+                            background: import.meta.env.VITE_ENV === "LOCAL" ? "#FF6B35" : "#1A3A2E",
+                            color: "#fff", letterSpacing: "0.06em"
+                          }}>
+                            {import.meta.env.VITE_ENV}
+                          </span>
+                        )}
+                      </div>
                       <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{user?.email}</div>
                       <div style={{ fontSize: 10, color: isAdmin ? "#1A3A2E" : COLORS.muted, fontWeight: 600, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>
                         {isAdmin ? "Household Admin" : isReviewer ? "Reviewer" : "Member"}
