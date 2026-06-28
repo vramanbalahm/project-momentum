@@ -592,7 +592,15 @@ def recommend_sides(
         )
         ORDER BY
             CASE WHEN rp.house_id IS NOT NULL THEN 0 ELSE 1 END,
-            rp.confidence DESC
+            CASE WHEN rp.source = 'ai_seeded'      THEN 1
+                 WHEN rp.source = 'user_accepted'   THEN 2
+                 WHEN rp.source = 'matrix_seeded'
+                      AND rp.acceptance_count > 0   THEN 3
+                 WHEN rp.source = 'matrix_seeded'   THEN 4
+                 ELSE 5
+            END,
+            rp.confidence DESC,
+            rp.acceptance_count DESC
     """), {
         "main_id":       str(main_recipe_id),
         "house_id":      str(house_id),
