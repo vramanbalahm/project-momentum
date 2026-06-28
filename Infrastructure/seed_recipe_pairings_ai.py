@@ -164,7 +164,7 @@ def main():
             cur.execute("""
                 SELECT DISTINCT main_recipe_id::text FROM recipe_pairing
                 WHERE house_id IS NULL
-                AND side_recipe_id = ANY(%s)
+                AND side_recipe_id = ANY(%s::uuid[])
             """, (new_side_ids,))
             already_done = {r[0] for r in cur.fetchall()}
             print(f"  Mains already paired with these sides: {len(already_done)} - skipping")
