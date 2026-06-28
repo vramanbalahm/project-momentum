@@ -83,7 +83,15 @@ def get_suggestions(db: Session, pref: str, h_id: str):
     current_pref = str(pref).strip() if pref else "Veg"
     clean_h_id = h_id  # h_id always from authenticated user
 
-    filter_sql = "AND r.diet_type IN ('Veg', 'Vegan')" if current_pref == "Veg" else ""
+    # Diet compatibility — include all compatible diet types
+    _diet_map = {
+        "Vegan":      ("'Vegan'",),
+        "Veg":        ("'Veg'", "'Vegan'"),
+        "Eggitarian": ("'Veg'", "'Vegan'", "'Eggitarian'"),
+        "Non-Veg":    ("'Veg'", "'Vegan'", "'Eggitarian'", "'Non-Veg'"),
+    }
+    _allowed = ", ".join(_diet_map.get(current_pref, ("'Veg'", "'Vegan'")))
+    filter_sql = f"AND r.diet_type IN ({_allowed})"
 
     query = text(f"""
         SELECT 

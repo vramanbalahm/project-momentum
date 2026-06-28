@@ -329,8 +329,9 @@ async def get_recipes_for_review(
         conditions.append("r.reviewed_by = CAST(:filter_reviewer_id AS uuid)")
         params["filter_reviewer_id"] = filter_reviewer_id
     if diet:
-        conditions.append("r.diet_type::text = :diet")
-        params["diet"] = diet
+        allowed_diets = DIET_COMPATIBLE.get(diet, [diet])
+        conditions.append("r.diet_type::text = ANY(:diet)")
+        params["diet"] = allowed_diets
     if meal_slot:
         conditions.append(":meal_slot = ANY(r.meal_slots)")
         params["meal_slot"] = meal_slot
@@ -892,8 +893,9 @@ def search_recipes(
         params["intensity"] = intensity
 
     if diet_type:
-        filters.append("r.diet_type::text = :diet_type")
-        params["diet_type"] = diet_type
+        allowed = DIET_COMPATIBLE.get(diet_type, [diet_type])
+        filters.append("r.diet_type::text = ANY(:diet_types)")
+        params["diet_types"] = allowed
 
     if sub_region and sub_region.lower() != "general":
         filters.append("r.sub_region ILIKE :sub_region")
@@ -976,7 +978,14 @@ def get_sub_regions(db: Session = Depends(get_db)):
     """Returns distinct sub_region values from approved recipes for filter chips."""
     # Only return known valid cuisine sub-regions
     # sub_region data needs cleaning — ingredient names incorrectly stored
-    VALID_REGIONS = [
+    DIET_COMPATIBLE = {
+    "Vegan":      ["Vegan"],
+    "Veg":        ["Veg", "Vegan"],
+    "Eggitarian": ["Veg", "Vegan", "Eggitarian"],
+    "Non-Veg":    ["Veg", "Vegan", "Eggitarian", "Non-Veg"],
+}
+
+VALID_REGIONS = [
         "Tamil Nadu", "Chettinad", "Kongu Nadu", "Tirunelveli", "Thanjavur",
         "Madurai", "Salem", "Vellore", "Coastal", "Kumbakonam",
         "Continental", "Virudhunagar", "Puducherry", "Coimbatore",
