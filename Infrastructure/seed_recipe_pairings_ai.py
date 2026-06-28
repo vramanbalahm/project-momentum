@@ -29,6 +29,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 parser = argparse.ArgumentParser()
 parser.add_argument("--db",       required=True)
 parser.add_argument("--preview",  action="store_true")
+parser.add_argument("--limit",    type=int, default=0, help="Process only N dishes (0=all). Free check before full run.")
 parser.add_argument("--category", default=None, help="tiffin|rice|bread|millet — run for one category only")
 args = parser.parse_args()
 
@@ -151,6 +152,9 @@ def main():
 
         print(f"[{idx+1}/{len(mains)}] {main_name} ({main_cat})")
 
+        if args.limit and idx >= args.limit:
+            print(f"\n  [LIMIT] Stopped after {args.limit} dishes.")
+            break
         if args.preview and idx >= 3:
             print(f"\n  [PREVIEW] Stopping after 3 dishes. Remove --preview to process all.\n")
             break
