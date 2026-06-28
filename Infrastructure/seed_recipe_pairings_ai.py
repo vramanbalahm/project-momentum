@@ -31,7 +31,7 @@ parser.add_argument("--db",       required=True)
 parser.add_argument("--preview",  action="store_true")
 parser.add_argument("--limit",    type=int, default=0, help="Process only N dishes (0=all). Free check before full run.")
 parser.add_argument("--category",  default=None, help="tiffin|rice|bread|millet — run for one category only")
-parser.add_argument("--new-sides", default=None, help="Comma-separated new side dish names — only process mains missing these sides")
+parser.add_argument("--new_sides", default=None, help="Comma-separated new side dish names — only process mains missing these sides")
 args = parser.parse_args()
 
 MODEL = "claude-haiku-4-5-20251001"  # Haiku — ~20x cheaper than Sonnet, sufficient for pairing
