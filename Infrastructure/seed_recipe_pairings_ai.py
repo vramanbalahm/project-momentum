@@ -51,11 +51,20 @@ def call_claude(main_dish, main_category, available_sides, compatible_cats):
     # Limit to 60 sides max to reduce token usage
     relevant_sides = relevant_sides[:60]
     sides_list = ", ".join([s[1] for s in relevant_sides])
-    prompt = f"""Tamil Nadu cuisine expert. Main: {main_dish} ({main_category}).
-Sides available: {sides_list}
-Return JSON only, no explanation:
-{{"matched":[{{"name":"exact name","confidence":0.9,"reason":"brief"}}],"missing":["missing name"],"overall_reasoning":"brief"}}
-Rules: exact names from list, 3-6 matches, confidence 0.6-1.0, missing=important traditional sides not in list."""
+    prompt = f"""You are a Tamil Nadu cuisine expert. Given a main dish, identify which sides from the provided list pair well with it.
+
+Main dish: {main_dish} (category: {main_category})
+Available sides (use EXACT names only): {sides_list}
+
+Return ONLY valid JSON, no explanation, no markdown:
+{{"matched":[{{"name":"exact name from list","confidence":0.9,"reason":"one line"}}],"missing":[],"overall_reasoning":"one line"}}
+
+Rules:
+- Use ONLY exact names from the Available sides list above
+- Select 3-8 best matching sides
+- confidence: 0.85-0.95 for traditional pairings, 0.70-0.84 for acceptable
+- missing: leave empty [] — do not invent names
+- Focus on authentic Tamil Nadu traditional pairings"""
 
     try:
         import anthropic
