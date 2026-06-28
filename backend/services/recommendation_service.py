@@ -577,7 +577,7 @@ def recommend_sides(
         JOIN recipe_dna_master r ON r.recipe_id = rp.side_recipe_id
         LEFT JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
         WHERE rp.main_recipe_id = CAST(:main_id AS uuid)
-        AND rp.source != 'user_rejected'
+        AND rp.source NOT IN ('user_rejected')
         AND (rp.house_id IS NULL OR rp.house_id = CAST(:house_id AS uuid))
         AND r.review_status = 'approved'
         AND r.diet_type::text = ANY(:diets)

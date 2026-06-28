@@ -162,7 +162,7 @@ def main():
                         INSERT INTO recipe_pairing
                             (main_recipe_id, side_recipe_id, confidence, source, house_id)
                         VALUES
-                            (CAST(%s AS uuid), CAST(%s AS uuid), %s, 'seeded', NULL)
+                            (CAST(%s AS uuid), CAST(%s AS uuid), %s, 'matrix_seeded', NULL)
                         ON CONFLICT DO NOTHING
                     """, (str(main_id), str(side_id), confidence))
                     inserted += cur.rowcount
