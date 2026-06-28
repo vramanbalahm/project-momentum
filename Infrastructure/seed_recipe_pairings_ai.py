@@ -32,7 +32,7 @@ parser.add_argument("--preview",  action="store_true")
 parser.add_argument("--category", default=None, help="tiffin|rice|bread|millet — run for one category only")
 args = parser.parse_args()
 
-MODEL = "claude-sonnet-4-6"
+MODEL = "claude-haiku-4-5-20251001"  # Haiku — ~20x cheaper than Sonnet, sufficient for pairing
 
 def get_conn():
     try:
@@ -47,6 +47,8 @@ def call_claude(main_dish, main_category, available_sides, compatible_cats):
 
     # Only send sides from compatible categories — reduces tokens significantly
     relevant_sides = [s for s in available_sides if s[2] in compatible_cats]
+    # Limit to 60 sides max to reduce token usage
+    relevant_sides = relevant_sides[:60]
     sides_list = ", ".join([s[1] for s in relevant_sides])
     prompt = f"""Tamil Nadu cuisine expert. Main: {main_dish} ({main_category}).
 Sides available: {sides_list}
