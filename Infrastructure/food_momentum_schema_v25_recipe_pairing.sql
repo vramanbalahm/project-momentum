@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.recipe_pairing (
     confidence      NUMERIC(4,2)    NOT NULL DEFAULT 0.80
                     CHECK (confidence >= 0.0 AND confidence <= 1.0),
     source          VARCHAR(20)     NOT NULL DEFAULT 'seeded'
-                    CHECK (source IN ('seeded','user_accepted','user_rejected','ml_generated')),
+                    CHECK (source IN ('seeded','ai_seeded','matrix_seeded','user_accepted','user_rejected','ml_generated')),
     house_id        UUID            REFERENCES public.household_master(household_id) ON DELETE CASCADE,
     -- NULL house_id = global seed (applies to all households)
     -- UUID house_id = household-specific learning
