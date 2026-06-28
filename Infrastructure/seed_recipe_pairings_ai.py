@@ -214,11 +214,8 @@ def main():
                         INSERT INTO recipe_pairing
                             (main_recipe_id, side_recipe_id, confidence, source, house_id, notes)
                         VALUES
-                            (CAST(%s AS uuid), CAST(%s AS uuid), %s, 'seeded', NULL, %s)
-                        ON CONFLICT (main_recipe_id, side_recipe_id, house_id) DO UPDATE SET
-                            confidence = GREATEST(recipe_pairing.confidence, EXCLUDED.confidence),
-                            notes = EXCLUDED.notes,
-                            updated_at = NOW()
+                            (CAST(%s AS uuid), CAST(%s AS uuid), %s, 'ai_seeded', NULL, %s)
+                        ON CONFLICT DO NOTHING
                     """, (str(main_id), str(side_id), confidence, reason))
                     total_inserted += cur.rowcount
                 except Exception as e:
