@@ -74,12 +74,13 @@ TABLES = [
     },
     {
         "table":    "recipe_pairing",
-        "conflict": "",
-        "update":   None,
+        "conflict": "main_recipe_id, side_recipe_id",
+        "update":   ["confidence", "source", "notes"],
         "order_by": "main_recipe_id",
         "filter":   "house_id IS NULL AND source IN ('seeded','ai_seeded','matrix_seeded')",
-        "do_nothing": True,
-        "no_conflict": True,  # use plain INSERT, skip on duplicate key error
+        "do_nothing": False,
+        "no_conflict": False,
+        "partial_where": "WHERE house_id IS NULL",  # for partial index
     },
     {
         "table":    "feature_registry",
@@ -187,8 +188,13 @@ def migrate_table(src_cur, dst_cur, cfg, batch_size):
         update_cols = [c for c in update_cols if c in common_cols]
 
     # Build upsert SQL
+    # Build conflict clause — use partial index WHERE clause if specified
+    conflict_str = cfg["conflict"]
+    if cfg.get("partial_where"):
+        conflict_str = f"{cfg['conflict']} {cfg['partial_where']}"
+
     sql = build_upsert(
-        cfg["table"], common_cols, cfg["conflict"],
+        cfg["table"], common_cols, conflict_str,
         update_cols,
         do_nothing=cfg.get("do_nothing", False),
         constraint=cfg.get("constraint"),
