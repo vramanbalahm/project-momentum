@@ -45,6 +45,14 @@ app.mount("/recipe_images", StaticFiles(directory=str(RECIPE_IMAGES_DIR)), name=
 import os
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
 
+# Diet compatibility — which diet types are visible to each household diet level
+DIET_COMPATIBLE = {
+    "Vegan":      ["Vegan"],
+    "Veg":        ["Veg", "Vegan"],
+    "Eggitarian": ["Veg", "Vegan", "Eggitarian"],
+    "Non-Veg":    ["Veg", "Vegan", "Eggitarian", "Non-Veg"],
+}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -972,18 +980,6 @@ def search_recipes(
         for row in rows
     ]
 
-
-@app.get("/recipes/sub-regions")
-def get_sub_regions(db: Session = Depends(get_db)):
-    """Returns distinct sub_region values from approved recipes for filter chips."""
-    # Only return known valid cuisine sub-regions
-    # sub_region data needs cleaning — ingredient names incorrectly stored
-    DIET_COMPATIBLE = {
-    "Vegan":      ["Vegan"],
-    "Veg":        ["Veg", "Vegan"],
-    "Eggitarian": ["Veg", "Vegan", "Eggitarian"],
-    "Non-Veg":    ["Veg", "Vegan", "Eggitarian", "Non-Veg"],
-}
 
 VALID_REGIONS = [
     "Tamil Nadu", "Chettinad", "Kongu Nadu", "Tirunelveli", "Thanjavur",
