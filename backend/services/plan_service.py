@@ -208,9 +208,6 @@ def execute_audit(db: Session, h_id: str, changes: list):
     """)).fetchall()
     satvik_dates = {r[0] for r in satvik_rows}
 
-    # Lunch intensity tracker for dinner check
-    lunch_intensity = {}
-
     # ── Audit each slot ───────────────────────────────────────────────────────
     for change in changes:
         issues  = []
@@ -266,16 +263,7 @@ def execute_audit(db: Session, h_id: str, changes: list):
         if meal in recent_meals:
             issues.append("You had this recently — maybe try something different this week?")
 
-        # 6. HEAVY LUNCH → LIGHT DINNER
-        if slot == "Dinner" and lunch_intensity.get(day) in ("Heavy", "Medium"):
-            if recipe and recipe.get("intensity") not in ("Light",):
-                issues.append("You had a hearty lunch today — a lighter dinner would feel better tonight.")
-
-        # Track lunch intensity for dinner check
-        if slot == "Lunch" and recipe:
-            lunch_intensity[day] = recipe.get("intensity", "Medium")
-
-        # 7. PANTRY CHECK — primary ingredients
+        # 6. PANTRY CHECK — primary ingredients
         if recipe_id and pantry_ids:
             primary_rows = db.execute(text("""
                 SELECT COUNT(*) FROM recipe_ingredients ri

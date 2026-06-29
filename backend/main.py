@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()  # Load backend/.env on startup
 
 # FT-033: Updated imports — plan_service now lives in services/
+from services.audit_service import execute_audit
 from services.plan_service import (
     fetch_active_plan,
     get_suggestions,
