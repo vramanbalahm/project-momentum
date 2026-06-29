@@ -28,10 +28,8 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
     return getDishImage(dish) || null;
   };
 
-  const auditColor = auditResult?.status === "Success" ? "#1D9E75"
-    : auditResult?.status === "Warning" ? "#EF9F27"
-    : auditResult?.status === "Conflict" ? "#E24B4A"
-    : "#B4B2A9";
+  const hasIssues = auditResult?.issues?.length > 0;
+  const [showAuditPanel, setShowAuditPanel] = React.useState(false);
 
   return (
     <div
@@ -69,21 +67,30 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
             >Edit</div>
           )}
 
-          {/* Audit pill */}
+          {/* Audit indicator */}
           {auditResult && (
-            <div style={{
-              position: "absolute", top: 8, right: 8, zIndex: 10,
-              display: "flex", alignItems: "center", gap: 4,
-              background: "rgba(255,255,255,0.92)", borderRadius: 20, padding: "3px 8px"
-            }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: auditColor, flexShrink: 0 }} />
-              <span style={{ fontSize: 9, color: "#444441", fontWeight: 500 }}>
-                {auditResult.status === "Success" ? "Ready"
-                  : auditResult.status === "Warning" ? "Check"
-                  : auditResult.status === "Conflict" ? "Conflict"
-                  : "Pending"}
-              </span>
-            </div>
+            hasIssues ? (
+              <div
+                onClick={e => { e.stopPropagation(); setShowAuditPanel(v => !v); }}
+                style={{
+                  position: "absolute", top: 8, right: 8, zIndex: 10,
+                  display: "flex", alignItems: "center", gap: 4,
+                  background: "rgba(255,255,255,0.92)", borderRadius: 20,
+                  padding: "3px 8px", cursor: "pointer"
+                }}>
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#EF9F27", flexShrink: 0 }} />
+                <span style={{ fontSize: 9, color: "#444441", fontWeight: 500 }}>
+                  {auditResult.issues.length} {auditResult.issues.length === 1 ? "issue" : "issues"}
+                </span>
+              </div>
+            ) : (
+              <div style={{
+                position: "absolute", top: 8, right: 8, zIndex: 10,
+                background: "rgba(255,255,255,0.92)", borderRadius: 20, padding: "3px 8px"
+              }}>
+                <span style={{ fontSize: 9, color: "#888780" }}>ok</span>
+              </div>
+            )
           )}
 
           {mains.length === 0 ? (
@@ -161,5 +168,28 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
 
       </div>
     </div>
+
+    {/* Audit issues panel */}
+    {showAuditPanel && hasIssues && (
+      <div style={{
+        margin: "0 0 8px", background: "#FDFCF8",
+        borderRadius: "0 0 16px 16px",
+        border: "0.5px solid #EDE8E0", borderTop: "none",
+        overflow: "hidden"
+      }}>
+        <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+          {auditResult.issues.map((issue, i) => (
+            <div key={i} style={{
+              display: "flex", gap: 10, alignItems: "flex-start",
+              padding: "8px 10px", background: "#FFF9E6",
+              borderRadius: 8, borderLeft: "3px solid #EF9F27"
+            }}>
+              <span style={{ fontSize: 14, flexShrink: 0 }}>⚠️</span>
+              <div style={{ fontSize: 12, color: "#2C2C2A", lineHeight: 1.5 }}>{issue}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
   );
 }

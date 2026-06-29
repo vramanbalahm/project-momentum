@@ -136,31 +136,172 @@ def get_suggestions(db: Session, pref: str, h_id: str):
 
 # --- 3. AUDIT LOGIC (Highlights) ---
 def execute_audit(db: Session, h_id: str, changes: list):
+    """
+    Audit engine — checks each meal slot for issues.
+    Returns friendly plain-language warnings — no technical rule names exposed.
+    Checks: diet compatibility, allergens, satvik day, repeat (week + history), pantry.
+    """
+    from sqlalchemy import text
     result_map = []
-    seen_meals = {}
+    seen_meals  = {}  # within-week repeat tracking
 
+    # ── Load household context ────────────────────────────────────────────────
+    # Effective diet
+    diet_row = db.execute(text("""
+        SELECT MIN(CASE dietary_preference::text
+            WHEN 'Vegan'      THEN 1
+            WHEN 'Veg'        THEN 2
+            WHEN 'Eggitarian' THEN 3
+            WHEN 'Non-Veg'    THEN 4
+            ELSE 2 END) as diet_rank
+        FROM member_preferences mp
+        JOIN users u ON u.user_id = mp.user_id
+        WHERE u.house_id = CAST(:h_id AS uuid)
+    """), {"h_id": h_id}).fetchone()
+    diet_rank = diet_row[0] if diet_row and diet_row[0] else 2
+    DIET_BY_RANK = {1: "Vegan", 2: "Veg", 3: "Eggitarian", 4: "Non-Veg"}
+    DIET_COMPATIBLE = {
+        "Vegan":      ["Vegan"],
+        "Veg":        ["Veg", "Vegan"],
+        "Eggitarian": ["Veg", "Vegan", "Eggitarian"],
+        "Non-Veg":    ["Veg", "Vegan", "Eggitarian", "Non-Veg"],
+    }
+    effective_diet = DIET_BY_RANK.get(diet_rank, "Veg")
+    allowed_diets  = DIET_COMPATIBLE.get(effective_diet, ["Veg"])
+
+    # Allergen ingredient IDs for household
+    allergen_rows = db.execute(text("""
+        SELECT DISTINCT hr.ingredient_id
+        FROM household_restrictions hr
+        WHERE hr.house_id = CAST(:h_id AS uuid)
+        AND hr.restriction_type = 'allergen'
+    """), {"h_id": h_id}).fetchall()
+    allergen_ids = {r[0] for r in allergen_rows}
+
+    # Pantry ingredient IDs
+    pantry_rows = db.execute(text("""
+        SELECT DISTINCT ingredient_id
+        FROM household_pantry
+        WHERE house_id = CAST(:h_id AS uuid)
+        AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
+    """), {"h_id": h_id}).fetchall()
+    pantry_ids = {r[0] for r in pantry_rows}
+
+    # Past meal history (last 2 weeks) for repeat check
+    history_rows = db.execute(text("""
+        SELECT DISTINCT r.dish_name
+        FROM meal_event_detail med
+        JOIN meal_event_header meh ON meh.event_id = med.event_id
+        JOIN recipe_dna_master r ON r.recipe_id = med.recipe_id
+        WHERE meh.house_id = CAST(:h_id AS uuid)
+        AND meh.event_date >= CURRENT_DATE - INTERVAL '14 days'
+        AND meh.event_date < CURRENT_DATE
+    """), {"h_id": h_id}).fetchall()
+    recent_meals = {r[0] for r in history_rows}
+
+    # Satvik dates this week
+    satvik_rows = db.execute(text("""
+        SELECT observation_date::text
+        FROM panchangam_types
+        WHERE observation_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
+        AND is_satvik = TRUE
+    """)).fetchall()
+    satvik_dates = {r[0] for r in satvik_rows}
+
+    # Lunch intensity tracker for dinner check
+    lunch_intensity = {}
+
+    # ── Audit each slot ───────────────────────────────────────────────────────
     for change in changes:
-        status = "Success"
-        message = "Ready"
-        score = 90
+        issues  = []
+        day     = change.day
+        slot    = change.type
+        meal    = change.to_meal
+        date    = change.date if hasattr(change, "date") else None
+        recipe_id = change.recipe_id if hasattr(change, "recipe_id") else None
 
-        if change.to_meal in seen_meals and change.to_meal != "Skipped":
-            status = "Conflict"
-            message = f"Divergence: {change.to_meal} is repeated. High fatigue risk!"
-            score = 40
-        elif "Paneer" in (change.to_meal or ""):
-            status = "Warning"
-            message = "Single Challenge: Heavy protein load for this slot."
-            score = 65
+        if not meal or meal == "Skipped":
+            result_map.append({"day": day, "type": slot, "status": "ok", "issues": []})
+            continue
 
-        seen_meals[change.to_meal] = True
+        # Load recipe details
+        recipe = None
+        if recipe_id:
+            row = db.execute(text("""
+                SELECT r.dish_name, r.diet_type::text, r.is_sattvic,
+                       r.intensity_level, r.meal_slots
+                FROM recipe_dna_master r
+                WHERE r.recipe_id = CAST(:rid AS uuid)
+            """), {"rid": recipe_id}).fetchone()
+            if row:
+                recipe = {"name": row[0], "diet": row[1], "sattvic": row[2],
+                          "intensity": row[3], "slots": list(row[4]) if row[4] else []}
 
+        # 1. DIET CHECK
+        if recipe and recipe["diet"] not in allowed_diets:
+            issues.append("This dish may not suit everyone at the table today.")
+
+        # 2. ALLERGEN CHECK
+        if recipe_id and allergen_ids:
+            allergen_hit = db.execute(text("""
+                SELECT COUNT(*) FROM recipe_ingredients
+                WHERE recipe_id = CAST(:rid AS uuid)
+                AND ingredient_id = ANY(:aids)
+                AND is_optional = FALSE
+            """), {"rid": recipe_id, "aids": list(allergen_ids)}).scalar()
+            if allergen_hit:
+                issues.append("One of the ingredients in this dish may cause a reaction for someone in the family.")
+
+        # 3. SATVIK CHECK
+        if date and str(date) in satvik_dates:
+            if recipe and not recipe.get("sattvic"):
+                issues.append("Today is a fasting day — this dish might not be the best fit.")
+
+        # 4. REPEAT THIS WEEK
+        if meal in seen_meals:
+            issues.append("This dish is already in your plan this week — a little variety would be nice!")
+        seen_meals[meal] = True
+
+        # 5. REPEAT PAST 2 WEEKS
+        if meal in recent_meals:
+            issues.append("You had this recently — maybe try something different this week?")
+
+        # 6. HEAVY LUNCH → LIGHT DINNER
+        if slot == "Dinner" and lunch_intensity.get(day) in ("Heavy", "Medium"):
+            if recipe and recipe.get("intensity") not in ("Light",):
+                issues.append("You had a hearty lunch today — a lighter dinner would feel better tonight.")
+
+        # Track lunch intensity for dinner check
+        if slot == "Lunch" and recipe:
+            lunch_intensity[day] = recipe.get("intensity", "Medium")
+
+        # 7. PANTRY CHECK — primary ingredients
+        if recipe_id and pantry_ids:
+            primary_rows = db.execute(text("""
+                SELECT COUNT(*) FROM recipe_ingredients ri
+                WHERE ri.recipe_id = CAST(:rid AS uuid)
+                AND ri.is_optional = FALSE
+            """), {"rid": recipe_id}).scalar()
+            if primary_rows and primary_rows > 0:
+                in_pantry = db.execute(text("""
+                    SELECT COUNT(*) FROM recipe_ingredients ri
+                    WHERE ri.recipe_id = CAST(:rid AS uuid)
+                    AND ri.is_optional = FALSE
+                    AND ri.ingredient_id = ANY(:pids)
+                """), {"rid": recipe_id, "pids": list(pantry_ids)}).scalar()
+                missing = primary_rows - (in_pantry or 0)
+                if missing > 0:
+                    issues.append("You may need to pick up some ingredients before cooking this.")
+
+        status = "ok" if not issues else "warning"
         result_map.append({
-            "day": change.day,
-            "type": change.type,
+            "day":    day,
+            "type":   slot,
             "status": status,
-            "message": message,
-            "score": score
+            "issues": issues,
+            # Keep backward compat
+            "message": issues[0] if issues else "Ready",
+            "score":   90 if not issues else 65,
         })
 
     return result_map

@@ -370,7 +370,14 @@ export default function App({ onBack }) {
   const runAudit = async () => {
     const payload = Object.entries(blueprint).map(([key, val]) => {
       const [day, type] = key.split('-');
-      return { day, type, to_meal: val?.main?.name || "Skipped", date: getTargetDate(day) };
+      const mains = val?.mains || (val?.main ? [val.main] : []);
+      const recipe_id = mains[0]?.recipe_id || null;
+      return {
+        day, type,
+        to_meal:   mains[0]?.name || "Skipped",
+        date:      getTargetDate(day),
+        recipe_id: recipe_id,
+      };
     });
     try {
       const res = await axios.post(`${API_BASE}/audit`, payload);
@@ -379,7 +386,6 @@ export default function App({ onBack }) {
       setAuditResults(resultMap);
       setIsAudited(true);
       setIsDirty(false);
-      // If in week view, switch to day view at Monday so user sees audit results
       if (viewMode === 'week') {
         setViewMode('day');
         setSelectedDay('Monday');
