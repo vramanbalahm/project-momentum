@@ -32,6 +32,7 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
   const [showAuditPanel, setShowAuditPanel] = React.useState(false);
 
   return (
+    <>
     <div
       ref={setDroppableRef}
       style={{
@@ -191,5 +192,6 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
         </div>
       </div>
     )}
+    </>
   );
 }
