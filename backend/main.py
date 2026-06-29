@@ -19,7 +19,6 @@ from services.plan_service import (
     get_dietary_pref,
     get_session_constants
 )
-from services.audit_service import check_pantry_availability, check_momentum_divergence
 from database import SessionLocal, engine
 from schemas import AuditItem, SavePlanRequest
 
