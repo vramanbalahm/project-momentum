@@ -23,6 +23,13 @@ async function loginAsAdmin(page) {
 async function goToWeeklyPlan(page) {
   await page.locator('[data-testid="tile-weekly_plan"]').click();
   await page.waitForTimeout(2000);
+
+  // If Member Availability overlay opened (first-time current-week setup), save and continue
+  const saveAvailBtn = page.locator('button', { hasText: 'Save Availability' });
+  if (await saveAvailBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await saveAvailBtn.click();
+    await page.waitForTimeout(2000);
+  }
 }
 
 async function generatePlanIfNeeded(page) {
