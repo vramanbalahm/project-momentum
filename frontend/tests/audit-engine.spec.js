@@ -65,12 +65,26 @@ async function clickReviewPlan(page) {
     await page.screenshot({ path: 'debug-no-review-btn.png', fullPage: true });
     throw new Error('Could not find Review/Save plan button — see debug-no-review-btn.png');
   }
-  const text = await reviewBtn.first().textContent();
-  if (text && text.toLowerCase().includes('review')) {
+  const text = (await reviewBtn.first().textContent() || '').toLowerCase();
+
+  if (text.includes('review')) {
+    // "Review plan" — not yet audited, click runs the audit
     await reviewBtn.first().click();
-    await page.waitForTimeout(2500); // audit API call
-  } else if (text && (text.toLowerCase().includes('saved'))) {
-    // Plan already saved from a prior run — tap to re-trigger audit so indicators are fresh
+    await page.waitForTimeout(2500);
+  } else if (text === 'save plan' || text.includes('save plan')) {
+    // isAudited=true but auditResults state was lost on a fresh page load
+    // (leftover from a prior test's unsaved audit). Reload to reset to a
+    // clean "Review plan" state, then click that to get fresh, visible indicators.
+    await page.reload();
+    await page.waitForTimeout(2000);
+    const freshReviewBtn = page.locator('button', { hasText: /Review plan/i });
+    const hasReview = await freshReviewBtn.first().isVisible({ timeout: 8000 }).catch(() => false);
+    if (hasReview) {
+      await freshReviewBtn.first().click();
+      await page.waitForTimeout(2500);
+    }
+  } else if (text.includes('saved')) {
+    // Fully saved plan — tap re-triggers audit (onClick=runAudit per app logic)
     await reviewBtn.first().click();
     await page.waitForTimeout(2500);
   }
