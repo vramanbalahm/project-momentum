@@ -37,10 +37,21 @@ async function generatePlanIfNeeded(page) {
   const isVisible = await generateBtn.first().isVisible({ timeout: 5000 }).catch(() => false);
   if (isVisible) {
     await generateBtn.first().click();
+    await page.waitForTimeout(500);
+
+    // "This week's preferences" questionnaire modal may appear — submit it to proceed
+    const prefsModalGenerateBtn = page.locator('button', { hasText: /^.{0,3}Generate plan/i }).last();
+    const modalVisible = await page.locator('text=/preferences/i').first().isVisible({ timeout: 3000 }).catch(() => false);
+    if (modalVisible) {
+      const modalBtn = page.locator('button', { hasText: /Generate plan/i }).last();
+      await modalBtn.click();
+      await page.waitForTimeout(500);
+    }
+
     // First-time generation computes 21 slots — can take a while
     await Promise.race([
-      page.locator('button', { hasText: /Review plan/i }).first().waitFor({ state: 'visible', timeout: 30000 }),
-      page.waitForTimeout(30000),
+      page.locator('button', { hasText: /Review plan/i }).first().waitFor({ state: 'visible', timeout: 40000 }),
+      page.waitForTimeout(40000),
     ]);
     await page.waitForTimeout(1000);
   }

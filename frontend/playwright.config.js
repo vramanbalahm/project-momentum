@@ -7,7 +7,7 @@ config({ path: '.env.test' });
 
 export default defineConfig({
   testDir: './tests',
-  timeout: 60000,          // 60s per test — first-time plan generation can be slow
+  timeout: 90000,          // 90s per test — accounts for questionnaire modal + 21-slot generation
   retries: 0,              // no retries — we want to see real failures
   workers: 1,              // run tests sequentially — avoids race conditions on shared UI state
 
