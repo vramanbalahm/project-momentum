@@ -85,23 +85,16 @@ async function clickReviewPlan(page) {
 
 test.describe('Audit Engine — Review Plan', () => {
 
-  test('clean meal shows "ok" with no icon (if any clean meals exist)', async ({ page }) => {
+  test('audit indicators render after review (ok or issue pill present)', async ({ page }) => {
     await loginAsAdmin(page);
     await goToWeeklyPlan(page);
     await generatePlanIfNeeded(page);
     await clickReviewPlan(page);
 
-    // Retry once more on cold start — first test in suite occasionally needs extra settle time
-    let hasOk     = await page.locator('text=ok').first().isVisible({ timeout: 8000 }).catch(() => false);
-    let hasIssues = await page.locator('text=/\d+ issues?/').first().isVisible({ timeout: 8000 }).catch(() => false);
-
-    if (!hasOk && !hasIssues) {
-      await page.reload();
-      await page.waitForTimeout(3000);
-      await clickReviewPlan(page);
-      hasOk     = await page.locator('text=ok').first().isVisible({ timeout: 8000 }).catch(() => false);
-      hasIssues = await page.locator('text=/\d+ issues?/').first().isVisible({ timeout: 8000 }).catch(() => false);
-    }
+    // A real plan may have every meal flagged with issues (no clean "ok" meals) —
+    // that is valid audit behavior, not a bug. We only confirm SOME indicator rendered.
+    const hasOk     = await page.locator('text=ok').first().isVisible({ timeout: 10000 }).catch(() => false);
+    const hasIssues = await page.locator('text=/\d+ issues?/').first().isVisible({ timeout: 10000 }).catch(() => false);
 
     expect(hasOk || hasIssues).toBeTruthy();
   });
