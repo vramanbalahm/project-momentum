@@ -86,6 +86,7 @@ async function clickReviewPlan(page) {
 test.describe('Audit Engine — Review Plan', () => {
 
   test('audit indicators render after review (ok or issue pill present)', async ({ page }) => {
+    test.setTimeout(60000); // first test in suite — cold browser/session, needs extra headroom
     await loginAsAdmin(page);
     await goToWeeklyPlan(page);
     await generatePlanIfNeeded(page);
@@ -93,8 +94,9 @@ test.describe('Audit Engine — Review Plan', () => {
 
     // A real plan may have every meal flagged with issues (no clean "ok" meals) —
     // that is valid audit behavior, not a bug. We only confirm SOME indicator rendered.
-    const hasOk     = await page.locator('text=ok').first().isVisible({ timeout: 10000 }).catch(() => false);
-    const hasIssues = await page.locator('text=/\d+ issues?/').first().isVisible({ timeout: 10000 }).catch(() => false);
+    // Extra-generous timeout here since this is the cold-start first test of the suite.
+    const hasOk     = await page.locator('text=ok').first().isVisible({ timeout: 20000 }).catch(() => false);
+    const hasIssues = await page.locator('text=/\d+ issues?/').first().isVisible({ timeout: 20000 }).catch(() => false);
 
     expect(hasOk || hasIssues).toBeTruthy();
   });
