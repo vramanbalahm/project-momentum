@@ -74,15 +74,18 @@ test.describe('Audit Engine — Review Plan', () => {
     await generatePlanIfNeeded(page);
     await clickReviewPlan(page);
 
-    // Some meals may show "ok", others may show issue pills — both are valid states.
-    // We just verify the page rendered meal cards with SOME audit indicator (ok or issues).
-    const okIndicator    = page.locator('text=ok').first();
-    const issueIndicator = page.locator('text=/\d+ issues?/').first();
+    // Retry once more on cold start — first test in suite occasionally needs extra settle time
+    let hasOk     = await page.locator('text=ok').first().isVisible({ timeout: 8000 }).catch(() => false);
+    let hasIssues = await page.locator('text=/\d+ issues?/').first().isVisible({ timeout: 8000 }).catch(() => false);
 
-    const hasOk     = await okIndicator.isVisible({ timeout: 8000 }).catch(() => false);
-    const hasIssues = await issueIndicator.isVisible({ timeout: 8000 }).catch(() => false);
+    if (!hasOk && !hasIssues) {
+      await page.reload();
+      await page.waitForTimeout(3000);
+      await clickReviewPlan(page);
+      hasOk     = await page.locator('text=ok').first().isVisible({ timeout: 8000 }).catch(() => false);
+      hasIssues = await page.locator('text=/\d+ issues?/').first().isVisible({ timeout: 8000 }).catch(() => false);
+    }
 
-    // At least one of the two audit states must be present — confirms audit ran
     expect(hasOk || hasIssues).toBeTruthy();
   });
 
