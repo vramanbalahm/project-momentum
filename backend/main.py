@@ -14,7 +14,6 @@ from services.audit_service import execute_audit
 from services.plan_service import (
     fetch_active_plan,
     get_suggestions,
-    execute_audit,
     persist_plan,
     get_dietary_pref,
     get_session_constants
