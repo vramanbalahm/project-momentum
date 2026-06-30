@@ -66,17 +66,18 @@ def load_household_context(db: Session, h_id: str) -> Dict:
     """), {"h_id": h_id}).fetchall()
     pantry_ids = {r[0] for r in pantry_rows}
 
-    # Past 2 weeks meal history
+    # Past 2 weeks meal history — map dish_name to most recent date served
     history_rows = db.execute(text("""
-        SELECT DISTINCT r.dish_name
+        SELECT r.dish_name, MAX(meh.event_date) as last_served
         FROM meal_event_detail med
         JOIN meal_event_header meh ON meh.event_id = med.event_id
         JOIN recipe_dna_master r   ON r.recipe_id  = med.recipe_id
         WHERE meh.house_id  = CAST(:h_id AS uuid)
         AND meh.event_date >= CURRENT_DATE - INTERVAL '14 days'
         AND meh.event_date  < CURRENT_DATE
+        GROUP BY r.dish_name
     """), {"h_id": h_id}).fetchall()
-    recent_meals = {r[0] for r in history_rows}
+    recent_meals = {r[0]: r[1] for r in history_rows}  # dish_name -> last served date
 
     # Satvik dates this week — household-specific lunar events
     satvik_rows = db.execute(text("""
@@ -155,31 +156,53 @@ def audit_repeat_week(meal_name: str, seen_this_week: set) -> str | None:
 
 
 def audit_repeat_past(meal_name: str, ctx: Dict) -> str | None:
-    """AU-D05: Check repeat from past 2 weeks."""
-    if meal_name and meal_name in ctx["recent_meals"]:
-        return "You had this recently — maybe try something different this week?"
-    return None
+    """AU-D05: Check repeat from past 2 weeks. Mentions when it was last served."""
+    if not meal_name:
+        return None
+    last_date = ctx["recent_meals"].get(meal_name)
+    if not last_date:
+        return None
+
+    from datetime import date as date_cls
+    days_ago = (date_cls.today() - last_date).days
+
+    if days_ago <= 0:
+        when = "today"
+    elif days_ago == 1:
+        when = "yesterday"
+    elif days_ago < 7:
+        when = f"{days_ago} days ago"
+    elif days_ago < 14:
+        when = "last week"
+    else:
+        when = last_date.strftime("on %b %d")
+
+    return f"You had this {when} — maybe try something different this time?"
 
 
 def audit_pantry(db: Session, recipe_id: str, ctx: Dict) -> str | None:
-    """AU-D06: Check if primary ingredients are in pantry."""
+    """AU-D06: Check if primary ingredients are in pantry. Names the missing items."""
     if not recipe_id or not ctx["pantry_ids"]:
         return None
-    total = db.execute(text("""
-        SELECT COUNT(*) FROM recipe_ingredients
-        WHERE recipe_id = CAST(:rid AS uuid) AND is_optional = FALSE
-    """), {"rid": recipe_id}).scalar() or 0
-    if total == 0:
+    rows = db.execute(text("""
+        SELECT ic.id, ic.name_en
+        FROM recipe_ingredients ri
+        JOIN ingredient_catalog ic ON ic.id = ri.ingredient_id
+        WHERE ri.recipe_id = CAST(:rid AS uuid)
+        AND ri.is_optional = FALSE
+    """), {"rid": recipe_id}).fetchall()
+    if not rows:
         return None
-    in_pantry = db.execute(text("""
-        SELECT COUNT(*) FROM recipe_ingredients
-        WHERE recipe_id     = CAST(:rid AS uuid)
-        AND is_optional     = FALSE
-        AND ingredient_id   = ANY(:pids)
-    """), {"rid": recipe_id, "pids": list(ctx["pantry_ids"])}).scalar() or 0
-    if (total - in_pantry) > 0:
-        return "You may need to pick up some ingredients before cooking this."
-    return None
+    missing_names = [r[1] for r in rows if r[0] not in ctx["pantry_ids"]]
+    if not missing_names:
+        return None
+    if len(missing_names) == 1:
+        items = missing_names[0]
+    elif len(missing_names) == 2:
+        items = f"{missing_names[0]} and {missing_names[1]}"
+    else:
+        items = f"{', '.join(missing_names[:-1])}, and {missing_names[-1]}"
+    return f"You'll need {items} for this — might be worth picking up before you cook."
 
 
 # ── Main audit runner ─────────────────────────────────────────────────────────
