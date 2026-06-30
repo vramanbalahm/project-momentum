@@ -54,15 +54,15 @@ def load_household_context(db: Session, h_id: str) -> Dict:
     allergen_rows = db.execute(text("""
         SELECT DISTINCT ingredient_id FROM household_restrictions
         WHERE house_id = CAST(:h_id AS uuid)
-        AND restriction_type = 'allergen'
+        AND restriction_type = 'Allergy'
     """), {"h_id": h_id}).fetchall()
     allergen_ids = {r[0] for r in allergen_rows}
 
-    # Pantry ingredient IDs
+    # Pantry ingredient IDs — only those marked available
     pantry_rows = db.execute(text("""
         SELECT DISTINCT ingredient_id FROM household_pantry
         WHERE house_id = CAST(:h_id AS uuid)
-        AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
+        AND is_available = TRUE
     """), {"h_id": h_id}).fetchall()
     pantry_ids = {r[0] for r in pantry_rows}
 
@@ -78,12 +78,14 @@ def load_household_context(db: Session, h_id: str) -> Dict:
     """), {"h_id": h_id}).fetchall()
     recent_meals = {r[0] for r in history_rows}
 
-    # Satvik dates this week
+    # Satvik dates this week — household-specific lunar events
     satvik_rows = db.execute(text("""
-        SELECT observation_date::text FROM panchangam_types
-        WHERE observation_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
-        AND is_satvik = TRUE
-    """)).fetchall()
+        SELECT DISTINCT event_date::text FROM event_master
+        WHERE house_id = CAST(:h_id AS uuid)
+        AND is_active = TRUE
+        AND is_sattvic_required = TRUE
+        AND event_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
+    """), {"h_id": h_id}).fetchall()
     satvik_dates = {r[0] for r in satvik_rows}
 
     return {
