@@ -21,8 +21,8 @@ async function loginAsAdmin(page) {
 }
 
 async function goToWeeklyPlan(page) {
-  await page.locator('text=Weekly Plan').click();
-  await page.waitForSelector('text=Generate', { timeout: 15000 }).catch(() => {});
+  await page.locator('[data-testid="tile-weekly_plan"]').click();
+  await page.waitForTimeout(2000);
 }
 
 async function generatePlanIfNeeded(page) {
