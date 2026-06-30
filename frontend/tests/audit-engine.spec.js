@@ -34,10 +34,20 @@ async function generatePlanIfNeeded(page) {
 }
 
 async function clickReviewPlan(page) {
-  const reviewBtn = page.locator('button', { hasText: 'Review' });
-  await reviewBtn.waitFor({ state: 'visible', timeout: 10000 });
-  await reviewBtn.click();
-  await page.waitForTimeout(2000); // audit API call
+  // CTA button cycles between "Generate plan" / "Review plan" / "Save plan" / "Saved"
+  // Wait for any CTA button matching Review or Save (plan already exists) then click
+  const reviewBtn = page.locator('button', { hasText: /Review plan|Save plan|Saved/i });
+  const found = await reviewBtn.first().isVisible({ timeout: 15000 }).catch(() => false);
+  if (!found) {
+    await page.screenshot({ path: 'debug-no-review-btn.png', fullPage: true });
+    throw new Error('Could not find Review/Save plan button — see debug-no-review-btn.png');
+  }
+  const text = await reviewBtn.first().textContent();
+  if (text && text.toLowerCase().includes('review')) {
+    await reviewBtn.first().click();
+    await page.waitForTimeout(2000); // audit API call
+  }
+  // If already "Save plan" or "Saved", audit already ran — no click needed
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
