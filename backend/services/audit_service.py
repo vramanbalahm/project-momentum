@@ -180,40 +180,60 @@ def audit_repeat_past(meal_name: str, ctx: Dict) -> str | None:
     return f"You had this {when} — maybe try something different this time?"
 
 
-def audit_pantry(db: Session, recipe_id: str, ctx: Dict) -> str | None:
-    """AU-D06: Check if primary ingredients are in pantry. Names the missing items."""
-    if not recipe_id or not ctx["pantry_ids"]:
+# Common pantry staples virtually every household already has —
+# excluded from "missing ingredient" warnings regardless of is_optional flag,
+# since recipe data currently has data-quality issues marking everything as mandatory.
+ALWAYS_AVAILABLE_INGREDIENTS = {
+    "Salt", "Water", "Oil", "Ghee", "Sugar", "Cooking Oil",
+    "Turmeric Powder", "Turmeric", "Mustard Seeds", "Curry Leaves",
+}
+
+
+def audit_pantry(db: Session, recipe_ids: List[str], ctx: Dict) -> str | None:
+    """
+    AU-D06: Check if primary ingredients are in pantry — across the main dish
+    AND its side dishes (sides matter just as much for shopping prep).
+    Names the missing items. Common staples (salt, water, oil etc.) are excluded.
+    """
+    recipe_ids = [r for r in (recipe_ids or []) if r]
+    if not recipe_ids or not ctx["pantry_ids"]:
         return None
+
     rows = db.execute(text("""
-        SELECT ic.id, ic.name_en
+        SELECT DISTINCT ic.id, ic.name_en
         FROM recipe_ingredients ri
         JOIN ingredient_catalog ic ON ic.id = ri.ingredient_id
-        WHERE ri.recipe_id = CAST(:rid AS uuid)
+        WHERE ri.recipe_id = ANY(CAST(:rids AS uuid[]))
         AND ri.is_optional = FALSE
-    """), {"rid": recipe_id}).fetchall()
+    """), {"rids": recipe_ids}).fetchall()
     if not rows:
         return None
-    missing_names = [r[1] for r in rows if r[0] not in ctx["pantry_ids"]]
+
+    missing_names = [
+        r[1] for r in rows
+        if r[0] not in ctx["pantry_ids"] and r[1] not in ALWAYS_AVAILABLE_INGREDIENTS
+    ]
     if not missing_names:
         return None
+
     if len(missing_names) == 1:
         items = missing_names[0]
     elif len(missing_names) == 2:
         items = f"{missing_names[0]} and {missing_names[1]}"
     else:
         items = f"{', '.join(missing_names[:-1])}, and {missing_names[-1]}"
-    return f"You'll need {items} for this — might be worth picking up before you cook."
+    return f"You'll need {items} for this meal — might be worth picking up before you cook."
 
 
 # ── Main audit runner ─────────────────────────────────────────────────────────
 
 AUDIT_FUNCTIONS = {
-    "AU-D01": lambda db, recipe, recipe_id, meal, date, ctx, seen: audit_diet(recipe, ctx),
-    "AU-D02": lambda db, recipe, recipe_id, meal, date, ctx, seen: audit_allergens(db, recipe_id, ctx),
-    "AU-D03": lambda db, recipe, recipe_id, meal, date, ctx, seen: audit_satvik(recipe, date, ctx),
-    "AU-D04": lambda db, recipe, recipe_id, meal, date, ctx, seen: audit_repeat_week(meal, seen),
-    "AU-D05": lambda db, recipe, recipe_id, meal, date, ctx, seen: audit_repeat_past(meal, ctx),
-    "AU-D06": lambda db, recipe, recipe_id, meal, date, ctx, seen: audit_pantry(db, recipe_id, ctx),
+    "AU-D01": lambda db, recipe, recipe_id, side_ids, meal, date, ctx, seen: audit_diet(recipe, ctx),
+    "AU-D02": lambda db, recipe, recipe_id, side_ids, meal, date, ctx, seen: audit_allergens(db, recipe_id, ctx),
+    "AU-D03": lambda db, recipe, recipe_id, side_ids, meal, date, ctx, seen: audit_satvik(recipe, date, ctx),
+    "AU-D04": lambda db, recipe, recipe_id, side_ids, meal, date, ctx, seen: audit_repeat_week(meal, seen),
+    "AU-D05": lambda db, recipe, recipe_id, side_ids, meal, date, ctx, seen: audit_repeat_past(meal, ctx),
+    "AU-D06": lambda db, recipe, recipe_id, side_ids, meal, date, ctx, seen: audit_pantry(db, [recipe_id] + (side_ids or []), ctx),
 }
 
 
@@ -228,11 +248,12 @@ def execute_audit(db: Session, h_id: str, changes: list) -> List[Dict]:
     result_map      = []
 
     for change in changes:
-        day       = change.day
-        slot      = change.type
-        meal      = change.to_meal
-        date      = change.date if hasattr(change, "date") else None
-        recipe_id = change.recipe_id if hasattr(change, "recipe_id") else None
+        day            = change.day
+        slot           = change.type
+        meal           = change.to_meal
+        date           = change.date if hasattr(change, "date") else None
+        recipe_id      = change.recipe_id if hasattr(change, "recipe_id") else None
+        side_recipe_ids = change.side_recipe_ids if hasattr(change, "side_recipe_ids") else []
 
         if not meal or meal == "Skipped":
             result_map.append({"day": day, "type": slot, "status": "ok", "issues": []})
@@ -246,7 +267,7 @@ def execute_audit(db: Session, h_id: str, changes: list) -> List[Dict]:
             if feature_code not in active_features:
                 continue
             try:
-                issue = fn(db, recipe, recipe_id, meal, date, ctx, seen_this_week)
+                issue = fn(db, recipe, recipe_id, side_recipe_ids, meal, date, ctx, seen_this_week)
                 if issue:
                     issues.append(issue)
             except Exception as e:

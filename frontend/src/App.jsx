@@ -371,12 +371,15 @@ export default function App({ onBack }) {
     const payload = Object.entries(blueprint).map(([key, val]) => {
       const [day, type] = key.split('-');
       const mains = val?.mains || (val?.main ? [val.main] : []);
+      const sides = val?.sides || [];
       const recipe_id = mains[0]?.recipe_id || null;
+      const side_recipe_ids = sides.map(s => s.recipe_id).filter(Boolean);
       return {
         day, type,
-        to_meal:   mains[0]?.name || "Skipped",
-        date:      getTargetDate(day),
-        recipe_id: recipe_id,
+        to_meal:         mains[0]?.name || "Skipped",
+        date:            getTargetDate(day),
+        recipe_id:       recipe_id,
+        side_recipe_ids: side_recipe_ids,
       };
     });
     try {

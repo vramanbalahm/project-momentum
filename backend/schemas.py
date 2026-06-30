@@ -8,7 +8,8 @@ class AuditItem(BaseModel):
     type: str
     to_meal: str
     date: str
-    recipe_id: str = None  # main recipe_id for deep audit checks
+    recipe_id: str = None         # main recipe_id for deep audit checks
+    side_recipe_ids: list = []    # side dish recipe_ids — also checked for pantry availability
 
 # --- 2. DISH SCHEMA (FT-033: Multi-dish per slot) ---
 # Represents a single dish — main or side
