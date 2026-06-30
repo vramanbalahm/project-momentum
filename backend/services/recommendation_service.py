@@ -512,7 +512,7 @@ def apply_dinner_model(recipes, day, slot, ctx, week_ctx, db, house_id, week_sta
             rows = db.execute(sqla_text("""
                 SELECT DISTINCT main_recipe_id
                 FROM recipe_pairing
-                WHERE side_recipe_id = ANY(:side_ids)
+                WHERE side_recipe_id = ANY(CAST(:side_ids AS uuid[]))
                 AND confidence >= 0.85
                 AND (house_id IS NULL OR house_id = CAST(:house_id AS uuid))
             """), {
@@ -520,8 +520,12 @@ def apply_dinner_model(recipes, day, slot, ctx, week_ctx, db, house_id, week_sta
                 "house_id": str(week_ctx.get("house_id", ""))
             }).fetchall()
             boosted_ids = {str(r.main_recipe_id) for r in rows}
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[F15 leftover boost] FAILED: {type(e).__name__}: {e}")
+            try:
+                db.rollback()  # CRITICAL: must rollback or transaction stays poisoned for all subsequent queries
+            except Exception:
+                pass
 
         if boosted_ids:
             boosted = [r for r in recipes if r.get("recipe_id") in boosted_ids]
