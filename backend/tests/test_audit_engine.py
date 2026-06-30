@@ -261,7 +261,8 @@ class TestAuditPantry:
             pytest.skip("No recipe with required ingredients found")
         recipe_id = row[0]
 
-        ctx = {"pantry_ids": set()}  # nothing in pantry
+        # Pantry has some unrelated ingredient — not empty, but missing this recipe's ingredients
+        ctx = {"pantry_ids": {999999}}
         result = audit_pantry(db, recipe_id, ctx)
         assert result is not None
         assert "ingredients" in result.lower()
