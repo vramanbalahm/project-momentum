@@ -33,10 +33,16 @@ async function goToWeeklyPlan(page) {
 }
 
 async function generatePlanIfNeeded(page) {
-  const generateBtn = page.locator('button', { hasText: 'Generate' });
-  if (await generateBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await generateBtn.click();
-    await page.waitForTimeout(3000); // plan generation
+  const generateBtn = page.locator('button', { hasText: /Generate plan/i });
+  const isVisible = await generateBtn.first().isVisible({ timeout: 5000 }).catch(() => false);
+  if (isVisible) {
+    await generateBtn.first().click();
+    // First-time generation computes 21 slots — can take a while
+    await Promise.race([
+      page.locator('button', { hasText: /Review plan/i }).first().waitFor({ state: 'visible', timeout: 30000 }),
+      page.waitForTimeout(30000),
+    ]);
+    await page.waitForTimeout(1000);
   }
 }
 
