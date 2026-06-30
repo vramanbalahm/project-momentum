@@ -42,7 +42,6 @@ async function generatePlanIfNeeded(page) {
 
 async function clickReviewPlan(page) {
   // CTA button cycles between "Generate plan" / "Review plan" / "Save plan" / "Saved"
-  // Wait for any CTA button matching Review or Save (plan already exists) then click
   const reviewBtn = page.locator('button', { hasText: /Review plan|Save plan|Saved/i });
   const found = await reviewBtn.first().isVisible({ timeout: 15000 }).catch(() => false);
   if (!found) {
@@ -52,9 +51,17 @@ async function clickReviewPlan(page) {
   const text = await reviewBtn.first().textContent();
   if (text && text.toLowerCase().includes('review')) {
     await reviewBtn.first().click();
-    await page.waitForTimeout(2000); // audit API call
+    await page.waitForTimeout(2500); // audit API call
+  } else if (text && (text.toLowerCase().includes('saved'))) {
+    // Plan already saved from a prior run — tap to re-trigger audit so indicators are fresh
+    await reviewBtn.first().click();
+    await page.waitForTimeout(2500);
   }
-  // If already "Save plan" or "Saved", audit already ran — no click needed
+  // Wait for at least one audit indicator (ok text or issue pill) to confirm render completed
+  await Promise.race([
+    page.locator('text=ok').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {}),
+    page.locator('text=/\\d+ issues?/').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {}),
+  ]);
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
