@@ -10,6 +10,7 @@ import MealEditScreen from './components/MealEditScreen';
 import SwapCopyBar from './components/SwapCopyBar';
 import { swapSlots, swapDays, auditBlueprint, persistSwap } from './services/swapService';
 import { useAuth } from './context/AuthContext';
+import { getDishImage } from './utils/imageUtils';
 import { useTranslation } from 'react-i18next';
 import WeeklyQuestionnaire from './components/WeeklyQuestionnaire';
 import MemberAvailability from './pages/MemberAvailability';
@@ -86,10 +87,7 @@ const WeekThumbCard = ({ meal, slotId, onClick, isSelected = false, isSwapMode =
   const extraMains = mainsArr.length > 1 ? mainsArr.length - 1 : 0;
   const sides = meal?.sides || [];
   const extraCount = extraMains + sides.length;
-  let imgUrl = main?.thumb || main?.hero;
-  if (!imgUrl && main?.name) {
-    imgUrl = `/assets/meals/${main.name.toLowerCase().replace(/\s+/g, '_')}.png`;
-  }
+  let imgUrl = getDishImage(main);
 
   return (
     <div style={{ width: "100%", height: "100%" }}>
@@ -911,6 +909,15 @@ export default function App({ onBack }) {
                     onClick={() => { setWeekOffset(0); setSelectedDay(DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]); }}
                     style={{ background: "#1A3A2E", color: "#9FE1CB", border: "none", borderRadius: 12, padding: "10px 20px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}
                   >Go to current week</button>
+                </div>
+              )}
+
+              {/* Empty state — current week, availability saved, no plan generated yet */}
+              {isCurrentWeek && Object.keys(blueprint).length === 0 && (
+                <div style={{ textAlign: "center", padding: "48px 20px", color: "#B4B2A9" }}>
+                  <div style={{ fontSize: 32, marginBottom: 12 }}>✨</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "#2C2C2A", marginBottom: 6 }}>Ready when you are</div>
+                  <div style={{ fontSize: 12, color: "#B4B2A9" }}>Tap "Generate plan" above to create this week's meals</div>
                 </div>
               )}
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

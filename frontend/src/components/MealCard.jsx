@@ -144,10 +144,7 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {sides.map((side, idx) => {
-                let sideUrl = side?.thumb || side?.hero;
-                if (!sideUrl && side?.name) {
-                  sideUrl = `/assets/meals/${side.name.toLowerCase().replace(/\s+/g, "_")}.png`;
-                }
+                let sideUrl = getDishImage(side);
                 return (
                   <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <img
