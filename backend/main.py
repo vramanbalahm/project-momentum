@@ -886,7 +886,9 @@ def search_recipes(
     is_side_dish:  bool = False,   # True = side dishes only
     meal_slot:     str  = "",      # Breakfast | Lunch | Dinner
     dish_category: str  = "",      # tiffin | rice | bread | millet | continental | wet | dry etc.
-    db: Session = Depends(get_db)
+    in_stock:      bool = False,   # True = only dishes whose primary ingredients are in household pantry
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Fuzzy search on recipe_dna_master with optional AND filters.
@@ -922,6 +924,22 @@ def search_recipes(
     if dish_category:
         filters.append("r.dish_category = :dish_category")
         params["dish_category"] = dish_category
+
+    if in_stock:
+        # Only show dishes where ALL primary (non-optional) ingredients are in household pantry
+        filters.append("""
+            NOT EXISTS (
+                SELECT 1 FROM recipe_ingredients ri
+                WHERE ri.recipe_id = r.recipe_id
+                AND ri.is_optional = FALSE
+                AND ri.ingredient_id NOT IN (
+                    SELECT ingredient_id FROM household_pantry
+                    WHERE house_id = CAST(:house_id AS uuid)
+                    AND is_available = TRUE
+                )
+            )
+        """)
+        params["house_id"] = current_user["house_id"]
 
     where = " AND ".join(filters)
 

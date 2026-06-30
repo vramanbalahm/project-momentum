@@ -35,6 +35,7 @@ export default function DishSearch({ onBack }) {
   const [subRegion,   setSubRegion]   = useState('');
   const [mealSlot,    setMealSlot]    = useState('');
   const [dishCat,     setDishCat]     = useState('');
+  const [inStock,     setInStock]     = useState(false);
 
   const inputRef = useRef(null);
   const [detailDish, setDetailDish] = useState(null);
@@ -57,6 +58,7 @@ export default function DishSearch({ onBack }) {
       const slot     = overrides.mealSlot   ?? mealSlot;
       const cat      = overrides.dishCat    ?? dishCat;
       const sides    = overrides.showSides  ?? showSides;
+      const stock    = overrides.inStock    ?? inStock;
 
       if (intens)  params.intensity     = intens;
       if (diet)    params.diet_type     = diet;
@@ -65,8 +67,13 @@ export default function DishSearch({ onBack }) {
       if (cat)     params.dish_category = cat;
       if (sides)   params.is_side_dish  = true;
       else         params.is_side_dish  = false;
+      if (stock)   params.in_stock      = true;
 
-      const res = await axios.get(`${API_BASE}/recipes/search`, { params });
+      const token = localStorage.getItem('access_token');
+      const res = await axios.get(`${API_BASE}/recipes/search`, {
+        params,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       setResults(res.data);
     } catch { setResults([]); }
     finally { setLoading(false); }
@@ -80,16 +87,17 @@ export default function DishSearch({ onBack }) {
     if (key === 'mealSlot')   setMealSlot(val);
     if (key === 'dishCat')    setDishCat(val);
     if (key === 'showSides')  setShowSides(val);
+    if (key === 'inStock')    setInStock(val);
     fetchResults(updates);
   };
 
   const clearFilters = () => {
     setIntensity(''); setDietType(''); setSubRegion('');
-    setMealSlot(''); setDishCat(''); setShowSides(false);
-    fetchResults({ intensity:'', dietType:'', subRegion:'', mealSlot:'', dishCat:'', showSides: false });
+    setMealSlot(''); setDishCat(''); setShowSides(false); setInStock(false);
+    fetchResults({ intensity:'', dietType:'', subRegion:'', mealSlot:'', dishCat:'', showSides: false, inStock: false });
   };
 
-  const hasFilters = intensity || dietType || subRegion || mealSlot || dishCat;
+  const hasFilters = intensity || dietType || subRegion || mealSlot || dishCat || inStock;
 
   const chipStyle = (active) => ({
     padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500,
@@ -140,6 +148,7 @@ export default function DishSearch({ onBack }) {
         <div style={{ ...rowStyle, paddingTop: 8 }}>
           <div onClick={() => setFilter('showSides', false)} style={chipStyle(!showSides)}>Main dish</div>
           <div onClick={() => setFilter('showSides', true)}  style={chipStyle(showSides)}>Side dish</div>
+          <div onClick={() => setFilter('inStock', !inStock)} style={chipStyle(inStock)}>🧊 In Pantry</div>
         </div>
 
         {/* Meal slot */}
