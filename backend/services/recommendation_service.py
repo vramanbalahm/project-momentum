@@ -26,6 +26,7 @@ from datetime import date, timedelta
 from typing import List, Dict, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from database import SessionLocal
 
 DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -257,9 +258,15 @@ def _log(
     execution_ms: int = 0,
     run_id: Optional[str] = None
 ):
+    """
+    Writes to plan_audit_log using an ISOLATED session — never shares the
+    caller's transaction. This guarantees a logging failure can never
+    roll back or poison the main plan-generation transaction.
+    """
+    log_db = SessionLocal()
     try:
         fids = "{" + ",".join(str(i) for i in filtered_ids) + "}" if filtered_ids else "{}"
-        db.execute(text("""
+        log_db.execute(text("""
             INSERT INTO plan_audit_log
                 (run_id, house_id, week_start, day_name, meal_slot,
                  feature_code, function_name,
@@ -282,12 +289,15 @@ def _log(
             "sel":    str(selected_id) if selected_id else None,
             "ms":     execution_ms,
         })
+        log_db.commit()
     except Exception as e:
-        print(f"[audit_log] {e}")
+        print(f"[audit_log] FAILED for {feature_code}/{function_name} house={house_id} day={day_name} slot={meal_slot}: {type(e).__name__}: {e}")
         try:
-            db.rollback()  # Reset aborted transaction so subsequent queries work
-        except Exception:
-            pass
+            log_db.rollback()
+        except Exception as rollback_err:
+            print(f"[audit_log] rollback also failed: {rollback_err}")
+    finally:
+        log_db.close()
 
 
 # ── Formula functions (pure in-memory) ───────────────────────────────────────
