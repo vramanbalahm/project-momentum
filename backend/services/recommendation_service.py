@@ -189,7 +189,7 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
     # Query 5a — Weekly generation config (questionnaire answers)
     wc_row = db.execute(text("""
         SELECT continental_days, allow_same_day_repeat,
-               allow_same_week_repeat, prefer_millet
+               allow_same_week_repeat, prefer_millet, pantry_only
         FROM weekly_generation_config
         WHERE house_id = CAST(:hid AS uuid)
         AND week_start = :ws
@@ -200,6 +200,7 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
         "allow_same_day_repeat":  wc_row.allow_same_day_repeat  if wc_row else False,
         "allow_same_week_repeat": wc_row.allow_same_week_repeat if wc_row else True,
         "prefer_millet":          wc_row.prefer_millet          if wc_row else False,
+        "pantry_only":            (wc_row.pantry_only if hasattr(wc_row, 'pantry_only') else False) if wc_row else False,
     }
 
     # Query 5 — Recent recipes (past N weeks) to avoid repetition
@@ -835,6 +836,17 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
     weekly_config = week_ctx.get("weekly_config", {})
     allow_same_week_repeat = weekly_config.get("allow_same_week_repeat", True)
     prefer_millet          = weekly_config.get("prefer_millet", False)
+    pantry_only            = weekly_config.get("pantry_only", False)
+
+    # Load pantry ingredient IDs if pantry_only mode is on
+    pantry_ingredient_ids = set()
+    if pantry_only:
+        pantry_rows = db.execute(text("""
+            SELECT DISTINCT ingredient_id FROM household_pantry
+            WHERE house_id = CAST(:hid AS uuid) AND is_available = TRUE
+        """), {"hid": house_id}).fetchall()
+        pantry_ingredient_ids = {r[0] for r in pantry_rows}
+        print(f"[pantry_only] {len(pantry_ingredient_ids)} ingredients in pantry")
 
     selected_this_week: Dict[str, set] = {
         "Breakfast": set(),
@@ -877,6 +889,32 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                 millet_recipes = [r for r in candidates if any(t in millet_tags for t in r.get("tags", []))]
                 other_recipes  = [r for r in candidates if r not in millet_recipes]
                 candidates = millet_recipes + other_recipes
+
+            # Apply pantry filter — only suggest dishes whose primary ingredients are available
+            if pantry_only and pantry_ingredient_ids:
+                pantry_filtered = []
+                for recipe in candidates:
+                    recipe_id = recipe.get("recipe_id")
+                    if not recipe_id:
+                        continue
+                    # Get primary (non-optional) ingredient IDs for this recipe
+                    try:
+                        ing_rows = db.execute(text("""
+                            SELECT ingredient_id FROM recipe_ingredients
+                            WHERE recipe_id = CAST(:rid AS uuid) AND is_optional = FALSE
+                        """), {"rid": recipe_id}).fetchall()
+                        primary_ids = {r[0] for r in ing_rows}
+                        # Include recipe if all primary ingredients are in pantry
+                        # (or if recipe has no ingredient data — don't exclude it)
+                        if not primary_ids or primary_ids.issubset(pantry_ingredient_ids):
+                            pantry_filtered.append(recipe)
+                    except Exception:
+                        pantry_filtered.append(recipe)  # include on error, don't block
+                # Only apply filter if it leaves at least some candidates
+                if pantry_filtered:
+                    candidates = pantry_filtered
+                else:
+                    print(f"[pantry_only] No recipes match pantry for {day}/{slot} — falling back to full pool")
 
             # Exclude recipes already selected this week for this slot
             if allow_same_week_repeat:

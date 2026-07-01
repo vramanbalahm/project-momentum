@@ -24,6 +24,7 @@ export default function WeeklyQuestionnaire({ onGenerate, onClose }) {
     allow_same_day_repeat:  false,
     allow_same_week_repeat: true,
     prefer_millet:          false,
+    pantry_only:            false,
   });
   const [weeksCollected, setWeeksCollected] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -39,6 +40,7 @@ export default function WeeklyQuestionnaire({ onGenerate, onClose }) {
         allow_same_day_repeat:  cfg.allow_same_day_repeat,
         allow_same_week_repeat: cfg.allow_same_week_repeat,
         prefer_millet:          cfg.prefer_millet,
+        pantry_only:            cfg.pantry_only || false,
       });
       setWeeksCollected(status.weeks_collected);
     }).catch(() => {});
@@ -187,6 +189,32 @@ export default function WeeklyQuestionnaire({ onGenerate, onClose }) {
               <div style={{
                 position: "absolute", top: 4,
                 left: config.prefer_millet ? 22 : 4,
+                width: 16, height: 16, borderRadius: "50%",
+                background: "white", transition: "left 0.2s"
+              }} />
+            </div>
+          </div>
+        </div>
+
+          {/* Pantry toggle */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: `0.5px solid ${C.border}` }}>
+            <div style={{ flex: 1, paddingRight: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>
+                🧊 Cook from what's in my pantry?
+              </div>
+              <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+                Only suggest dishes you can cook without shopping
+              </div>
+            </div>
+            <div onClick={() => toggle("pantry_only")}
+              style={{
+                width: 44, height: 24, borderRadius: 12, cursor: "pointer",
+                background: config.pantry_only ? C.teal : "#D1CFC8",
+                position: "relative", flexShrink: 0, transition: "background 0.2s"
+              }}>
+              <div style={{
+                position: "absolute", top: 4,
+                left: config.pantry_only ? 22 : 4,
                 width: 16, height: 16, borderRadius: "50%",
                 background: "white", transition: "left 0.2s"
               }} />

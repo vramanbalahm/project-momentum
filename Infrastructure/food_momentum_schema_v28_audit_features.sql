@@ -18,3 +18,7 @@ ON CONFLICT (feature_code) DO UPDATE SET
     is_active   = EXCLUDED.is_active,
     description = EXCLUDED.description,
     updated_at  = NOW();
+
+-- Add pantry_only to household_plan_config / weekly generation config
+ALTER TABLE household_plan_config ADD COLUMN IF NOT EXISTS pantry_only BOOLEAN DEFAULT FALSE;
+ALTER TABLE weekly_generation_config ADD COLUMN IF NOT EXISTS pantry_only BOOLEAN DEFAULT FALSE;

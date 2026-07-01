@@ -64,7 +64,7 @@ async def get_weekly_config(
 
     row = db.execute(text("""
         SELECT continental_days, allow_same_day_repeat,
-               allow_same_week_repeat, prefer_millet
+               allow_same_week_repeat, prefer_millet, pantry_only
         FROM weekly_generation_config
         WHERE house_id = CAST(:hid AS uuid)
         AND week_start = :ws
@@ -77,6 +77,7 @@ async def get_weekly_config(
             "allow_same_day_repeat": row.allow_same_day_repeat,
             "allow_same_week_repeat":row.allow_same_week_repeat,
             "prefer_millet":         row.prefer_millet,
+            "pantry_only":           row.pantry_only if hasattr(row, 'pantry_only') else False,
             "is_set":                True,
         }
 
@@ -86,6 +87,7 @@ async def get_weekly_config(
         "allow_same_day_repeat": False,
         "allow_same_week_repeat":True,
         "prefer_millet":         False,
+        "pantry_only":           False,
         "is_set":                False,
     }
 
@@ -97,6 +99,7 @@ class WeeklyConfigRequest(BaseModel):
     allow_same_day_repeat:  bool    = False
     allow_same_week_repeat: bool    = True
     prefer_millet:          bool    = False
+    pantry_only:            bool    = False
 
 @router.post("", status_code=200)
 async def save_weekly_config(
@@ -112,7 +115,7 @@ async def save_weekly_config(
     db.execute(text("""
         INSERT INTO weekly_generation_config
             (house_id, week_start, continental_days,
-             allow_same_day_repeat, allow_same_week_repeat, prefer_millet)
+             allow_same_day_repeat, allow_same_week_repeat, prefer_millet, pantry_only)
         VALUES
             (CAST(:hid AS uuid), :ws, :cd, :asd, :asw, :pm)
         ON CONFLICT (house_id, week_start) DO UPDATE SET
@@ -120,6 +123,7 @@ async def save_weekly_config(
             allow_same_day_repeat   = EXCLUDED.allow_same_day_repeat,
             allow_same_week_repeat  = EXCLUDED.allow_same_week_repeat,
             prefer_millet           = EXCLUDED.prefer_millet,
+            pantry_only             = EXCLUDED.pantry_only,
             updated_at              = NOW()
     """), {
         "hid": house_id,
@@ -128,6 +132,7 @@ async def save_weekly_config(
         "asd": req.allow_same_day_repeat,
         "asw": req.allow_same_week_repeat,
         "pm":  req.prefer_millet,
+        "po":  req.pantry_only,
     })
     db.commit()
 
