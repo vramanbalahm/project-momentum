@@ -890,31 +890,40 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                 other_recipes  = [r for r in candidates if r not in millet_recipes]
                 candidates = millet_recipes + other_recipes
 
-            # Apply pantry filter — only suggest dishes whose primary ingredients are available
+            # Apply pantry filter — strict mode when user selects pantry_only
+            # Filters to only dishes with pantry ingredients, scored by overlap
+            # If no matches — slot marked as "pantry_exhausted", not filled
             if pantry_only and pantry_ingredient_ids:
-                pantry_filtered = []
+                pantry_match = []
                 for recipe in candidates:
                     recipe_id = recipe.get("recipe_id")
                     if not recipe_id:
                         continue
-                    # Get primary (non-optional) ingredient IDs for this recipe
                     try:
                         ing_rows = db.execute(text("""
                             SELECT ingredient_id FROM recipe_ingredients
                             WHERE recipe_id = CAST(:rid AS uuid) AND is_optional = FALSE
                         """), {"rid": recipe_id}).fetchall()
                         primary_ids = {r[0] for r in ing_rows}
-                        # Include recipe if all primary ingredients are in pantry
-                        # (or if recipe has no ingredient data — don't exclude it)
-                        if not primary_ids or primary_ids.issubset(pantry_ingredient_ids):
-                            pantry_filtered.append(recipe)
+                        overlap = primary_ids & pantry_ingredient_ids
+                        if overlap or not primary_ids:  # match or no ingredient data
+                            recipe["pantry_score"] = len(overlap)
+                            pantry_match.append(recipe)
                     except Exception:
-                        pantry_filtered.append(recipe)  # include on error, don't block
-                # Only apply filter if it leaves at least some candidates
-                if pantry_filtered:
-                    candidates = pantry_filtered
+                        pass  # skip on error — don't include unverified
+
+                if pantry_match:
+                    pantry_match.sort(key=lambda r: -r.get("pantry_score", 0))
+                    candidates = pantry_match
                 else:
-                    print(f"[pantry_only] No recipes match pantry for {day}/{slot} — falling back to full pool")
+                    # Pantry exhausted for this slot — mark and skip
+                    print(f"[pantry_only] Pantry exhausted for {day}/{slot}")
+                    result[day][slot] = {
+                        "pantry_exhausted": True,
+                        "message": "Pantry exhausted — no matching dishes for this slot",
+                        "mains": [], "sides": [],
+                    }
+                    continue  # skip to next slot
 
             # Exclude recipes already selected this week for this slot
             if allow_same_week_repeat:

@@ -200,10 +200,10 @@ export default function WeeklyQuestionnaire({ onGenerate, onClose }) {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: `0.5px solid ${C.border}` }}>
             <div style={{ flex: 1, paddingRight: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>
-                🧊 Cook from what's in my pantry?
+                🧊 Prioritise pantry ingredients?
               </div>
               <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
-                Only suggest dishes you can cook without shopping
+                Only use ingredients currently in your pantry
               </div>
             </div>
             <div onClick={() => toggle("pantry_only")}

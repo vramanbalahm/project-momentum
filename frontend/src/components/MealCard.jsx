@@ -95,8 +95,18 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
           )}
 
           {mains.length === 0 ? (
-            <div style={{ flex: 1, background: "#EDE8E0", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ fontSize: 11, color: "#B4B2A9" }}>No meal set</span>
+            <div style={{ flex: 1, background: meal?.pantry_exhausted ? "#F0FAF6" : "#EDE8E0",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexDirection: "column", gap: 2, padding: "8px 0" }}>
+              {meal?.pantry_exhausted ? (
+                <>
+                  <span style={{ fontSize: 18 }}>🧊</span>
+                  <span style={{ fontSize: 11, color: "#0F6E56", fontWeight: 500 }}>Pantry exhausted</span>
+                  <span style={{ fontSize: 10, color: "#888780" }}>No matching dishes in pantry</span>
+                </>
+              ) : (
+                <span style={{ fontSize: 11, color: "#B4B2A9" }}>No meal set</span>
+              )}
             </div>
           ) : (
             mains.map((dish, idx) => (

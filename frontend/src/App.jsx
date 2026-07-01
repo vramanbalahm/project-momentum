@@ -435,8 +435,11 @@ export default function App({ onBack }) {
       days.forEach(day => {
         slots.forEach(slot => {
           const suggested = plan[day]?.[slot];
-          if (suggested && suggested.recipe_id) {
-            const bpKey = `${day}-${slot}`;
+          const bpKey = `${day}-${slot}`;
+          if (suggested?.pantry_exhausted) {
+            // Pantry exhausted for this slot — mark it visually
+            newBlueprint[bpKey] = { pantry_exhausted: true, mains: [], sides: [] };
+          } else if (suggested && suggested.recipe_id) {
             newBlueprint[bpKey] = {
               main:  { name: suggested.dish_name, recipe_id: suggested.recipe_id, diet_type: suggested.diet_type, thumb: suggested.thumb, hero: suggested.hero },
               mains: [{ name: suggested.dish_name, dish_name: suggested.dish_name, recipe_id: suggested.recipe_id, diet_type: suggested.diet_type, thumb: suggested.thumb, hero: suggested.hero }],
