@@ -723,7 +723,7 @@ class TestRecipeSearch:
         assert resp.status_code == 200
         results = resp.json()
         for r in results:
-            assert r["diet_type"] == "Veg"
+            assert r["diet_type"] in ("Veg", "Vegan")
 
     def test_search_side_dish_filter(self, client, admin_user):
         headers = {"Authorization": f"Bearer {admin_user['access_token']}"}

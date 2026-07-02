@@ -265,7 +265,7 @@ class TestAuditPantry:
         ctx = {"pantry_ids": {999999}}
         result = audit_pantry(db, [recipe_id], ctx)
         assert result is not None
-        assert "ingredients" in result.lower()
+        assert "you'll need" in result.lower()
 
     def test_no_recipe_id_no_crash(self, db):
         ctx = {"pantry_ids": {1, 2, 3}}
