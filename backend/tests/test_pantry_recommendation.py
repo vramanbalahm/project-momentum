@@ -46,11 +46,15 @@ def auth_headers(client, db):
 
 
 @pytest.fixture
-def house_id(auth_headers, client):
-    """Get house_id for the test household."""
-    resp = client.get("/household/profile", headers=auth_headers)
-    if resp.status_code == 200:
-        return resp.json().get("household_id") or resp.json().get("house_id")
+def house_id(auth_headers):
+    """Get house_id from the access token's org_id claim.
+    (No /household/profile endpoint exists in the app — house_id lives
+    in the JWT, not in a profile response.)"""
+    from auth.security import decode_access_token
+    token = auth_headers["Authorization"].replace("Bearer ", "")
+    payload = decode_access_token(token)
+    if payload and payload.get("org_id"):
+        return payload["org_id"]
     pytest.skip("Could not get house_id")
 
 
