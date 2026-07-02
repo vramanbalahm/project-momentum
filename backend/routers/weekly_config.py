@@ -117,7 +117,7 @@ async def save_weekly_config(
             (house_id, week_start, continental_days,
              allow_same_day_repeat, allow_same_week_repeat, prefer_millet, pantry_only)
         VALUES
-            (CAST(:hid AS uuid), :ws, :cd, :asd, :asw, :pm)
+            (CAST(:hid AS uuid), :ws, :cd, :asd, :asw, :pm, :po)
         ON CONFLICT (house_id, week_start) DO UPDATE SET
             continental_days        = EXCLUDED.continental_days,
             allow_same_day_repeat   = EXCLUDED.allow_same_day_repeat,
