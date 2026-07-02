@@ -893,7 +893,7 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
             # Apply pantry filter — strict mode when user selects pantry_only
             # Filters to only dishes with pantry ingredients, scored by overlap
             # If no matches — slot marked as "pantry_exhausted", not filled
-            if pantry_only and pantry_ingredient_ids:
+            if pantry_only:
                 pantry_match = []
                 for recipe in candidates:
                     recipe_id = recipe.get("recipe_id")
