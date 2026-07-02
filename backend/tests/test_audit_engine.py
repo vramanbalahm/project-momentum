@@ -196,18 +196,18 @@ class TestAuditRepeatWeek:
 class TestAuditRepeatPast:
 
     def test_not_recently_served_no_issue(self):
-        ctx = {"recent_meals": {"Sambar Rice"}}
+        ctx = {"recent_meals": {"Sambar Rice": date.today() - timedelta(days=1)}}
         result = audit_repeat_past("Idli", ctx)
         assert result is None
 
     def test_recently_served_flags_issue(self):
-        ctx = {"recent_meals": {"Idli"}}
+        ctx = {"recent_meals": {"Idli": date.today() - timedelta(days=1)}}
         result = audit_repeat_past("Idli", ctx)
         assert result is not None
-        assert "recently" in result.lower()
+        assert "yesterday" in result.lower()
 
     def test_empty_recent_meals_no_issue(self):
-        ctx = {"recent_meals": set()}
+        ctx = {"recent_meals": {}}
         result = audit_repeat_past("Idli", ctx)
         assert result is None
 
@@ -219,7 +219,7 @@ class TestAuditPantry:
     def test_no_pantry_items_no_issue(self, db, sample_veg_recipe):
         """If pantry is empty, no warning (nothing to compare against)."""
         ctx = {"pantry_ids": set()}
-        result = audit_pantry(db, sample_veg_recipe["recipe_id"], ctx)
+        result = audit_pantry(db, [sample_veg_recipe["recipe_id"]], ctx)
         assert result is None
 
     def test_all_ingredients_in_pantry_no_issue(self, db):
@@ -244,7 +244,7 @@ class TestAuditPantry:
         all_ids = {r[0] for r in ing_rows}
 
         ctx = {"pantry_ids": all_ids}
-        result = audit_pantry(db, recipe_id, ctx)
+        result = audit_pantry(db, [recipe_id], ctx)
         assert result is None
 
     def test_missing_ingredient_flags_issue(self, db):
@@ -263,7 +263,7 @@ class TestAuditPantry:
 
         # Pantry has some unrelated ingredient — not empty, but missing this recipe's ingredients
         ctx = {"pantry_ids": {999999}}
-        result = audit_pantry(db, recipe_id, ctx)
+        result = audit_pantry(db, [recipe_id], ctx)
         assert result is not None
         assert "ingredients" in result.lower()
 
