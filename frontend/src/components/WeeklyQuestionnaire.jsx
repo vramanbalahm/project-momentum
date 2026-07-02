@@ -194,7 +194,6 @@ export default function WeeklyQuestionnaire({ onGenerate, onClose }) {
               }} />
             </div>
           </div>
-        </div>
 
           {/* Pantry toggle */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: `0.5px solid ${C.border}` }}>
