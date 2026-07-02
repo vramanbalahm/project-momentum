@@ -711,35 +711,35 @@ class TestFullPlanGeneration:
 
 class TestRecipeSearch:
 
-    def test_search_returns_results(self):
-        with TestClient(app) as c:
-            resp = c.get("/recipes/search?q=idli")
-            assert resp.status_code == 200
-            assert len(resp.json()) > 0
+    def test_search_returns_results(self, client, admin_user):
+        headers = {"Authorization": f"Bearer {admin_user['access_token']}"}
+        resp = client.get("/recipes/search?q=idli", headers=headers)
+        assert resp.status_code == 200
+        assert len(resp.json()) > 0
 
-    def test_search_veg_filter(self):
-        with TestClient(app) as c:
-            resp = c.get("/recipes/search?diet_type=Veg&is_side_dish=false")
-            assert resp.status_code == 200
-            results = resp.json()
-            for r in results:
-                assert r["diet_type"] == "Veg"
+    def test_search_veg_filter(self, client, admin_user):
+        headers = {"Authorization": f"Bearer {admin_user['access_token']}"}
+        resp = client.get("/recipes/search?diet_type=Veg&is_side_dish=false", headers=headers)
+        assert resp.status_code == 200
+        results = resp.json()
+        for r in results:
+            assert r["diet_type"] == "Veg"
 
-    def test_search_side_dish_filter(self):
-        with TestClient(app) as c:
-            resp = c.get("/recipes/search?is_side_dish=true")
-            assert resp.status_code == 200
-            results = resp.json()
-            for r in results:
-                assert "side" in r.get("meal_role", [])
+    def test_search_side_dish_filter(self, client, admin_user):
+        headers = {"Authorization": f"Bearer {admin_user['access_token']}"}
+        resp = client.get("/recipes/search?is_side_dish=true", headers=headers)
+        assert resp.status_code == 200
+        results = resp.json()
+        for r in results:
+            assert "side" in r.get("meal_role", [])
 
-    def test_search_intensity_filter(self):
-        with TestClient(app) as c:
-            resp = c.get("/recipes/search?intensity=Light")
-            assert resp.status_code == 200
-            results = resp.json()
-            for r in results:
-                assert r["intensity_level"] == "Light"
+    def test_search_intensity_filter(self, client, admin_user):
+        headers = {"Authorization": f"Bearer {admin_user['access_token']}"}
+        resp = client.get("/recipes/search?intensity=Light", headers=headers)
+        assert resp.status_code == 200
+        results = resp.json()
+        for r in results:
+            assert r["intensity_level"] == "Light"
 
     def test_sub_regions_endpoint(self):
         with TestClient(app) as c:
@@ -749,10 +749,10 @@ class TestRecipeSearch:
             assert "sub_regions" in data
             assert len(data["sub_regions"]) > 0
 
-    def test_dish_category_filter(self):
-        with TestClient(app) as c:
-            resp = c.get("/recipes/search?dish_category=tiffin")
-            assert resp.status_code == 200
-            results = resp.json()
-            for r in results:
-                assert r.get("dish_category") == "tiffin"
+    def test_dish_category_filter(self, client, admin_user):
+        headers = {"Authorization": f"Bearer {admin_user['access_token']}"}
+        resp = client.get("/recipes/search?dish_category=tiffin", headers=headers)
+        assert resp.status_code == 200
+        results = resp.json()
+        for r in results:
+            assert r.get("dish_category") == "tiffin"
