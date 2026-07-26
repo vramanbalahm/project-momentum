@@ -48,6 +48,8 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
   const [activeTab,   setActiveTab]   = useState(initialTab);
   const [dietFilter,  setDietFilter]  = useState(null);
   const [slotFilter,  setSlotFilter]  = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [recipes,     setRecipes]     = useState([]);
   const [total,       setTotal]       = useState(0);
   const [page,        setPage]        = useState(1);
@@ -64,6 +66,12 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
   const [editSaving,  setEditSaving]  = useState(false);
   const [genLoading,  setGenLoading]  = useState(false);
 
+  // ── Debounce search input ─────────────────────────────────
+  useEffect(() => {
+    const t = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
   // ── Load list ─────────────────────────────────────────────
   const loadRecipes = useCallback(async (pg = 1) => {
     setLoading(true);
@@ -75,6 +83,7 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
       });
       if (dietFilter) params.append("diet", dietFilter);
       if (slotFilter) params.append("meal_slot", slotFilter);
+      if (searchQuery) params.append("q", searchQuery);
       const data = await apiFetch(`/recipes/review?${params}`);
       if (pg === 1) setRecipes(data.recipes);
       else setRecipes(prev => [...prev, ...data.recipes]);
@@ -85,7 +94,7 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
     } finally {
       setLoading(false);
     }
-  }, [activeTab, dietFilter, slotFilter, apiFetch]);
+  }, [activeTab, dietFilter, slotFilter, searchQuery, apiFetch]);
 
   useEffect(() => { loadRecipes(1); }, [loadRecipes]);
 
@@ -227,8 +236,26 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
         </div>
       </div>
 
+      {/* Search */}
+      <div style={{ padding: "10px 14px 0", background: C.card }}>
+        <input
+          value={searchInput}
+          onChange={e => setSearchInput(e.target.value)}
+          placeholder="Search dish name…"
+          style={{
+            width: "100%", padding: "8px 12px", borderRadius: 10,
+            border: `0.5px solid ${C.border}`, fontSize: 13, boxSizing: "border-box"
+          }}
+        />
+        {searchQuery && (
+          <div style={{ fontSize: 11, color: C.muted, padding: "6px 2px 0" }}>
+            Searching all statuses for "{searchQuery}" — tabs are ignored while searching
+          </div>
+        )}
+      </div>
+
       {/* Status tabs */}
-      <div style={{ display: "flex", background: C.card, borderBottom: `0.5px solid ${C.border}` }}>
+      <div style={{ display: "flex", background: C.card, borderBottom: `0.5px solid ${C.border}`, opacity: searchQuery ? 0.4 : 1, pointerEvents: searchQuery ? "none" : "auto" }}>
         {STATUSES.map(s => (
           <div key={s} onClick={() => { setActiveTab(s); setSelected(new Set()); }}
             style={{
@@ -287,7 +314,7 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
 
         {!loading && recipes.length === 0 && (
           <div style={{ textAlign: "center", padding: "48px 0", color: C.muted, fontSize: 13 }}>
-            No recipes in this category.
+            {searchQuery ? `No recipes found for "${searchQuery}".` : "No recipes in this category."}
           </div>
         )}
 
@@ -305,7 +332,7 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
               }}>
               <div style={{ display: "flex", alignItems: "flex-start", padding: "12px 14px", gap: 10 }}>
                 {/* Checkbox */}
-                {activeTab === "under_review" && (
+                {r.review_status === "under_review" && (
                   <input type="checkbox" checked={isSelected}
                     onChange={() => toggleSelect(r.recipe_id)}
                     style={{ marginTop: 2, flexShrink: 0, width: 15, height: 15 }} />

@@ -305,6 +305,7 @@ async def get_recipes_for_review(
     diet: str = None,
     meal_slot: str = None,
     sub_region: str = None,
+    q: str = None,
     page: int = 1,
     page_size: int = 20,
     filter_reviewer_id: str = None,
@@ -315,6 +316,10 @@ async def get_recipes_for_review(
     Returns paginated recipe list for review screen.
     Accessible to platform_admin and reviewer roles only.
     filter_reviewer_id: platform_admin only — filter by a specific reviewer's user_id.
+    q: dish name search. When provided, searches across ALL statuses (not just
+       the active tab) so a recipe can be found regardless of where it sits in
+       the review pipeline — the tab/status filter is dropped in favor of the
+       same role-based visibility rule applied across every status at once.
     """
     role = current_user["role"]
     if role not in ("platform_admin", "reviewer"):
@@ -324,14 +329,23 @@ async def get_recipes_for_review(
     conditions = []
     params = {"status": status, "offset": (page - 1) * page_size, "limit": page_size, "user_id": user_id}
 
-    if status != "all":
-        conditions.append("r.review_status = :status")
+    if q:
+        conditions.append("r.dish_name ILIKE :q")
+        params["q"] = f"%{q}%"
+        # Cross-status search — same visibility rule as the tab logic below,
+        # just applied across all statuses instead of one at a time.
+        if role != "platform_admin":
+            conditions.append("(r.review_status NOT IN ('approved', 'rejected') OR r.reviewed_by = CAST(:user_id AS uuid))")
+    else:
+        if status != "all":
+            conditions.append("r.review_status = :status")
 
-    # For approved/rejected — show only current reviewer's work
-    # For pending — show all (shared pool)
-    # Platform admin sees everything
-    if status in ("approved", "rejected") and role != "platform_admin":
-        conditions.append("r.reviewed_by = CAST(:user_id AS uuid)")
+        # For approved/rejected — show only current reviewer's work
+        # For pending — show all (shared pool)
+        # Platform admin sees everything
+        if status in ("approved", "rejected") and role != "platform_admin":
+            conditions.append("r.reviewed_by = CAST(:user_id AS uuid)")
+
     if filter_reviewer_id and role == "platform_admin":
         conditions.append("r.reviewed_by = CAST(:filter_reviewer_id AS uuid)")
         params["filter_reviewer_id"] = filter_reviewer_id
