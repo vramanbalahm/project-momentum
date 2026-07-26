@@ -352,7 +352,7 @@ async def get_recipes_for_review(
         SELECT
             r.recipe_id, r.dish_name, r.regional_name, r.sub_region,
             r.diet_type::text as diet_type, r.is_sattvic, r.is_vegan,
-            r.intensity_level, r.meal_slots, r.review_status,
+            r.intensity_level, r.meal_slots, r.meal_role, r.review_status,
             r.reviewed_at, r.review_notes,
             u.name as reviewed_by_name,
             v.hero_image_url, v.image_generation_count,
@@ -407,7 +407,7 @@ async def get_recipe_detail(
         SELECT
             r.recipe_id, r.dish_name, r.regional_name, r.sub_region,
             r.diet_type::text, r.is_sattvic, r.is_vegan, r.intensity_level,
-            r.meal_slots, r.is_scalable, r.is_regional_specific,
+            r.meal_slots, r.meal_role, r.is_scalable, r.is_regional_specific,
             r.prep_time_mins, r.cook_time_mins, r.serves, r.tags,
             r.review_status, r.review_notes,
             v.hero_image_url, v.prep_steps, v.youtube_urls,
