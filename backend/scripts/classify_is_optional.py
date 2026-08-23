@@ -389,7 +389,10 @@ def main():
     total_errors = 0
     for recipe, ingredients in targets:
         if args.max_cost is not None and cost_tracker.running_total() >= args.max_cost:
-            print(f"\nABORTED: running cost ${cost_tracker.running_total():.4f} reached --max-cost ${args.max_cost:.4f} cap.")
+            print(f"\nSTOPPED: running cost ${cost_tracker.running_total():.4f} reached --max-cost ${args.max_cost:.4f} cap.")
+            print(f"Everything applied above this line is already committed and safe.")
+            print(f"Just re-run the same command to continue -- already-classified recipes are")
+            print(f"automatically skipped, so you'll only pay for what's left.")
             break
 
         if not ingredients:
@@ -438,6 +441,8 @@ if __name__ == "__main__":
         sys.exit(1)
     except Exception as e:
         print(f"\n\nFATAL (unrecoverable): {e}")
-        print("Recipes already applied before this point were committed individually and are safe.")
+        print("Everything applied before this point was committed per-recipe and is safe --")
+        print("nothing is lost. Just re-run the same command; already-classified recipes")
+        print("are skipped automatically, so you'll only pay for what's left.")
         cost_tracker.summary()
         raise
