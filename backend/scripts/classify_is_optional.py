@@ -286,21 +286,33 @@ def print_preview(dish_name, classifications):
         print(f"    - {c['ingredient_name']:30s} | {c['reason']}")
 
 
-def apply_classifications(cur, recipe_id, classifications):
+def apply_classifications(cur, recipe_id, classifications, valid_ingredient_ids):
     updated = 0
+    skipped = 0
     for c in classifications:
+        raw_id = c.get("ingredient_id")
+        try:
+            ingredient_id = int(raw_id)
+        except (TypeError, ValueError):
+            print(f"    SKIPPED bad entry (ingredient_id={raw_id!r}, name={c.get('ingredient_name')!r}) -- not a valid integer id")
+            skipped += 1
+            continue
+        if ingredient_id not in valid_ingredient_ids:
+            print(f"    SKIPPED entry (ingredient_id={ingredient_id}, name={c.get('ingredient_name')!r}) -- not one of this recipe's actual ingredients")
+            skipped += 1
+            continue
         cur.execute("""
             UPDATE recipe_ingredients
             SET is_optional = %s
             WHERE recipe_id = %s AND ingredient_id = %s
-        """, (c["is_optional"], recipe_id, c["ingredient_id"]))
+        """, (c["is_optional"], recipe_id, ingredient_id))
         updated += cur.rowcount
     # Mark this recipe as classified so future --all/--sample runs skip it.
     cur.execute("""
         UPDATE recipe_dna_master SET is_optional_classified_at = NOW()
         WHERE recipe_id = %s
     """, (recipe_id,))
-    return updated
+    return updated, skipped
 
 
 def main():
@@ -354,6 +366,7 @@ def main():
     print(f"\n{len(targets)} recipe(s) to process.\n")
 
     total_updated = 0
+    total_skipped = 0
     for recipe, ingredients in targets:
         if args.max_cost is not None and cost_tracker.running_total() >= args.max_cost:
             print(f"\nABORTED: running cost ${cost_tracker.running_total():.4f} reached --max-cost ${args.max_cost:.4f} cap.")
@@ -371,13 +384,19 @@ def main():
         if args.preview:
             print_preview(recipe[1], classifications)
         else:
-            n = apply_classifications(cur, recipe[0], classifications)
-            total_updated += n
-            print(f"  Applied {n} updates -> {recipe[1]}")
+            valid_ingredient_ids = {i[0] for i in ingredients}
+            try:
+                n, skipped = apply_classifications(cur, recipe[0], classifications, valid_ingredient_ids)
+                conn.commit()  # commit per-recipe -- a later failure can't undo work already done
+                total_updated += n
+                total_skipped += skipped
+                print(f"  Applied {n} updates -> {recipe[1]}" + (f" ({skipped} entries skipped)" if skipped else ""))
+            except Exception as e:
+                conn.rollback()
+                print(f"  ERROR applying {recipe[1]}: {e} -- rolled back this recipe, continuing")
 
     if args.apply:
-        conn.commit()
-        print(f"\nTotal ingredient rows updated: {total_updated}")
+        print(f"\nTotal ingredient rows updated: {total_updated}" + (f" ({total_skipped} entries skipped as invalid)" if total_skipped else ""))
     else:
         print("\n(Preview only -- no DB changes made.)")
 
