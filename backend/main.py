@@ -1059,6 +1059,112 @@ VALID_REGIONS = [
 ]
 
 
+# --- HOUSEHOLD QUICK-ENTRY DISH ---
+@app.post("/recipes/quick-entry")
+async def create_quick_entry_dish(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Let a household create their own private dish for immediate use in
+    their own plan -- no review/approval step. Auto-approved, visible
+    only to this household (created_by_house_id), never enters the
+    shared reviewer queue.
+
+    Deliberately minimal: dish name + one mandatory ingredient (used for
+    pantry matching -- see is_optional design). Everything else defaults
+    to sensible values; the household can flesh it out further later via
+    the same edit sheet (/recipes/{recipe_id}/detail, PUT .../review)
+    Recipe Review already uses, since ownership now grants access there.
+
+    payload: {
+        dish_name: str (required),
+        main_ingredient_id: int (required) -- must exist in ingredient_catalog,
+        diet_type: "Veg"|"Non-Veg"|"Vegan"|"Eggitarian" (required),
+        meal_slot: "Breakfast"|"Lunch"|"Dinner" (optional hint),
+        is_side_dish: bool (optional, default False)
+    }
+    """
+    house_id = current_user["house_id"]
+
+    dish_name = (payload.get("dish_name") or "").strip()
+    if not dish_name:
+        raise HTTPException(status_code=400, detail="Dish name is required.")
+
+    main_ingredient_id = payload.get("main_ingredient_id")
+    if main_ingredient_id is None:
+        raise HTTPException(status_code=400, detail="A main ingredient is required.")
+
+    valid_diets = ["Veg", "Non-Veg", "Vegan", "Eggitarian"]
+    diet_type = payload.get("diet_type")
+    if diet_type not in valid_diets:
+        raise HTTPException(status_code=400, detail=f"diet_type must be one of {valid_diets}.")
+
+    meal_slot = payload.get("meal_slot") or ""
+    valid_slots = ["Breakfast", "Lunch", "Dinner"]
+    if meal_slot and meal_slot not in valid_slots:
+        raise HTTPException(status_code=400, detail=f"meal_slot must be one of {valid_slots}.")
+
+    is_side_dish = bool(payload.get("is_side_dish", False))
+
+    # Validate the ingredient actually exists
+    ing_row = db.execute(text("""
+        SELECT id, name_en FROM ingredient_catalog WHERE id = :iid
+    """), {"iid": main_ingredient_id}).fetchone()
+    if not ing_row:
+        raise HTTPException(status_code=400, detail="main_ingredient_id does not exist in the ingredient catalog.")
+
+    # Avoid silent duplicates -- if this household already has a dish by
+    # this name, hand back the existing one instead of creating a clutter copy.
+    existing = db.execute(text("""
+        SELECT recipe_id FROM recipe_dna_master
+        WHERE created_by_house_id = CAST(:hid AS uuid)
+        AND LOWER(dish_name) = LOWER(:dish_name)
+    """), {"hid": house_id, "dish_name": dish_name}).fetchone()
+    if existing:
+        return {
+            "recipe_id": str(existing.recipe_id),
+            "dish_name": dish_name,
+            "created": False,
+            "message": "You already have a dish by this name -- reusing it instead of creating a duplicate."
+        }
+
+    recipe_id = db.execute(text("SELECT gen_random_uuid()")).scalar()
+
+    db.execute(text(f"""
+        INSERT INTO recipe_dna_master
+            (recipe_id, dish_name, diet_type, is_sattvic, is_vegan, is_scalable,
+             intensity_level, meal_slots, meal_role, review_status,
+             created_by_house_id, created_by_ai)
+        VALUES
+            (CAST(:rid AS uuid), :dish_name, '{diet_type}'::diet_pref, FALSE, :is_vegan, TRUE,
+             'Medium', :meal_slots, :meal_role, 'approved',
+             CAST(:hid AS uuid), FALSE)
+    """), {
+        "rid": recipe_id,
+        "dish_name": dish_name,
+        "is_vegan": diet_type == "Vegan",
+        "meal_slots": [meal_slot] if meal_slot else [],
+        "meal_role": ["side"] if is_side_dish else ["main"],
+        "hid": house_id,
+    })
+
+    db.execute(text("""
+        INSERT INTO recipe_ingredients (recipe_id, ingredient_id, is_optional, sort_order)
+        VALUES (CAST(:rid AS uuid), :iid, FALSE, 1)
+    """), {"rid": recipe_id, "iid": main_ingredient_id})
+
+    db.commit()
+
+    return {
+        "recipe_id": str(recipe_id),
+        "dish_name": dish_name,
+        "created": True,
+        "message": "Added -- you can use this in your plan right away, or add more detail via the edit screen."
+    }
+
+
 @app.get("/recipes/sub-regions")
 def get_sub_regions(db: Session = Depends(get_db)):
     rows = db.execute(text("""
