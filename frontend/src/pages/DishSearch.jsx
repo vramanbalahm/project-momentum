@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { getDishImage } from '../utils/imageUtils';
 import { DishDetailPanel } from '../components/MealEditScreen';
+import QuickEntryModal from '../components/QuickEntryModal';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
@@ -39,6 +40,7 @@ export default function DishSearch({ onBack }) {
 
   const inputRef = useRef(null);
   const [detailDish, setDetailDish] = useState(null);
+  const [showQuickEntry, setShowQuickEntry] = useState(false);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -242,7 +244,14 @@ export default function DishSearch({ onBack }) {
           );
         })}
         {!loading && results.length === 0 && (
-          <div style={{ textAlign: "center", padding: 40, color: C.muted, fontSize: 13 }}>No dishes found</div>
+          <div style={{ textAlign: "center", padding: 40, color: C.muted, fontSize: 13 }}>
+            <div>No dishes found</div>
+            <button onClick={() => setShowQuickEntry(true)}
+              style={{ marginTop: 12, padding: "8px 16px", borderRadius: 20, border: `0.5px solid ${C.accent}`,
+                background: "none", color: C.accent, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+              {query ? `Add "${query}" as your own dish` : "Add your own dish"}
+            </button>
+          </div>
         )}
       </div>
 
@@ -256,6 +265,16 @@ export default function DishSearch({ onBack }) {
             selectLabel={null}
           />
         </div>
+      )}
+
+      {showQuickEntry && (
+        <QuickEntryModal
+          initialDishName={query}
+          initialMealSlot={mealSlot}
+          isSideDish={showSides}
+          onClose={() => setShowQuickEntry(false)}
+          onCreated={() => { setShowQuickEntry(false); fetchResults(); }}
+        />
       )}
     </div>
   );

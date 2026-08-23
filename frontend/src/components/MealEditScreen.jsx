@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getDishImage } from '../utils/imageUtils';
 import axios from 'axios';
+import QuickEntryModal from './QuickEntryModal';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
@@ -187,6 +188,7 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
   const [dishCat, setDishCat]       = useState('');
   const [inStock, setInStock]       = useState(false);
   const [showSides, setShowSides]   = useState(context === 'add-side');
+  const [showQuickEntry, setShowQuickEntry] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -401,7 +403,14 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px" }}>
         {loading && <div style={{ fontSize: 12, color: "#B4B2A9", padding: "20px 0", textAlign: "center" }}>Searching...</div>}
         {!loading && results.length === 0 && (
-          <div style={{ fontSize: 12, color: "#B4B2A9", padding: "20px 0", textAlign: "center" }}>No dishes found</div>
+          <div style={{ fontSize: 12, color: "#B4B2A9", padding: "20px 0", textAlign: "center" }}>
+            <div>No dishes found</div>
+            <button onClick={() => setShowQuickEntry(true)}
+              style={{ marginTop: 10, padding: "7px 14px", borderRadius: 20, border: "0.5px solid #0F6E56",
+                background: "none", color: "#0F6E56", fontSize: 11, fontWeight: 500, cursor: "pointer" }}>
+              {query ? `Add "${query}" as your own dish` : "Add your own dish"}
+            </button>
+          </div>
         )}
         {results.map(recipe => (
           <div key={recipe.recipe_id}
@@ -435,6 +444,16 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
           </div>
         ))}
       </div>
+
+      {showQuickEntry && (
+        <QuickEntryModal
+          initialDishName={query}
+          initialMealSlot=""
+          isSideDish={showSides}
+          onClose={() => setShowQuickEntry(false)}
+          onCreated={(recipe) => { setShowQuickEntry(false); onSelect(recipe); }}
+        />
+      )}
     </div>
   );
 }
