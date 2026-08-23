@@ -121,7 +121,7 @@ For each ingredient, decide if it is "core" or "optional" using this exact test:
       if a recipe "needs" them for good flavor, a household missing them
       should NOT be blocked from getting this dish suggested.
 
-WORKED EXAMPLE (already confirmed correct by the product owner):
+WORKED EXAMPLE 1 (already confirmed correct by the product owner):
     Dish: Thengai Paal Biryani (a coconut-milk biryani)
     CORE: Basmati rice, Coconut milk
     OPTIONAL: everything else -- Bay Leaf, Cardamom pods, Cinnamon stick,
@@ -131,6 +131,36 @@ WORKED EXAMPLE (already confirmed correct by the product owner):
     distinguish it from a plain biryani. Every other ingredient -- even onion,
     garlic, and salt -- is common enough that its absence shouldn't block the
     suggestion.
+
+NAMED-VARIANT RULE: if the dish name itself calls out a specific protein or
+ingredient (e.g. "Egg Kothu Parotta", "Mutton Kothu Parotta", "Chicken
+Biryani"), that named ingredient joins the base as CORE alongside it. If the
+dish name is plain/generic with no protein called out (e.g. plain "Kothu
+Parotta"), only the base itself is CORE -- even if a protein happens to appear
+in that recipe's ingredient list. The protein becomes OPTIONAL in that case.
+
+WORKED EXAMPLE 2 (named-variant rule, confirmed by product owner):
+    - "Kothu Parotta" (plain, no protein in the name):
+        CORE: Parotta only. Any egg/chicken/mutton present in the ingredient
+        list is OPTIONAL, not core -- the dish name doesn't call it out.
+    - "Egg Kothu Parotta":
+        CORE: Parotta, Egg
+    - "Mutton Kothu Parotta":
+        CORE: Parotta, Mutton
+
+GENERIC-CATEGORY RULE: if the dish name uses a generic category word instead
+of one specific vegetable/ingredient (e.g. "Vegetable Sandwich", "Vegetable
+Kurma"), do NOT pick any single vegetable as core just because it's in the
+list -- no specific vegetable is more defining than another here, so they all
+stay OPTIONAL. This keeps the dish qualifying for suggestion even if a
+household is missing any one particular vegetable.
+
+WORKED EXAMPLE 3 (generic-category rule, confirmed by product owner):
+    Dish: Vegetable Sandwich
+    CORE: Bread only
+    OPTIONAL: Tomato, Cucumber, Onion, Butter, Green Chilli, Salt -- no single
+        vegetable is treated as defining since the dish name says "Vegetable"
+        generically, not one specific vegetable.
 
 Now classify the following recipe's ingredients using the same standard.
 
