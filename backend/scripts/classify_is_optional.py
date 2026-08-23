@@ -59,9 +59,52 @@ GCP_PROJECT  = os.getenv("GOOGLE_CLOUD_PROJECT", "project-momentum-495709")
 GCP_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 MODEL_NAME   = os.getenv("VERTEX_CLASSIFY_MODEL", "gemini-2.5-flash-lite")
 
+# Vertex AI pricing per 1M tokens (input, output) -- checked against
+# cloud.google.com/vertex-ai/generative-ai/pricing. Update if pricing changes.
+PRICING_PER_MILLION = {
+    "gemini-2.5-flash-lite": (0.10, 0.40),
+    "gemini-2.5-flash":      (0.30, 2.50),
+    "gemini-2.5-pro":        (1.25, 10.00),
+}
+
+class CostTracker:
+    """Tracks real token usage + cost across a run, using the actual numbers
+    Vertex AI reports back per call -- not an estimate."""
+    def __init__(self, model_name):
+        self.model_name = model_name
+        self.price_in, self.price_out = PRICING_PER_MILLION.get(
+            model_name, PRICING_PER_MILLION["gemini-2.5-flash-lite"]
+        )
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
+        self.call_count = 0
+
+    def record(self, input_tokens, output_tokens):
+        self.total_input_tokens += input_tokens
+        self.total_output_tokens += output_tokens
+        self.call_count += 1
+        call_cost = (input_tokens / 1_000_000 * self.price_in) + (output_tokens / 1_000_000 * self.price_out)
+        running_cost = self.running_total()
+        print(f"    tokens: in={input_tokens} out={output_tokens} | this call: ${call_cost:.5f} | running total: ${running_cost:.5f}")
+        return call_cost
+
+    def running_total(self):
+        return (self.total_input_tokens / 1_000_000 * self.price_in) + \
+               (self.total_output_tokens / 1_000_000 * self.price_out)
+
+    def summary(self):
+        print(f"\n{'='*70}")
+        print(f"COST SUMMARY ({self.model_name})")
+        print(f"  Calls made:      {self.call_count}")
+        print(f"  Input tokens:    {self.total_input_tokens:,}")
+        print(f"  Output tokens:   {self.total_output_tokens:,}")
+        print(f"  TOTAL COST:      ${self.running_total():.4f}")
+        print(f"{'='*70}")
+
 # Vertex AI mode -- vertexai=True + project/location + ADC. NOT an api_key.
 # Billing draws from the GCP project's credits, not a personal card.
 client = genai.Client(vertexai=True, project=GCP_PROJECT, location=GCP_LOCATION)
+cost_tracker = CostTracker(MODEL_NAME)
 
 # ── Prompt ───────────────────────────────────────────────────────────────────
 PROMPT_TEMPLATE = """You are a Tamil Nadu home cooking expert helping classify recipe ingredients.
@@ -161,6 +204,16 @@ def classify_recipe(recipe, ingredients):
         ingredient_list=ingredient_list,
     )
     response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+
+    # Real token counts from Vertex AI's response -- not an estimate.
+    usage = getattr(response, "usage_metadata", None)
+    if usage:
+        input_tokens = getattr(usage, "prompt_token_count", 0) or 0
+        output_tokens = getattr(usage, "candidates_token_count", 0) or 0
+        cost_tracker.record(input_tokens, output_tokens)
+    else:
+        print("    (no usage_metadata returned -- cost tracking unavailable for this call)")
+
     text = response.text.strip()
     # Strip accidental markdown fences if the model adds them anyway
     if text.startswith("```"):
@@ -201,6 +254,7 @@ def main():
     parser.add_argument("--dishes", default=None, help="Comma-separated dish names (partial match ok)")
     parser.add_argument("--sample", type=int, default=None, help="Auto-pick N diverse recipes")
     parser.add_argument("--all", action="store_true", help="Run against ALL approved recipes (real run)")
+    parser.add_argument("--max-cost", type=float, default=None, help="Abort the run if running total exceeds this dollar amount")
     args = parser.parse_args()
 
     if not args.preview and not args.apply:
@@ -238,6 +292,10 @@ def main():
 
     total_updated = 0
     for recipe, ingredients in targets:
+        if args.max_cost is not None and cost_tracker.running_total() >= args.max_cost:
+            print(f"\nABORTED: running cost ${cost_tracker.running_total():.4f} reached --max-cost ${args.max_cost:.4f} cap.")
+            break
+
         if not ingredients:
             print(f"  SKIP {recipe[1]} -- no ingredients found")
             continue
@@ -259,6 +317,8 @@ def main():
         print(f"\nTotal ingredient rows updated: {total_updated}")
     else:
         print("\n(Preview only -- no DB changes made.)")
+
+    cost_tracker.summary()
 
     cur.close()
     conn.close()
