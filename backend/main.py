@@ -326,7 +326,10 @@ async def get_recipes_for_review(
         raise HTTPException(status_code=403, detail="Recipe review access denied.")
 
     user_id = current_user["user_id"]
-    conditions = []
+    # Household-private quick-entry dishes never enter the shared reviewer
+    # queue — they're auto-approved for their own household and reviewers
+    # have no reason to see them.
+    conditions = ["r.house_id IS NULL"]
     params = {"status": status, "offset": (page - 1) * page_size, "limit": page_size, "user_id": user_id}
 
     if q:
@@ -612,6 +615,7 @@ async def bulk_approve_recipes(
                 reviewed_by   = CAST(:uid AS uuid),
                 reviewed_at   = NOW()
             WHERE recipe_id = CAST(:rid AS uuid)
+            AND house_id IS NULL
         """), {"uid": user_id, "rid": rid})
         count += 1
 
@@ -645,7 +649,7 @@ async def reviewer_progress(
             COUNT(*) FILTER (WHERE r.review_status != 'under_review'
                              AND r.review_status IS NOT NULL)             AS total_done
         FROM users u
-        LEFT JOIN recipe_dna_master r ON r.reviewed_by = u.user_id
+        LEFT JOIN recipe_dna_master r ON r.reviewed_by = u.user_id AND r.house_id IS NULL
         WHERE u.role IN ('reviewer', 'platform_admin')
         GROUP BY u.user_id, u.name, u.email
         ORDER BY total_done DESC, u.name ASC
@@ -659,6 +663,7 @@ async def reviewer_progress(
             COUNT(*) FILTER (WHERE review_status = 'rejected')      AS rejected,
             COUNT(*)                                                 AS total
         FROM recipe_dna_master
+        WHERE house_id IS NULL
     """)).fetchone()
 
     return {
@@ -699,6 +704,12 @@ async def mark_recipe_pending(
     """
     if current_user["role"] != "platform_admin":
         raise HTTPException(status_code=403, detail="Platform admin only.")
+
+    owner_check = db.execute(text("""
+        SELECT house_id FROM recipe_dna_master WHERE recipe_id = CAST(:rid AS uuid)
+    """), {"rid": recipe_id}).fetchone()
+    if owner_check and owner_check[0] is not None:
+        raise HTTPException(status_code=400, detail="Household-private dishes don't go through the review pipeline.")
 
     db.execute(text("""
         UPDATE recipe_dna_master
@@ -907,9 +918,11 @@ def search_recipes(
     """
     Fuzzy search on recipe_dna_master with optional AND filters.
     Filters: intensity, diet_type, sub_region, is_side_dish (all optional, AND logic).
+    Includes the shared vault (house_id IS NULL) plus this household's own
+    private quick-entry dishes (house_id = their own).
     """
-    filters = ["r.review_status = 'approved'"]
-    params  = {}
+    filters = ["r.review_status = 'approved'", "(r.house_id IS NULL OR r.house_id = CAST(:house_id AS uuid))"]
+    params  = {"house_id": current_user["house_id"]}
 
     if intensity:
         filters.append("r.intensity_level = :intensity")

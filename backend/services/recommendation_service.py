@@ -90,8 +90,9 @@ def load_week_context(db: Session, house_id: str, week_start: date, no_repeat_we
         FROM recipe_dna_master r
         LEFT JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
         WHERE r.review_status = 'approved'
+        AND (r.house_id IS NULL OR r.house_id = CAST(:house_id AS uuid))
         AND r.meal_role @> ARRAY['main']::text[]
-    """)).fetchall()
+    """), {"house_id": house_id}).fetchall()
 
     approved_recipes = [
         {
@@ -595,6 +596,7 @@ def recommend_sides(
         AND rp.source NOT IN ('user_rejected')
         AND (rp.house_id IS NULL OR rp.house_id = CAST(:house_id AS uuid))
         AND r.review_status = 'approved'
+        AND (r.house_id IS NULL OR r.house_id = CAST(:house_id AS uuid))
         AND r.diet_type::text = ANY(:diets)
         AND (r.meal_slots = '{}'::text[] OR r.meal_slots IS NULL OR r.meal_slots @> ARRAY[:slot]::text[])
         AND (
@@ -684,11 +686,12 @@ def recommend_sides(
                 FROM recipe_dna_master r
                 LEFT JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
                 WHERE r.review_status = 'approved'
+                AND (r.house_id IS NULL OR r.house_id = CAST(:house_id AS uuid))
                 AND r.meal_role @> ARRAY['side']::text[]
                 AND r.dish_category = ANY(:cats)
                 AND r.diet_type::text = ANY(:diets)
                 AND r.meal_slots @> ARRAY[:slot]::text[]
-            """), {"cats": compatible_cats, "diets": allowed_diets, "slot": slot}).fetchall()
+            """), {"cats": compatible_cats, "diets": allowed_diets, "slot": slot, "house_id": house_id}).fetchall()
 
             sides = [
                 {
