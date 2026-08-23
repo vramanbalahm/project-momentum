@@ -415,10 +415,13 @@ async def get_recipe_detail(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Full recipe detail for review edit sheet."""
+    """
+    Full recipe detail for the edit sheet.
+    Accessible to platform_admin/reviewer for any recipe, OR to any
+    authenticated user for their own household's private quick-entry
+    dish (house_id matches their own).
+    """
     role = current_user["role"]
-    if role not in ("platform_admin", "reviewer"):
-        raise HTTPException(status_code=403, detail="Access denied.")
 
     r = db.execute(text("""
         SELECT
@@ -426,7 +429,7 @@ async def get_recipe_detail(
             r.diet_type::text, r.is_sattvic, r.is_vegan, r.intensity_level,
             r.meal_slots, r.meal_role, r.is_scalable, r.is_regional_specific,
             r.prep_time_mins, r.cook_time_mins, r.serves, r.tags,
-            r.review_status, r.review_notes,
+            r.review_status, r.review_notes, r.house_id,
             v.hero_image_url, v.prep_steps, v.youtube_urls,
             v.image_generation_count
         FROM recipe_dna_master r
@@ -436,6 +439,10 @@ async def get_recipe_detail(
 
     if not r:
         raise HTTPException(status_code=404, detail="Recipe not found.")
+
+    is_own_household_dish = r.house_id is not None and str(r.house_id) == str(current_user["house_id"])
+    if role not in ("platform_admin", "reviewer") and not is_own_household_dish:
+        raise HTTPException(status_code=403, detail="Access denied.")
 
     # Fetch ingredients
     ingredients = db.execute(text("""
@@ -492,10 +499,23 @@ async def update_recipe_review(
 ):
     """
     Update recipe details + review status.
-    Accessible to platform_admin and reviewer.
+    Accessible to platform_admin/reviewer for any recipe, OR to any
+    authenticated user for their own household's private quick-entry dish.
+    The household-owner path skips review_status/reviewed_by entirely --
+    those are reviewer-pipeline concepts that don't apply to a dish that's
+    already auto-approved for private use.
     """
     role = current_user["role"]
-    if role not in ("platform_admin", "reviewer"):
+
+    owner_row = db.execute(text("""
+        SELECT house_id FROM recipe_dna_master WHERE recipe_id = CAST(:rid AS uuid)
+    """), {"rid": recipe_id}).fetchone()
+    if not owner_row:
+        raise HTTPException(status_code=404, detail="Recipe not found.")
+
+    is_own_household_dish = owner_row.house_id is not None and str(owner_row.house_id) == str(current_user["house_id"])
+    is_reviewer = role in ("platform_admin", "reviewer")
+    if not is_reviewer and not is_own_household_dish:
         raise HTTPException(status_code=403, detail="Access denied.")
 
     user_id = current_user["user_id"]
@@ -507,9 +527,13 @@ async def update_recipe_review(
     set_clauses = []
     params = {"recipe_id": recipe_id, "reviewed_by": user_id}
 
-    # String fields — update only if provided
-    for field in ["dish_name", "regional_name", "sub_region", "intensity_level",
-                  "review_status", "review_notes"]:
+    # String fields — update only if provided. review_status/review_notes are
+    # reviewer-pipeline fields and are skipped entirely on the household-owner
+    # path, since a private dish is already 'approved' and stays that way.
+    editable_string_fields = ["dish_name", "regional_name", "sub_region", "intensity_level"]
+    if is_reviewer:
+        editable_string_fields += ["review_status", "review_notes"]
+    for field in editable_string_fields:
         if payload.get(field) is not None:
             set_clauses.append(f"{field} = :{field}")
             params[field] = payload[field]
@@ -536,9 +560,11 @@ async def update_recipe_review(
         if payload["diet_type"] in valid_diets:
             set_clauses.append(f"diet_type = '{payload['diet_type']}'::diet_pref")
 
-    # Always update reviewed_by and reviewed_at
-    set_clauses.append("reviewed_by = CAST(:reviewed_by AS uuid)")
-    set_clauses.append("reviewed_at = NOW()")
+    # reviewed_by/reviewed_at only make sense on the reviewer-pipeline path --
+    # a household editing their own dish isn't being "reviewed" by anyone.
+    if is_reviewer:
+        set_clauses.append("reviewed_by = CAST(:reviewed_by AS uuid)")
+        set_clauses.append("reviewed_at = NOW()")
 
     if set_clauses:
         db.execute(text(f"""
