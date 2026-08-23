@@ -340,15 +340,30 @@ def main():
 
     if args.dishes:
         for name in [d.strip() for d in args.dishes.split(",")]:
-            recipe, ingredients = fetch_recipe_ingredients(cur, dish_name_pattern=name)
+            try:
+                recipe, ingredients = fetch_recipe_ingredients(cur, dish_name_pattern=name)
+            except Exception as e:
+                conn.rollback()
+                print(f"  ERROR fetching '{name}': {e} -- skipped")
+                continue
             if not recipe:
                 print(f"  WARNING: no approved recipe matching '{name}' -- skipped")
                 continue
             targets.append((recipe, ingredients))
     elif args.sample:
-        for row in pick_diverse_sample(cur, args.sample, force=args.force):
-            recipe, ingredients = fetch_recipe_ingredients(cur, recipe_id=row[0])
-            targets.append((recipe, ingredients))
+        try:
+            sample_rows = pick_diverse_sample(cur, args.sample, force=args.force)
+        except Exception as e:
+            conn.rollback()
+            print(f"FATAL: could not build sample set: {e}")
+            sys.exit(1)
+        for row in sample_rows:
+            try:
+                recipe, ingredients = fetch_recipe_ingredients(cur, recipe_id=row[0])
+                targets.append((recipe, ingredients))
+            except Exception as e:
+                conn.rollback()
+                print(f"  ERROR fetching recipe_id {row[0]}: {e} -- skipped")
     elif args.all:
         skip_clause = "" if args.force else "AND is_optional_classified_at IS NULL"
         cur.execute(f"SELECT recipe_id FROM recipe_dna_master WHERE review_status = 'approved' {skip_clause}")
@@ -360,13 +375,18 @@ def main():
         print(f"Running against {len(all_ids)} approved recipes not yet classified" +
               (f" ({already_done} already classified, skipped -- use --force to reprocess)." if already_done else "."))
         for rid in all_ids:
-            recipe, ingredients = fetch_recipe_ingredients(cur, recipe_id=rid)
-            targets.append((recipe, ingredients))
+            try:
+                recipe, ingredients = fetch_recipe_ingredients(cur, recipe_id=rid)
+                targets.append((recipe, ingredients))
+            except Exception as e:
+                conn.rollback()
+                print(f"  ERROR fetching recipe_id {rid}: {e} -- skipped")
 
     print(f"\n{len(targets)} recipe(s) to process.\n")
 
     total_updated = 0
     total_skipped = 0
+    total_errors = 0
     for recipe, ingredients in targets:
         if args.max_cost is not None and cost_tracker.running_total() >= args.max_cost:
             print(f"\nABORTED: running cost ${cost_tracker.running_total():.4f} reached --max-cost ${args.max_cost:.4f} cap.")
@@ -375,28 +395,31 @@ def main():
         if not ingredients:
             print(f"  SKIP {recipe[1]} -- no ingredients found")
             continue
+
+        # Single wide net around the entire per-recipe body -- classify, apply,
+        # and commit. Nothing here should be able to kill the whole 723-recipe
+        # run; a failure on one recipe rolls back just that recipe and moves on.
         try:
             classifications = classify_recipe(recipe, ingredients)
-        except Exception as e:
-            print(f"  ERROR classifying {recipe[1]}: {e}")
-            continue
 
-        if args.preview:
-            print_preview(recipe[1], classifications)
-        else:
-            valid_ingredient_ids = {i[0] for i in ingredients}
-            try:
+            if args.preview:
+                print_preview(recipe[1], classifications)
+            else:
+                valid_ingredient_ids = {i[0] for i in ingredients}
                 n, skipped = apply_classifications(cur, recipe[0], classifications, valid_ingredient_ids)
                 conn.commit()  # commit per-recipe -- a later failure can't undo work already done
                 total_updated += n
                 total_skipped += skipped
                 print(f"  Applied {n} updates -> {recipe[1]}" + (f" ({skipped} entries skipped)" if skipped else ""))
-            except Exception as e:
-                conn.rollback()
-                print(f"  ERROR applying {recipe[1]}: {e} -- rolled back this recipe, continuing")
+        except Exception as e:
+            conn.rollback()
+            total_errors += 1
+            print(f"  ERROR on {recipe[1]}: {e} -- rolled back this recipe, continuing")
 
     if args.apply:
-        print(f"\nTotal ingredient rows updated: {total_updated}" + (f" ({total_skipped} entries skipped as invalid)" if total_skipped else ""))
+        print(f"\nTotal ingredient rows updated: {total_updated}" +
+              (f" ({total_skipped} entries skipped as invalid)" if total_skipped else "") +
+              (f" ({total_errors} recipes errored and were skipped entirely)" if total_errors else ""))
     else:
         print("\n(Preview only -- no DB changes made.)")
 
@@ -407,4 +430,14 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\nInterrupted by user.")
+        cost_tracker.summary()
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n\nFATAL (unrecoverable): {e}")
+        print("Recipes already applied before this point were committed individually and are safe.")
+        cost_tracker.summary()
+        raise
