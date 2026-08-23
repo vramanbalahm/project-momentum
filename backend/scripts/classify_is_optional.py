@@ -189,14 +189,26 @@ def fetch_recipe_ingredients(cur, dish_name_pattern=None, recipe_id=None):
             SELECT recipe_id, dish_name, dish_category, diet_type::text, is_optional_classified_at
             FROM recipe_dna_master WHERE recipe_id = %s
         """, (recipe_id,))
+        recipe = cur.fetchone()
     else:
+        # Exact match first (case-insensitive) -- avoids "Kothu Parotta" search
+        # accidentally matching "Egg Kothu Parotta" via substring + alphabetical
+        # ORDER BY LIMIT 1. Only fall back to substring if no exact match exists.
         cur.execute("""
             SELECT recipe_id, dish_name, dish_category, diet_type::text, is_optional_classified_at
             FROM recipe_dna_master
             WHERE dish_name ILIKE %s AND review_status = 'approved'
-            ORDER BY dish_name LIMIT 1
-        """, (f"%{dish_name_pattern}%",))
-    recipe = cur.fetchone()
+            LIMIT 1
+        """, (dish_name_pattern,))
+        recipe = cur.fetchone()
+        if not recipe:
+            cur.execute("""
+                SELECT recipe_id, dish_name, dish_category, diet_type::text, is_optional_classified_at
+                FROM recipe_dna_master
+                WHERE dish_name ILIKE %s AND review_status = 'approved'
+                ORDER BY dish_name LIMIT 1
+            """, (f"%{dish_name_pattern}%",))
+            recipe = cur.fetchone()
     if not recipe:
         return None, []
 
