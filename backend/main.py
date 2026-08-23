@@ -329,7 +329,7 @@ async def get_recipes_for_review(
     # Household-private quick-entry dishes never enter the shared reviewer
     # queue — they're auto-approved for their own household and reviewers
     # have no reason to see them.
-    conditions = ["r.house_id IS NULL"]
+    conditions = ["r.created_by_house_id IS NULL"]
     params = {"status": status, "offset": (page - 1) * page_size, "limit": page_size, "user_id": user_id}
 
     if q:
@@ -419,7 +419,7 @@ async def get_recipe_detail(
     Full recipe detail for the edit sheet.
     Accessible to platform_admin/reviewer for any recipe, OR to any
     authenticated user for their own household's private quick-entry
-    dish (house_id matches their own).
+    dish (created_by_house_id matches their own).
     """
     role = current_user["role"]
 
@@ -429,7 +429,7 @@ async def get_recipe_detail(
             r.diet_type::text, r.is_sattvic, r.is_vegan, r.intensity_level,
             r.meal_slots, r.meal_role, r.is_scalable, r.is_regional_specific,
             r.prep_time_mins, r.cook_time_mins, r.serves, r.tags,
-            r.review_status, r.review_notes, r.house_id,
+            r.review_status, r.review_notes, r.created_by_house_id,
             v.hero_image_url, v.prep_steps, v.youtube_urls,
             v.image_generation_count
         FROM recipe_dna_master r
@@ -440,7 +440,7 @@ async def get_recipe_detail(
     if not r:
         raise HTTPException(status_code=404, detail="Recipe not found.")
 
-    is_own_household_dish = r.house_id is not None and str(r.house_id) == str(current_user["house_id"])
+    is_own_household_dish = r.created_by_house_id is not None and str(r.created_by_house_id) == str(current_user["house_id"])
     if role not in ("platform_admin", "reviewer") and not is_own_household_dish:
         raise HTTPException(status_code=403, detail="Access denied.")
 
@@ -508,12 +508,12 @@ async def update_recipe_review(
     role = current_user["role"]
 
     owner_row = db.execute(text("""
-        SELECT house_id FROM recipe_dna_master WHERE recipe_id = CAST(:rid AS uuid)
+        SELECT created_by_house_id FROM recipe_dna_master WHERE recipe_id = CAST(:rid AS uuid)
     """), {"rid": recipe_id}).fetchone()
     if not owner_row:
         raise HTTPException(status_code=404, detail="Recipe not found.")
 
-    is_own_household_dish = owner_row.house_id is not None and str(owner_row.house_id) == str(current_user["house_id"])
+    is_own_household_dish = owner_row.created_by_house_id is not None and str(owner_row.created_by_house_id) == str(current_user["house_id"])
     is_reviewer = role in ("platform_admin", "reviewer")
     if not is_reviewer and not is_own_household_dish:
         raise HTTPException(status_code=403, detail="Access denied.")
@@ -641,7 +641,7 @@ async def bulk_approve_recipes(
                 reviewed_by   = CAST(:uid AS uuid),
                 reviewed_at   = NOW()
             WHERE recipe_id = CAST(:rid AS uuid)
-            AND house_id IS NULL
+            AND created_by_house_id IS NULL
         """), {"uid": user_id, "rid": rid})
         count += 1
 
@@ -675,7 +675,7 @@ async def reviewer_progress(
             COUNT(*) FILTER (WHERE r.review_status != 'under_review'
                              AND r.review_status IS NOT NULL)             AS total_done
         FROM users u
-        LEFT JOIN recipe_dna_master r ON r.reviewed_by = u.user_id AND r.house_id IS NULL
+        LEFT JOIN recipe_dna_master r ON r.reviewed_by = u.user_id AND r.created_by_house_id IS NULL
         WHERE u.role IN ('reviewer', 'platform_admin')
         GROUP BY u.user_id, u.name, u.email
         ORDER BY total_done DESC, u.name ASC
@@ -689,7 +689,7 @@ async def reviewer_progress(
             COUNT(*) FILTER (WHERE review_status = 'rejected')      AS rejected,
             COUNT(*)                                                 AS total
         FROM recipe_dna_master
-        WHERE house_id IS NULL
+        WHERE created_by_house_id IS NULL
     """)).fetchone()
 
     return {
@@ -732,7 +732,7 @@ async def mark_recipe_pending(
         raise HTTPException(status_code=403, detail="Platform admin only.")
 
     owner_check = db.execute(text("""
-        SELECT house_id FROM recipe_dna_master WHERE recipe_id = CAST(:rid AS uuid)
+        SELECT created_by_house_id FROM recipe_dna_master WHERE recipe_id = CAST(:rid AS uuid)
     """), {"rid": recipe_id}).fetchone()
     if owner_check and owner_check[0] is not None:
         raise HTTPException(status_code=400, detail="Household-private dishes don't go through the review pipeline.")
@@ -944,10 +944,10 @@ def search_recipes(
     """
     Fuzzy search on recipe_dna_master with optional AND filters.
     Filters: intensity, diet_type, sub_region, is_side_dish (all optional, AND logic).
-    Includes the shared vault (house_id IS NULL) plus this household's own
-    private quick-entry dishes (house_id = their own).
+    Includes the shared vault (created_by_house_id IS NULL) plus this
+    household's own private quick-entry dishes (created_by_house_id = their own).
     """
-    filters = ["r.review_status = 'approved'", "(r.house_id IS NULL OR r.house_id = CAST(:house_id AS uuid))"]
+    filters = ["r.review_status = 'approved'", "(r.created_by_house_id IS NULL OR r.created_by_house_id = CAST(:house_id AS uuid))"]
     params  = {"house_id": current_user["house_id"]}
 
     if intensity:

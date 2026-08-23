@@ -117,7 +117,7 @@ def get_suggestions(db: Session, pref: str, h_id: str):
             ORDER BY recorded_at DESC LIMIT 1
         ) lp ON TRUE
         WHERE r.review_status = 'approved'
-        AND (r.house_id IS NULL OR r.house_id = CAST(:h_id AS uuid))
+        AND (r.created_by_house_id IS NULL OR r.created_by_house_id = CAST(:h_id AS uuid))
         {filter_sql}
         ORDER BY match_score DESC
         LIMIT 20
