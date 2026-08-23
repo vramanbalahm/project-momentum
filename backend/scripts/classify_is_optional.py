@@ -181,15 +181,17 @@ def get_conn():
 
 
 def fetch_recipe_ingredients(cur, dish_name_pattern=None, recipe_id=None):
-    """Fetch one recipe (by exact-ish name or id) with its ingredient list."""
+    """Fetch one recipe (by exact-ish name or id) with its ingredient list.
+    Always fetches regardless of prior classification -- used for explicit
+    --dishes targeting, where re-checking a specific dish is intentional."""
     if recipe_id:
         cur.execute("""
-            SELECT recipe_id, dish_name, dish_category, diet_type::text
+            SELECT recipe_id, dish_name, dish_category, diet_type::text, is_optional_classified_at
             FROM recipe_dna_master WHERE recipe_id = %s
         """, (recipe_id,))
     else:
         cur.execute("""
-            SELECT recipe_id, dish_name, dish_category, diet_type::text
+            SELECT recipe_id, dish_name, dish_category, diet_type::text, is_optional_classified_at
             FROM recipe_dna_master
             WHERE dish_name ILIKE %s AND review_status = 'approved'
             ORDER BY dish_name LIMIT 1
@@ -197,6 +199,9 @@ def fetch_recipe_ingredients(cur, dish_name_pattern=None, recipe_id=None):
     recipe = cur.fetchone()
     if not recipe:
         return None, []
+
+    if recipe[4] is not None:
+        print(f"  NOTE: '{recipe[1]}' was already classified on {recipe[4]} -- processing again since it was explicitly requested.")
 
     cur.execute("""
         SELECT ri.ingredient_id, ic.name_en, ri.quantity, ri.unit
@@ -209,12 +214,16 @@ def fetch_recipe_ingredients(cur, dish_name_pattern=None, recipe_id=None):
     return recipe, ingredients
 
 
-def pick_diverse_sample(cur, n):
-    """Auto-pick n recipes spread across distinct dish_category/diet_type combos."""
-    cur.execute("""
+def pick_diverse_sample(cur, n, force=False):
+    """Auto-pick n recipes spread across distinct dish_category/diet_type combos.
+    Skips already-classified recipes by default so re-runs don't reprocess
+    (and re-bill) recipes that are already done."""
+    skip_clause = "" if force else "AND is_optional_classified_at IS NULL"
+    cur.execute(f"""
         SELECT DISTINCT ON (dish_category, diet_type) recipe_id, dish_name, dish_category, diet_type::text
         FROM recipe_dna_master
         WHERE review_status = 'approved'
+        {skip_clause}
         ORDER BY dish_category, diet_type, RANDOM()
         LIMIT %s
     """, (n,))
@@ -274,6 +283,11 @@ def apply_classifications(cur, recipe_id, classifications):
             WHERE recipe_id = %s AND ingredient_id = %s
         """, (c["is_optional"], recipe_id, c["ingredient_id"]))
         updated += cur.rowcount
+    # Mark this recipe as classified so future --all/--sample runs skip it.
+    cur.execute("""
+        UPDATE recipe_dna_master SET is_optional_classified_at = NOW()
+        WHERE recipe_id = %s
+    """, (recipe_id,))
     return updated
 
 
@@ -285,6 +299,7 @@ def main():
     parser.add_argument("--sample", type=int, default=None, help="Auto-pick N diverse recipes")
     parser.add_argument("--all", action="store_true", help="Run against ALL approved recipes (real run)")
     parser.add_argument("--max-cost", type=float, default=None, help="Abort the run if running total exceeds this dollar amount")
+    parser.add_argument("--force", action="store_true", help="Include already-classified recipes in --sample/--all (normally skipped)")
     args = parser.parse_args()
 
     if not args.preview and not args.apply:
@@ -307,13 +322,19 @@ def main():
                 continue
             targets.append((recipe, ingredients))
     elif args.sample:
-        for row in pick_diverse_sample(cur, args.sample):
+        for row in pick_diverse_sample(cur, args.sample, force=args.force):
             recipe, ingredients = fetch_recipe_ingredients(cur, recipe_id=row[0])
             targets.append((recipe, ingredients))
     elif args.all:
-        cur.execute("SELECT recipe_id FROM recipe_dna_master WHERE review_status = 'approved'")
+        skip_clause = "" if args.force else "AND is_optional_classified_at IS NULL"
+        cur.execute(f"SELECT recipe_id FROM recipe_dna_master WHERE review_status = 'approved' {skip_clause}")
         all_ids = [r[0] for r in cur.fetchall()]
-        print(f"Running against ALL {len(all_ids)} approved recipes...")
+        already_done = 0
+        if not args.force:
+            cur.execute("SELECT COUNT(*) FROM recipe_dna_master WHERE review_status = 'approved' AND is_optional_classified_at IS NOT NULL")
+            already_done = cur.fetchone()[0]
+        print(f"Running against {len(all_ids)} approved recipes not yet classified" +
+              (f" ({already_done} already classified, skipped -- use --force to reprocess)." if already_done else "."))
         for rid in all_ids:
             recipe, ingredients = fetch_recipe_ingredients(cur, recipe_id=rid)
             targets.append((recipe, ingredients))
