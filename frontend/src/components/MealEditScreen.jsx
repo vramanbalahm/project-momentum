@@ -4,6 +4,11 @@ import axios from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
+const MEAL_SLOTS = ["Breakfast", "Lunch", "Dinner"];
+const MAIN_CATS  = ["tiffin", "rice", "bread", "millet", "continental"];
+const SIDE_CATS  = ["wet", "semi_dry", "dry", "condiment", "sweet"];
+const catLabel   = (c) => c.replace("_", " ");
+
 const SWAP_REASONS = ['Complexity', 'Inventory', 'Variety', 'Other'];
 
 const DietBadge = ({ dietType, isSattvic }) => {
@@ -178,27 +183,40 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
   const [dietType, setDietType]     = useState('');
   const [subRegion, setSubRegion]   = useState('');
   const [subRegions, setSubRegions] = useState([]);
+  const [mealSlot, setMealSlot]     = useState('');
+  const [dishCat, setDishCat]       = useState('');
+  const [inStock, setInStock]       = useState(false);
   const [showSides, setShowSides]   = useState(context === 'add-side');
   const inputRef = useRef(null);
 
   useEffect(() => {
     inputRef.current?.focus();
-    fetchResults('', '', '', '');
+    fetchResults('', '', '', '', '', '', false);
     // Load sub-regions dynamically
     axios.get(`${API_BASE}/recipes/sub-regions`)
       .then(r => setSubRegions(r.data.sub_regions || []))
       .catch(() => {});
   }, []);
 
-  const fetchResults = async (q, intens, diet, region) => {
+  const fetchResults = async (q, intens, diet, region, slot, cat, stock) => {
     setLoading(true);
     try {
       const params = { q };
-      if (intens) params.intensity  = intens;
-      if (diet)   params.diet_type  = diet;
-      if (region) params.sub_region = region;
+      if (intens) params.intensity     = intens;
+      if (diet)   params.diet_type     = diet;
+      if (region) params.sub_region    = region;
+      if (slot)   params.meal_slot     = slot;
+      if (cat)    params.dish_category = cat;
+      if (stock)  params.in_stock      = true;
       if (showSides) params.is_side_dish = true;
-      const res = await axios.get(`${API_BASE}/recipes/search`, { params });
+      // /recipes/search requires an authenticated user -- this call was
+      // previously missing the token entirely and silently returning empty
+      // results on every search (401 swallowed by the catch below).
+      const token = localStorage.getItem('access_token');
+      const res = await axios.get(`${API_BASE}/recipes/search`, {
+        params,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       setResults(res.data);
     } catch { setResults([]); }
     finally { setLoading(false); }
@@ -206,31 +224,41 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
 
   const handleSearch = (val) => {
     setQuery(val);
-    fetchResults(val, intensity, dietType, subRegion);
+    fetchResults(val, intensity, dietType, subRegion, mealSlot, dishCat, inStock);
   };
 
   const setFilter = (type, val) => {
     const newIntens  = type === 'intensity'  ? val : intensity;
     const newDiet    = type === 'diet'       ? val : dietType;
     const newRegion  = type === 'subRegion'  ? val : subRegion;
+    const newSlot    = type === 'mealSlot'   ? val : mealSlot;
+    const newCat     = type === 'dishCat'    ? val : dishCat;
     if (type === 'intensity')  setIntensity(val);
     if (type === 'diet')       setDietType(val);
     if (type === 'subRegion')  setSubRegion(val);
-    fetchResults(query, newIntens, newDiet, newRegion);
+    if (type === 'mealSlot')   setMealSlot(val);
+    if (type === 'dishCat')    setDishCat(val);
+    fetchResults(query, newIntens, newDiet, newRegion, newSlot, newCat, inStock);
   };
 
   const toggleSides = () => {
     const newShowSides = !showSides;
     setShowSides(newShowSides);
-    fetchResults(query, intensity, dietType, subRegion);
+    fetchResults(query, intensity, dietType, subRegion, mealSlot, dishCat, inStock);
+  };
+
+  const toggleInStock = () => {
+    const newInStock = !inStock;
+    setInStock(newInStock);
+    fetchResults(query, intensity, dietType, subRegion, mealSlot, dishCat, newInStock);
   };
 
   const clearFilters = () => {
-    setIntensity(''); setDietType(''); setSubRegion('');
-    fetchResults(query, '', '', '');
+    setIntensity(''); setDietType(''); setSubRegion(''); setMealSlot(''); setDishCat(''); setInStock(false);
+    fetchResults(query, '', '', '', '', '', false);
   };
 
-  const hasFilters = intensity || dietType || subRegion;
+  const hasFilters = intensity || dietType || subRegion || mealSlot || dishCat || inStock;
 
   if (detailRecipe) {
     return (
@@ -274,7 +302,7 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
 
       {/* Filter chips */}
       <div style={{ background: "#F7F4EE", borderBottom: "0.5px solid #EDE8E0", flexShrink: 0 }}>
-        {/* Main / Side toggle */}
+        {/* Main / Side toggle + In Pantry */}
         <div style={{ padding: "6px 12px 2px", display: "flex", gap: 5 }}>
           <div onClick={() => { if(showSides) toggleSides(); }}
             style={{ padding: "3px 14px", borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: "pointer",
@@ -290,6 +318,37 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
               border: `0.5px solid ${showSides ? "#5DCAA5" : "#EDE8E0"}` }}>
             Side dish
           </div>
+          <div onClick={toggleInStock}
+            style={{ padding: "3px 14px", borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: "pointer",
+              background: inStock ? "#1A3A2E" : "transparent",
+              color: inStock ? "#9FE1CB" : "#888780",
+              border: `0.5px solid ${inStock ? "#5DCAA5" : "#EDE8E0"}` }}>
+            🧊 In Pantry
+          </div>
+        </div>
+        {/* Meal slot */}
+        <div style={{ padding: "3px 12px 2px", display: "flex", gap: 5, overflowX: "auto", scrollbarWidth: "none", WebkitOverflowScrolling: "touch", msOverflowStyle: "none" }}>
+          {["", ...MEAL_SLOTS].map(v => (
+            <div key={v} onClick={() => setFilter('mealSlot', v)}
+              style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: "pointer", flexShrink: 0,
+                background: mealSlot === v ? "#1A3A2E" : "transparent",
+                color: mealSlot === v ? "#9FE1CB" : "#888780",
+                border: `0.5px solid ${mealSlot === v ? "#5DCAA5" : "#EDE8E0"}` }}>
+              {v || "All slots"}
+            </div>
+          ))}
+        </div>
+        {/* Dish category (main vs side categories differ) */}
+        <div style={{ padding: "3px 12px 2px", display: "flex", gap: 5, overflowX: "auto", scrollbarWidth: "none", WebkitOverflowScrolling: "touch", msOverflowStyle: "none" }}>
+          {["", ...(showSides ? SIDE_CATS : MAIN_CATS)].map(v => (
+            <div key={v} onClick={() => setFilter('dishCat', v)}
+              style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: "pointer", flexShrink: 0,
+                background: dishCat === v ? "#1A3A2E" : "transparent",
+                color: dishCat === v ? "#9FE1CB" : "#888780",
+                border: `0.5px solid ${dishCat === v ? "#5DCAA5" : "#EDE8E0"}` }}>
+              {v ? catLabel(v) : "All types"}
+            </div>
+          ))}
         </div>
         {/* Intensity */}
         <div style={{ padding: "6px 12px 2px", display: "flex", gap: 5, overflowX: "auto", scrollbarWidth: "none", WebkitOverflowScrolling: "touch", msOverflowStyle: "none" }}>
