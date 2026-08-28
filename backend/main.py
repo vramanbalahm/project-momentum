@@ -1091,10 +1091,16 @@ async def create_quick_entry_dish(
     dish_name = (payload.get("dish_name") or "").strip()
     if not dish_name:
         raise HTTPException(status_code=400, detail="Dish name is required.")
+    if len(dish_name) > 255:
+        raise HTTPException(status_code=400, detail="Dish name must be 255 characters or fewer.")
 
-    main_ingredient_id = payload.get("main_ingredient_id")
-    if main_ingredient_id is None:
+    main_ingredient_id_raw = payload.get("main_ingredient_id")
+    if main_ingredient_id_raw is None:
         raise HTTPException(status_code=400, detail="A main ingredient is required.")
+    try:
+        main_ingredient_id = int(main_ingredient_id_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="main_ingredient_id must be a valid integer.")
 
     valid_diets = ["Veg", "Non-Veg", "Vegan", "Eggitarian"]
     diet_type = payload.get("diet_type")
