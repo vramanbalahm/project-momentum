@@ -190,6 +190,8 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
   const [showSides, setShowSides]   = useState(context === 'add-side');
   const [showQuickEntry, setShowQuickEntry] = useState(false);
   const inputRef = useRef(null);
+  const debounceTimer = useRef(null);
+  const requestSeq = useRef(0);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -201,6 +203,7 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
   }, []);
 
   const fetchResults = async (q, intens, diet, region, slot, cat, stock) => {
+    const thisRequest = ++requestSeq.current;
     setLoading(true);
     try {
       const params = { q };
@@ -219,14 +222,24 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
         params,
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      setResults(res.data);
-    } catch { setResults([]); }
-    finally { setLoading(false); }
+      // Only apply this response if it's still the most recent request --
+      // an older, slower request resolving after a newer one must never
+      // overwrite the newer result with stale data.
+      if (thisRequest === requestSeq.current) setResults(res.data);
+    } catch {
+      if (thisRequest === requestSeq.current) setResults([]);
+    } finally {
+      if (thisRequest === requestSeq.current) setLoading(false);
+    }
   };
 
   const handleSearch = (val) => {
     setQuery(val);
-    fetchResults(val, intensity, dietType, subRegion, mealSlot, dishCat, inStock);
+    clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(
+      () => fetchResults(val, intensity, dietType, subRegion, mealSlot, dishCat, inStock),
+      300
+    );
   };
 
   const setFilter = (type, val) => {
