@@ -422,17 +422,17 @@ class TestQuickEntryExceptions:
             headers={"Authorization": f"Bearer {admin_user['access_token']}"})
         assert resp.status_code == 400
 
-    def test_dish_name_over_255_chars_rejected(self, client, admin_user, sample_ingredient):
-        """dish_name is VARCHAR(255) -- must fail cleanly with 400, not a raw
+    def test_dish_name_over_100_chars_rejected(self, client, admin_user, sample_ingredient):
+        """dish_name is VARCHAR(100) -- must fail cleanly with 400, not a raw
         DB-level 'value too long' 500."""
         resp = client.post("/recipes/quick-entry",
             json={"dish_name": "A" * 300, "main_ingredient_id": sample_ingredient["id"], "diet_type": "Veg"},
             headers={"Authorization": f"Bearer {admin_user['access_token']}"})
         assert resp.status_code == 400
 
-    def test_dish_name_at_exactly_255_chars_succeeds(self, client, admin_user, sample_ingredient, db):
+    def test_dish_name_at_exactly_100_chars_succeeds(self, client, admin_user, sample_ingredient, db):
         """Boundary check -- exactly at the limit should still be accepted."""
-        name = "B" * 255
+        name = "B" * 100
         resp = client.post("/recipes/quick-entry",
             json={"dish_name": name, "main_ingredient_id": sample_ingredient["id"], "diet_type": "Veg"},
             headers={"Authorization": f"Bearer {admin_user['access_token']}"})

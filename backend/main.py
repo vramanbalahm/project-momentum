@@ -421,6 +421,11 @@ async def get_recipe_detail(
     authenticated user for their own household's private quick-entry
     dish (created_by_house_id matches their own).
     """
+    try:
+        uuid.UUID(recipe_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid recipe id.")
+
     role = current_user["role"]
 
     r = db.execute(text("""
@@ -505,6 +510,11 @@ async def update_recipe_review(
     those are reviewer-pipeline concepts that don't apply to a dish that's
     already auto-approved for private use.
     """
+    try:
+        uuid.UUID(recipe_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid recipe id.")
+
     role = current_user["role"]
 
     owner_row = db.execute(text("""
@@ -728,6 +738,11 @@ async def mark_recipe_pending(
     Resets a recipe back to under_review so reviewers can pick it up again.
     Clears reviewed_by and reviewed_at.
     """
+    try:
+        uuid.UUID(recipe_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid recipe id.")
+
     if current_user["role"] != "platform_admin":
         raise HTTPException(status_code=403, detail="Platform admin only.")
 
@@ -1091,8 +1106,8 @@ async def create_quick_entry_dish(
     dish_name = (payload.get("dish_name") or "").strip()
     if not dish_name:
         raise HTTPException(status_code=400, detail="Dish name is required.")
-    if len(dish_name) > 255:
-        raise HTTPException(status_code=400, detail="Dish name must be 255 characters or fewer.")
+    if len(dish_name) > 100:
+        raise HTTPException(status_code=400, detail="Dish name must be 100 characters or fewer.")
 
     main_ingredient_id_raw = payload.get("main_ingredient_id")
     if main_ingredient_id_raw is None:
