@@ -130,7 +130,7 @@ export default function QuickEntryModal({ initialDishName = '', initialMealSlot 
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: C.green }}>Add your own dish</span>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 18, color: C.muted, cursor: "pointer" }}>×</button>
+          <button data-testid="quick-entry-close" onClick={onClose} style={{ background: "none", border: "none", fontSize: 18, color: C.muted, cursor: "pointer" }}>×</button>
         </div>
         <div style={{ fontSize: 12, color: C.muted, marginBottom: 16 }}>
           This stays private to your household -- ready to use right away, no review needed.
@@ -140,6 +140,7 @@ export default function QuickEntryModal({ initialDishName = '', initialMealSlot 
         <label style={{ fontSize: 11, fontWeight: 500, color: C.text }}>Dish name</label>
         <input
           ref={inputRef}
+          data-testid="quick-entry-dish-name"
           value={dishName}
           onChange={e => setDishName(e.target.value)}
           placeholder="e.g. Amma's Special Kootu"
@@ -152,6 +153,7 @@ export default function QuickEntryModal({ initialDishName = '', initialMealSlot 
         <div style={{ display: "flex", gap: 6, margin: "6px 0 14px", flexWrap: "wrap" }}>
           {DIETS.map(d => (
             <div key={d} onClick={() => setDietType(d)}
+              data-testid={`quick-entry-diet-${d}`}
               style={{ padding: "5px 12px", borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: "pointer",
                 background: dietType === d ? C.green : "transparent",
                 color: dietType === d ? C.mint : C.muted,
@@ -168,6 +170,7 @@ export default function QuickEntryModal({ initialDishName = '', initialMealSlot 
         </div>
         <div style={{ position: "relative", margin: "6px 0 14px" }}>
           <input
+            data-testid="quick-entry-ingredient-search"
             value={ingredientQuery}
             onChange={e => handleIngredientSearch(e.target.value)}
             placeholder={loadingIngredients ? "Loading ingredients..." : "Search ingredient..."}
@@ -176,11 +179,12 @@ export default function QuickEntryModal({ initialDishName = '', initialMealSlot 
               fontSize: 13, boxSizing: "border-box" }}
           />
           {ingredientResults.length > 0 && (
-            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: C.card,
+            <div data-testid="quick-entry-ingredient-results" style={{ position: "absolute", top: "100%", left: 0, right: 0, background: C.card,
               border: `0.5px solid ${C.border}`, borderRadius: 10, marginTop: 4, zIndex: 10,
               maxHeight: 180, overflowY: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
               {ingredientResults.map(ing => (
                 <div key={ing.id} onClick={() => pickIngredient(ing)}
+                  data-testid={`quick-entry-ingredient-option-${ing.id}`}
                   style={{ padding: "8px 12px", fontSize: 13, cursor: "pointer", borderBottom: `0.5px solid ${C.border}` }}>
                   {ing.name_en}
                 </div>
@@ -210,6 +214,7 @@ export default function QuickEntryModal({ initialDishName = '', initialMealSlot 
         )}
 
         <button
+          data-testid="quick-entry-submit"
           onClick={handleSubmit}
           disabled={!canSubmit}
           style={{
