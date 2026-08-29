@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { getDishImage } from '../utils/imageUtils';
 import { DishDetailPanel } from '../components/MealEditScreen';
+import QuickEntryModal from '../components/QuickEntryModal';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
@@ -38,7 +39,9 @@ export default function DishSearch({ onBack }) {
   const [inStock,     setInStock]     = useState(false);
 
   const inputRef = useRef(null);
+  const debounceTimer = useRef(null);
   const [detailDish, setDetailDish] = useState(null);
+  const [showQuickEntry, setShowQuickEntry] = useState(false);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -48,7 +51,10 @@ export default function DishSearch({ onBack }) {
       .catch(() => {});
   }, []);
 
+  const requestSeq = useRef(0);
+
   const fetchResults = async (overrides = {}) => {
+    const thisRequest = ++requestSeq.current;
     setLoading(true);
     try {
       const params = { q: overrides.query ?? query };
@@ -74,9 +80,15 @@ export default function DishSearch({ onBack }) {
         params,
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      setResults(res.data);
-    } catch { setResults([]); }
-    finally { setLoading(false); }
+      // Only apply this response if it's still the most recent request fired --
+      // an older, slower request resolving after a newer one must never
+      // overwrite the newer result with stale data.
+      if (thisRequest === requestSeq.current) setResults(res.data);
+    } catch {
+      if (thisRequest === requestSeq.current) setResults([]);
+    } finally {
+      if (thisRequest === requestSeq.current) setLoading(false);
+    }
   };
 
   const setFilter = (key, val) => {
@@ -133,7 +145,12 @@ export default function DishSearch({ onBack }) {
           <input
             ref={inputRef}
             value={query}
-            onChange={e => { setQuery(e.target.value); fetchResults({ query: e.target.value }); }}
+            onChange={e => {
+              const val = e.target.value;
+              setQuery(val);
+              clearTimeout(debounceTimer.current);
+              debounceTimer.current = setTimeout(() => fetchResults({ query: val }), 300);
+            }}
             placeholder="Search dishes..."
             style={{ background: "transparent", border: "none", outline: "none", color: "#FDFCF8", fontSize: 13, width: "100%" }}
           />
@@ -242,7 +259,14 @@ export default function DishSearch({ onBack }) {
           );
         })}
         {!loading && results.length === 0 && (
-          <div style={{ textAlign: "center", padding: 40, color: C.muted, fontSize: 13 }}>No dishes found</div>
+          <div style={{ textAlign: "center", padding: 40, color: C.muted, fontSize: 13 }}>
+            <div>No dishes found</div>
+            <button onClick={() => setShowQuickEntry(true)}
+              style={{ marginTop: 12, padding: "8px 16px", borderRadius: 20, border: `0.5px solid ${C.accent}`,
+                background: "none", color: C.accent, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+              {query ? `Add "${query}" as your own dish` : "Add your own dish"}
+            </button>
+          </div>
         )}
       </div>
 
@@ -256,6 +280,16 @@ export default function DishSearch({ onBack }) {
             selectLabel={null}
           />
         </div>
+      )}
+
+      {showQuickEntry && (
+        <QuickEntryModal
+          initialDishName={query}
+          initialMealSlot={mealSlot}
+          isSideDish={showSides}
+          onClose={() => setShowQuickEntry(false)}
+          onCreated={() => { setShowQuickEntry(false); fetchResults(); }}
+        />
       )}
     </div>
   );

@@ -326,7 +326,10 @@ async def get_recipes_for_review(
         raise HTTPException(status_code=403, detail="Recipe review access denied.")
 
     user_id = current_user["user_id"]
-    conditions = []
+    # Household-private quick-entry dishes never enter the shared reviewer
+    # queue — they're auto-approved for their own household and reviewers
+    # have no reason to see them.
+    conditions = ["r.created_by_house_id IS NULL"]
     params = {"status": status, "offset": (page - 1) * page_size, "limit": page_size, "user_id": user_id}
 
     if q:
@@ -412,10 +415,18 @@ async def get_recipe_detail(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Full recipe detail for review edit sheet."""
+    """
+    Full recipe detail for the edit sheet.
+    Accessible to platform_admin/reviewer for any recipe, OR to any
+    authenticated user for their own household's private quick-entry
+    dish (created_by_house_id matches their own).
+    """
+    try:
+        uuid.UUID(recipe_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid recipe id.")
+
     role = current_user["role"]
-    if role not in ("platform_admin", "reviewer"):
-        raise HTTPException(status_code=403, detail="Access denied.")
 
     r = db.execute(text("""
         SELECT
@@ -423,7 +434,7 @@ async def get_recipe_detail(
             r.diet_type::text, r.is_sattvic, r.is_vegan, r.intensity_level,
             r.meal_slots, r.meal_role, r.is_scalable, r.is_regional_specific,
             r.prep_time_mins, r.cook_time_mins, r.serves, r.tags,
-            r.review_status, r.review_notes,
+            r.review_status, r.review_notes, r.created_by_house_id,
             v.hero_image_url, v.prep_steps, v.youtube_urls,
             v.image_generation_count
         FROM recipe_dna_master r
@@ -433,6 +444,10 @@ async def get_recipe_detail(
 
     if not r:
         raise HTTPException(status_code=404, detail="Recipe not found.")
+
+    is_own_household_dish = r.created_by_house_id is not None and str(r.created_by_house_id) == str(current_user["house_id"])
+    if role not in ("platform_admin", "reviewer") and not is_own_household_dish:
+        raise HTTPException(status_code=403, detail="Access denied.")
 
     # Fetch ingredients
     ingredients = db.execute(text("""
@@ -489,10 +504,28 @@ async def update_recipe_review(
 ):
     """
     Update recipe details + review status.
-    Accessible to platform_admin and reviewer.
+    Accessible to platform_admin/reviewer for any recipe, OR to any
+    authenticated user for their own household's private quick-entry dish.
+    The household-owner path skips review_status/reviewed_by entirely --
+    those are reviewer-pipeline concepts that don't apply to a dish that's
+    already auto-approved for private use.
     """
+    try:
+        uuid.UUID(recipe_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid recipe id.")
+
     role = current_user["role"]
-    if role not in ("platform_admin", "reviewer"):
+
+    owner_row = db.execute(text("""
+        SELECT created_by_house_id FROM recipe_dna_master WHERE recipe_id = CAST(:rid AS uuid)
+    """), {"rid": recipe_id}).fetchone()
+    if not owner_row:
+        raise HTTPException(status_code=404, detail="Recipe not found.")
+
+    is_own_household_dish = owner_row.created_by_house_id is not None and str(owner_row.created_by_house_id) == str(current_user["house_id"])
+    is_reviewer = role in ("platform_admin", "reviewer")
+    if not is_reviewer and not is_own_household_dish:
         raise HTTPException(status_code=403, detail="Access denied.")
 
     user_id = current_user["user_id"]
@@ -504,9 +537,13 @@ async def update_recipe_review(
     set_clauses = []
     params = {"recipe_id": recipe_id, "reviewed_by": user_id}
 
-    # String fields — update only if provided
-    for field in ["dish_name", "regional_name", "sub_region", "intensity_level",
-                  "review_status", "review_notes"]:
+    # String fields — update only if provided. review_status/review_notes are
+    # reviewer-pipeline fields and are skipped entirely on the household-owner
+    # path, since a private dish is already 'approved' and stays that way.
+    editable_string_fields = ["dish_name", "regional_name", "sub_region", "intensity_level"]
+    if is_reviewer:
+        editable_string_fields += ["review_status", "review_notes"]
+    for field in editable_string_fields:
         if payload.get(field) is not None:
             set_clauses.append(f"{field} = :{field}")
             params[field] = payload[field]
@@ -533,9 +570,11 @@ async def update_recipe_review(
         if payload["diet_type"] in valid_diets:
             set_clauses.append(f"diet_type = '{payload['diet_type']}'::diet_pref")
 
-    # Always update reviewed_by and reviewed_at
-    set_clauses.append("reviewed_by = CAST(:reviewed_by AS uuid)")
-    set_clauses.append("reviewed_at = NOW()")
+    # reviewed_by/reviewed_at only make sense on the reviewer-pipeline path --
+    # a household editing their own dish isn't being "reviewed" by anyone.
+    if is_reviewer:
+        set_clauses.append("reviewed_by = CAST(:reviewed_by AS uuid)")
+        set_clauses.append("reviewed_at = NOW()")
 
     if set_clauses:
         db.execute(text(f"""
@@ -612,6 +651,7 @@ async def bulk_approve_recipes(
                 reviewed_by   = CAST(:uid AS uuid),
                 reviewed_at   = NOW()
             WHERE recipe_id = CAST(:rid AS uuid)
+            AND created_by_house_id IS NULL
         """), {"uid": user_id, "rid": rid})
         count += 1
 
@@ -645,7 +685,7 @@ async def reviewer_progress(
             COUNT(*) FILTER (WHERE r.review_status != 'under_review'
                              AND r.review_status IS NOT NULL)             AS total_done
         FROM users u
-        LEFT JOIN recipe_dna_master r ON r.reviewed_by = u.user_id
+        LEFT JOIN recipe_dna_master r ON r.reviewed_by = u.user_id AND r.created_by_house_id IS NULL
         WHERE u.role IN ('reviewer', 'platform_admin')
         GROUP BY u.user_id, u.name, u.email
         ORDER BY total_done DESC, u.name ASC
@@ -659,6 +699,7 @@ async def reviewer_progress(
             COUNT(*) FILTER (WHERE review_status = 'rejected')      AS rejected,
             COUNT(*)                                                 AS total
         FROM recipe_dna_master
+        WHERE created_by_house_id IS NULL
     """)).fetchone()
 
     return {
@@ -697,8 +738,19 @@ async def mark_recipe_pending(
     Resets a recipe back to under_review so reviewers can pick it up again.
     Clears reviewed_by and reviewed_at.
     """
+    try:
+        uuid.UUID(recipe_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid recipe id.")
+
     if current_user["role"] != "platform_admin":
         raise HTTPException(status_code=403, detail="Platform admin only.")
+
+    owner_check = db.execute(text("""
+        SELECT created_by_house_id FROM recipe_dna_master WHERE recipe_id = CAST(:rid AS uuid)
+    """), {"rid": recipe_id}).fetchone()
+    if owner_check and owner_check[0] is not None:
+        raise HTTPException(status_code=400, detail="Household-private dishes don't go through the review pipeline.")
 
     db.execute(text("""
         UPDATE recipe_dna_master
@@ -907,9 +959,11 @@ def search_recipes(
     """
     Fuzzy search on recipe_dna_master with optional AND filters.
     Filters: intensity, diet_type, sub_region, is_side_dish (all optional, AND logic).
+    Includes the shared vault (created_by_house_id IS NULL) plus this
+    household's own private quick-entry dishes (created_by_house_id = their own).
     """
-    filters = ["r.review_status = 'approved'"]
-    params  = {}
+    filters = ["r.review_status = 'approved'", "(r.created_by_house_id IS NULL OR r.created_by_house_id = CAST(:house_id AS uuid))"]
+    params  = {"house_id": current_user["house_id"]}
 
     if intensity:
         filters.append("r.intensity_level = :intensity")
@@ -1018,6 +1072,118 @@ VALID_REGIONS = [
     "Continental", "Virudhunagar", "Puducherry", "Coimbatore",
     "Kanchipuram", "Chennai", "Karnataka"
 ]
+
+
+# --- HOUSEHOLD QUICK-ENTRY DISH ---
+@app.post("/recipes/quick-entry")
+async def create_quick_entry_dish(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Let a household create their own private dish for immediate use in
+    their own plan -- no review/approval step. Auto-approved, visible
+    only to this household (created_by_house_id), never enters the
+    shared reviewer queue.
+
+    Deliberately minimal: dish name + one mandatory ingredient (used for
+    pantry matching -- see is_optional design). Everything else defaults
+    to sensible values; the household can flesh it out further later via
+    the same edit sheet (/recipes/{recipe_id}/detail, PUT .../review)
+    Recipe Review already uses, since ownership now grants access there.
+
+    payload: {
+        dish_name: str (required),
+        main_ingredient_id: int (required) -- must exist in ingredient_catalog,
+        diet_type: "Veg"|"Non-Veg"|"Vegan"|"Eggitarian" (required),
+        meal_slot: "Breakfast"|"Lunch"|"Dinner" (optional hint),
+        is_side_dish: bool (optional, default False)
+    }
+    """
+    house_id = current_user["house_id"]
+
+    dish_name = (payload.get("dish_name") or "").strip()
+    if not dish_name:
+        raise HTTPException(status_code=400, detail="Dish name is required.")
+    if len(dish_name) > 100:
+        raise HTTPException(status_code=400, detail="Dish name must be 100 characters or fewer.")
+
+    main_ingredient_id_raw = payload.get("main_ingredient_id")
+    if main_ingredient_id_raw is None:
+        raise HTTPException(status_code=400, detail="A main ingredient is required.")
+    try:
+        main_ingredient_id = int(main_ingredient_id_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="main_ingredient_id must be a valid integer.")
+
+    valid_diets = ["Veg", "Non-Veg", "Vegan", "Eggitarian"]
+    diet_type = payload.get("diet_type")
+    if diet_type not in valid_diets:
+        raise HTTPException(status_code=400, detail=f"diet_type must be one of {valid_diets}.")
+
+    meal_slot = payload.get("meal_slot") or ""
+    valid_slots = ["Breakfast", "Lunch", "Dinner"]
+    if meal_slot and meal_slot not in valid_slots:
+        raise HTTPException(status_code=400, detail=f"meal_slot must be one of {valid_slots}.")
+
+    is_side_dish = bool(payload.get("is_side_dish", False))
+
+    # Validate the ingredient actually exists
+    ing_row = db.execute(text("""
+        SELECT id, name_en FROM ingredient_catalog WHERE id = :iid
+    """), {"iid": main_ingredient_id}).fetchone()
+    if not ing_row:
+        raise HTTPException(status_code=400, detail="main_ingredient_id does not exist in the ingredient catalog.")
+
+    # Avoid silent duplicates -- if this household already has a dish by
+    # this name, hand back the existing one instead of creating a clutter copy.
+    existing = db.execute(text("""
+        SELECT recipe_id FROM recipe_dna_master
+        WHERE created_by_house_id = CAST(:hid AS uuid)
+        AND LOWER(dish_name) = LOWER(:dish_name)
+    """), {"hid": house_id, "dish_name": dish_name}).fetchone()
+    if existing:
+        return {
+            "recipe_id": str(existing.recipe_id),
+            "dish_name": dish_name,
+            "created": False,
+            "message": "You already have a dish by this name -- reusing it instead of creating a duplicate."
+        }
+
+    recipe_id = db.execute(text("SELECT gen_random_uuid()")).scalar()
+
+    db.execute(text(f"""
+        INSERT INTO recipe_dna_master
+            (recipe_id, dish_name, diet_type, is_sattvic, is_vegan, is_scalable,
+             intensity_level, meal_slots, meal_role, review_status,
+             created_by_house_id, created_by_ai)
+        VALUES
+            (CAST(:rid AS uuid), :dish_name, '{diet_type}'::diet_pref, FALSE, :is_vegan, TRUE,
+             'Medium', :meal_slots, :meal_role, 'approved',
+             CAST(:hid AS uuid), FALSE)
+    """), {
+        "rid": recipe_id,
+        "dish_name": dish_name,
+        "is_vegan": diet_type == "Vegan",
+        "meal_slots": [meal_slot] if meal_slot else [],
+        "meal_role": ["side"] if is_side_dish else ["main"],
+        "hid": house_id,
+    })
+
+    db.execute(text("""
+        INSERT INTO recipe_ingredients (recipe_id, ingredient_id, is_optional, sort_order)
+        VALUES (CAST(:rid AS uuid), :iid, FALSE, 1)
+    """), {"rid": recipe_id, "iid": main_ingredient_id})
+
+    db.commit()
+
+    return {
+        "recipe_id": str(recipe_id),
+        "dish_name": dish_name,
+        "created": True,
+        "message": "Added -- you can use this in your plan right away, or add more detail via the edit screen."
+    }
 
 
 @app.get("/recipes/sub-regions")

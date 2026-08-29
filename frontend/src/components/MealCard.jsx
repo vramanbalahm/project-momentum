@@ -35,6 +35,7 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
     <>
     <div
       ref={setDroppableRef}
+      data-testid={`meal-card-${slotId}`}
       style={{
         background: isHighlighted ? "#FFF3DC" : "#fff",
         borderRadius: 20,
