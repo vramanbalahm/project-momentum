@@ -60,12 +60,29 @@ async function login(page, email = ADMIN_EMAIL, password = ADMIN_PASSWORD) {
 }
 
 async function goToDishSearch(page) {
+  // Wait for the on-mount fetch's actual response, not a guessed duration --
+  // a fixed timeout doesn't scale as the household's dish count grows across
+  // a test run (each created quick dish makes this fetch slightly slower).
+  const initialLoad = page.waitForResponse(
+    resp => resp.url().includes('/recipes/search') && resp.request().method() === 'GET',
+    { timeout: 15000 }
+  );
   await page.locator('[data-testid="tile-dish_search"]').click();
   await page.waitForSelector('input[placeholder="Search dishes..."]', { timeout: 10000 });
-  // DishSearch fires its own on-mount fetch (unfiltered dish list) --
-  // let it settle before the test starts typing, so the test's own
-  // search isn't racing against that initial load.
-  await page.waitForTimeout(800);
+  await initialLoad;
+}
+
+/** Fills the search box and waits for the matching network response to
+ * resolve before returning -- eliminates the class of race condition where
+ * an in-flight earlier request (mount-time or a previous keystroke) could
+ * still be settling when the test moves on to check the DOM. */
+async function searchFor(page, text) {
+  const responsePromise = page.waitForResponse(
+    resp => resp.url().includes('/recipes/search') && resp.url().includes(encodeURIComponent(text)),
+    { timeout: 15000 }
+  );
+  await page.locator('input[placeholder="Search dishes..."]').fill(text);
+  await responsePromise;
 }
 
 async function fillQuickEntryModal(page, { dishName, diet = 'Veg', ingredient }) {
@@ -90,14 +107,14 @@ test.describe('Household Quick-Entry Dish — Dish Search', () => {
 
   test('CTA appears when search comes up empty', async ({ page }) => {
     const gibberish = `Zzqx${Date.now()}NoSuchDish`;
-    await page.locator('input[placeholder="Search dishes..."]').fill(gibberish);
+    await searchFor(page, gibberish);
     await expect(page.locator('text=No dishes found')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('button', { hasText: /Add ".*" as your own dish/i })).toBeVisible();
   });
 
   test('modal opens prefilled with the search query', async ({ page }) => {
     const gibberish = `Zzqx${Date.now()}NoSuchDish`;
-    await page.locator('input[placeholder="Search dishes..."]').fill(gibberish);
+    await searchFor(page, gibberish);
     await page.locator('button', { hasText: /Add ".*" as your own dish/i }).click();
     await expect(page.locator('text=Add your own dish')).toBeVisible();
     await expect(page.locator('[data-testid="quick-entry-dish-name"]')).toHaveValue(gibberish);
@@ -105,7 +122,7 @@ test.describe('Household Quick-Entry Dish — Dish Search', () => {
 
   test('submit stays disabled until all required fields are set', async ({ page }) => {
     const gibberish = `Zzqx${Date.now()}NoSuchDish`;
-    await page.locator('input[placeholder="Search dishes..."]').fill(gibberish);
+    await searchFor(page, gibberish);
     await page.locator('button', { hasText: /Add ".*" as your own dish/i }).click();
 
     const submitBtn = page.locator('[data-testid="quick-entry-submit"]');
@@ -118,7 +135,7 @@ test.describe('Household Quick-Entry Dish — Dish Search', () => {
 
   test('creating a dish shows it in search results afterward', async ({ page }) => {
     const dishName = uniqueDishName();
-    await page.locator('input[placeholder="Search dishes..."]').fill(dishName);
+    await searchFor(page, dishName);
     await page.locator('button', { hasText: /Add ".*" as your own dish/i }).click();
 
     await fillQuickEntryModal(page, { dishName, diet: 'Veg', ingredient: 'Rice' });
@@ -134,7 +151,7 @@ test.describe('Household Quick-Entry Dish — Dish Search', () => {
 
   test('closing the modal without submitting discards it cleanly', async ({ page }) => {
     const gibberish = `Zzqx${Date.now()}NoSuchDish`;
-    await page.locator('input[placeholder="Search dishes..."]').fill(gibberish);
+    await searchFor(page, gibberish);
     await page.locator('button', { hasText: /Add ".*" as your own dish/i }).click();
     await expect(page.locator('text=Add your own dish')).toBeVisible();
 
@@ -170,7 +187,7 @@ test.describe('Household Quick-Entry Dish — Meal Replace Flow', () => {
     await page.waitForSelector('text=Choose a dish', { timeout: 10000 });
 
     const gibberish = `Zzqx${Date.now()}NoSuchDish`;
-    await page.locator('input[placeholder="Search dishes..."]').fill(gibberish);
+    await searchFor(page, gibberish);
     await expect(page.locator('button', { hasText: /Add ".*" as your own dish/i })).toBeVisible({ timeout: 10000 });
     await page.locator('button', { hasText: /Add ".*" as your own dish/i }).click();
 
@@ -196,7 +213,7 @@ test.describe('Household Quick-Entry Dish — Cross-Household Isolation', () => 
     await login(page);
     await goToDishSearch(page);
     const dishName = uniqueDishName();
-    await page.locator('input[placeholder="Search dishes..."]').fill(dishName);
+    await searchFor(page, dishName);
     await page.locator('button', { hasText: /Add ".*" as your own dish/i }).click();
     await fillQuickEntryModal(page, { dishName, diet: 'Veg', ingredient: 'Rice' });
     await page.locator('[data-testid="quick-entry-submit"]').click();
@@ -220,7 +237,7 @@ test.describe('Household Quick-Entry Dish — Cross-Household Isolation', () => 
 
     // Step 3 — this new household searches for the first household's dish name
     await goToDishSearch(page);
-    await page.locator('input[placeholder="Search dishes..."]').fill(dishName);
+    await searchFor(page, dishName);
     await expect(page.locator('text=No dishes found')).toBeVisible({ timeout: 10000 });
     await expect(page.locator(`text=${dishName}`)).not.toBeVisible();
   });
