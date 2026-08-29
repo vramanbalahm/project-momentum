@@ -48,14 +48,20 @@ TABLES = [
             "is_scalable", "is_regional_specific"
         ],
         "order_by": "dish_name",
-        "filter":   "review_status = 'approved'",
+        # created_by_house_id IS NULL -- this migrates the SHARED, admin-curated
+        # vault. Household-private quick-entry dishes (created_by_house_id
+        # non-null) are auto-approved too but scoped to one household in one
+        # environment; their house_id wouldn't correspond to any real
+        # household in the target environment, so they must never be
+        # migrated as if they were shared reference data.
+        "filter":   "review_status = 'approved' AND created_by_house_id IS NULL",
     },
     {
         "table":    "recipe_content_vault",
         "conflict": "recipe_id",
         "update":   ["hero_image_url", "carousel_thumb_url", "prep_steps", "ingredients_json", "video_url"],
         "order_by": "recipe_id",
-        "filter":   "recipe_id IN (SELECT recipe_id FROM recipe_dna_master WHERE review_status = 'approved')",
+        "filter":   "recipe_id IN (SELECT recipe_id FROM recipe_dna_master WHERE review_status = 'approved' AND created_by_house_id IS NULL)",
         "json_cols": ["prep_steps", "ingredients_json"],  # columns needing JSON serialization
     },
     {
@@ -63,7 +69,7 @@ TABLES = [
         "conflict": "recipe_id, ingredient_id",
         "update":   ["quantity", "unit", "is_optional"],
         "order_by": "recipe_id",
-        "filter":   "recipe_id IN (SELECT recipe_id FROM recipe_dna_master WHERE review_status = 'approved')",
+        "filter":   "recipe_id IN (SELECT recipe_id FROM recipe_dna_master WHERE review_status = 'approved' AND created_by_house_id IS NULL)",
         "constraint": "uq_recipe_ingredient",
     },
     {
