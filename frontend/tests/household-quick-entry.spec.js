@@ -62,6 +62,10 @@ async function login(page, email = ADMIN_EMAIL, password = ADMIN_PASSWORD) {
 async function goToDishSearch(page) {
   await page.locator('[data-testid="tile-dish_search"]').click();
   await page.waitForSelector('input[placeholder="Search dishes..."]', { timeout: 10000 });
+  // DishSearch fires its own on-mount fetch (unfiltered dish list) --
+  // let it settle before the test starts typing, so the test's own
+  // search isn't racing against that initial load.
+  await page.waitForTimeout(800);
 }
 
 async function fillQuickEntryModal(page, { dishName, diet = 'Veg', ingredient }) {
