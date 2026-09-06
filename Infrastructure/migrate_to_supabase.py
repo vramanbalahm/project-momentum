@@ -133,7 +133,7 @@ def get_dst_columns(cur, table):
     """, (table,))
     return {r[0] for r in cur.fetchall()}
 
-def build_upsert(table, columns, conflict, update_cols, do_nothing=False, constraint=None, no_conflict=False):
+def build_upsert(table, columns, conflict, update_cols, do_nothing=False, constraint=None, no_conflict=False, partial_where=None):
     col_list    = ", ".join(columns)
     placeholder = ", ".join(["%s"] * len(columns))
 
@@ -144,7 +144,12 @@ def build_upsert(table, columns, conflict, update_cols, do_nothing=False, constr
     if constraint:
         conflict_clause = f"ON CONFLICT ON CONSTRAINT {constraint}"
     else:
+        # Postgres requires a partial index's predicate OUTSIDE the column
+        # list parens: "ON CONFLICT (a, b) WHERE x IS NULL DO UPDATE ..." --
+        # NOT "ON CONFLICT (a, b WHERE x IS NULL)", which is a syntax error.
         conflict_clause = f"ON CONFLICT ({conflict})"
+        if partial_where:
+            conflict_clause += f" {partial_where}"
 
     if do_nothing or update_cols is None:
         conflict_clause += " DO NOTHING"
@@ -194,17 +199,14 @@ def migrate_table(src_cur, dst_cur, cfg, batch_size):
         update_cols = [c for c in update_cols if c in common_cols]
 
     # Build upsert SQL
-    # Build conflict clause — use partial index WHERE clause if specified
-    conflict_str = cfg["conflict"]
-    if cfg.get("partial_where"):
-        conflict_str = f"{cfg['conflict']} {cfg['partial_where']}"
 
     sql = build_upsert(
-        cfg["table"], common_cols, conflict_str,
+        cfg["table"], common_cols, cfg["conflict"],
         update_cols,
         do_nothing=cfg.get("do_nothing", False),
         constraint=cfg.get("constraint"),
         no_conflict=cfg.get("no_conflict", False),
+        partial_where=cfg.get("partial_where"),
     )
 
     inserted = errors = 0
