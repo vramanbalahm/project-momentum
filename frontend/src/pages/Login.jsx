@@ -27,9 +27,10 @@ export default function Login({ onSwitchToRegister }) {
 
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>🌿</div>
-          <div style={{ color: "#FDFCF8", fontSize: 24, fontWeight: 500 }}>Momentum</div>
-          <div style={{ color: "#5DCAA5", fontSize: 13, marginTop: 4 }}>Your weekly meal planner</div>
+          <div style={{ display: "inline-block", background: "#FAF9F5", borderRadius: 16, padding: "16px 20px", marginBottom: 8 }}>
+            <img src="/assets/branding/ladleful-logo.png" alt="Ladleful" style={{ height: 64, display: "block" }} />
+          </div>
+          <div style={{ color: "#5DCAA5", fontSize: 13, marginTop: 8 }}>Your weekly meal planner</div>
         </div>
 
         {/* Card */}

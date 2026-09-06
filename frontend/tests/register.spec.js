@@ -160,7 +160,7 @@ test.describe('Register Screen', () => {
     const email = uniqueEmail();
     await fillForm(page, { email });
     await page.locator('button', { hasText: 'Continue' }).click();
-    await expect(page.locator('text=Welcome to Momentum')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('text=Welcome to Ladleful')).toBeVisible({ timeout: 15000 });
 
     await page.evaluate(() => localStorage.clear());
     await goToRegister(page);
@@ -181,7 +181,7 @@ test.describe('Register Screen', () => {
     // onboarding wizard first -- not directly on the Dashboard. This is a
     // real, intentional flow (see main.jsx: !user.onboarding_done check),
     // not a bug.
-    await expect(page.locator('text=Welcome to Momentum')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('text=Welcome to Ladleful')).toBeVisible({ timeout: 15000 });
   });
 
   // Test 19

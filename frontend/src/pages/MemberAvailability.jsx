@@ -186,7 +186,7 @@ export default function MemberAvailability({ onBack, onProceed }) {
             style={{ color: C.mint, fontSize: 20, cursor: "pointer", lineHeight: 1, padding: "4px 0" }}
           >←</div>
           <div>
-            <div style={{ color: C.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>MOMENTUM</div>
+            <div style={{ color: C.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>LADLEFUL</div>
             <div style={{ color: "#FDFCF8", fontSize: 17, fontWeight: 500, marginTop: 2 }}>{t("memberAvailability.title")}</div>
             {weekStart && (
               <div style={{ color: C.teal, fontSize: 11, marginTop: 2 }}>

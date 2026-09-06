@@ -94,7 +94,7 @@ test.describe('Login Screen', () => {
     await page.locator('input[type="password"]').nth(1).fill(password);
     await page.locator('input[type="text"]').nth(1).fill('Login Test House');
     await page.locator('button', { hasText: 'Continue' }).click();
-    await expect(page.locator('text=Welcome to Momentum')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('text=Welcome to Ladleful')).toBeVisible({ timeout: 15000 });
 
     // Now log out and exercise the actual login flow with those credentials
     await page.evaluate(() => localStorage.clear());
@@ -105,7 +105,7 @@ test.describe('Login Screen', () => {
     await page.locator('button', { hasText: 'Sign in' }).click();
     // Fresh account -- lands on the onboarding wizard, not the Dashboard
     // directly (see main.jsx: !user.onboarding_done check).
-    await expect(page.locator('text=Welcome to Momentum')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text=Welcome to Ladleful')).toBeVisible({ timeout: 10000 });
   });
 
   // Test 7

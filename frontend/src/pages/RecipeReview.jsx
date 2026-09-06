@@ -229,7 +229,7 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div onClick={onBack} style={{ color: C.mint, fontSize: 20, cursor: "pointer" }}>←</div>
           <div style={{ flex: 1 }}>
-            <div style={{ color: C.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>MOMENTUM · REVIEW</div>
+            <div style={{ color: C.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>LADLEFUL · REVIEW</div>
             <div style={{ color: "#FDFCF8", fontSize: 17, fontWeight: 500, marginTop: 2 }}>Recipe Review</div>
             <div style={{ color: C.teal, fontSize: 11, marginTop: 2 }}>{total} recipes · tap any to review</div>
           </div>

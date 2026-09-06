@@ -83,7 +83,7 @@ export default function HelpScreen({ onBack }) {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div onClick={onBack} style={{ color: C.mint, fontSize: 20, cursor: "pointer" }}>←</div>
           <div style={{ flex: 1 }}>
-            <div style={{ color: C.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>MOMENTUM</div>
+            <div style={{ color: C.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>LADLEFUL</div>
             <div style={{ color: "#FDFCF8", fontSize: 17, fontWeight: 500, marginTop: 2 }}>
               {lang === "en" ? "Help & Guide" : "உதவி & வழிகாட்டி"}
             </div>

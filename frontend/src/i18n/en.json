@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Momentum",
+    "name": "Ladleful",
     "tagline": "Your weekly meal planner"
   },
   "common": {
@@ -149,7 +149,7 @@
       "done": "Done"
     },
     "welcome": {
-      "title": "Welcome to Momentum",
+      "title": "Welcome to Ladleful",
       "subtitle": "Let's set up your household in a few simple steps.",
       "point1": "Add your family members and their food preferences",
       "point2": "Set your Satvik rules and lunar calendar",

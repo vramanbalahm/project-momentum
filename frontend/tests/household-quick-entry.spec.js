@@ -233,7 +233,7 @@ test.describe('Household Quick-Entry Dish — Cross-Household Isolation', () => 
     await page.locator('input[type="password"]').nth(1).fill('ValidPass1!');
     await page.locator('input[type="text"]').nth(1).fill('Isolation Test House');
     await page.locator('button', { hasText: 'Continue' }).click();
-    await expect(page.locator('text=MOMENTUM')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('text=LADLEFUL')).toBeVisible({ timeout: 15000 });
 
     // Step 3 — this new household searches for the first household's dish name
     await goToDishSearch(page);

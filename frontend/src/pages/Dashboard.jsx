@@ -163,7 +163,7 @@ export default function Dashboard({ onNavigate }) {
       <div style={{ background: COLORS.bg, padding: "16px 20px 20px", position: "relative", zIndex: 10 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ color: COLORS.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>MOMENTUM</div>
+            <div style={{ color: COLORS.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>LADLEFUL</div>
             <div style={{ color: "#FDFCF8", fontSize: 18, fontWeight: 500, marginTop: 2 }}>
               {t(`common.greeting_${getGreeting()}`, { name: user?.name?.split(" ")[0] || "" })} 👋
             </div>
