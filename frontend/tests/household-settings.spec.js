@@ -172,6 +172,15 @@ test.describe('Lunar Calendar settings', () => {
   // Test 13
   test('saving Lunar preference shows success toast', async ({ page }) => {
     await page.locator("text=We don't follow a Panchangam").click();
+    // This account is a persistent, real, reused one -- if it already has a
+    // Panchangam type set from prior use, the app correctly shows a
+    // "this will reset your customisations" confirmation before allowing
+    // the change. Handle it if present; a fresh account with no prior
+    // selection won't show it at all, so this is a no-op in that case.
+    const confirmBtn = page.locator('button', { hasText: 'Yes, change it' });
+    if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await confirmBtn.click();
+    }
     await page.locator('button', { hasText: 'Save' }).click();
     await expect(page.locator('text=Lunar calendar saved')).toBeVisible({ timeout: 6000 });
   });

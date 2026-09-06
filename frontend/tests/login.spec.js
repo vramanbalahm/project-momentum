@@ -6,7 +6,7 @@
 //  3. Empty form submission shows error
 //  4. Only email filled shows error
 //  5. Only password filled shows error
-//  6. Valid credentials log in and land on Dashboard
+//  6. Valid credentials log in and land on the onboarding wizard
 //  7. Wrong password shows error
 //  8. Non-existent email shows error
 //
@@ -78,14 +78,34 @@ test.describe('Login Screen', () => {
   });
 
   // Test 6
-  test('valid credentials log in and land on Dashboard', async ({ page }) => {
-    await page.locator('input[type="email"]').fill(VALID_EMAIL);
-    await page.locator('input[type="password"]').fill(VALID_PASSWORD);
+  test('valid credentials log in and land on the onboarding wizard', async ({ page }) => {
+    // Self-contained: register a fresh account first to guarantee it exists
+    // with a known password, rather than depending on VALID_EMAIL/
+    // VALID_PASSWORD pointing to an undocumented seed account that no
+    // setup script actually creates.
+    const email = `login_${Date.now()}@playwright-test.com`;
+    const password = 'ValidPass1!';
+
+    await page.locator('text=Create account').click();
+    await page.waitForSelector('text=New household signup', { timeout: 10000 });
+    await page.locator('input[type="text"]').nth(0).fill('Login Test User');
+    await page.locator('input[type="email"]').fill(email);
+    await page.locator('input[type="password"]').nth(0).fill(password);
+    await page.locator('input[type="password"]').nth(1).fill(password);
+    await page.locator('input[type="text"]').nth(1).fill('Login Test House');
+    await page.locator('button', { hasText: 'Continue' }).click();
+    await expect(page.locator('text=Welcome to Momentum')).toBeVisible({ timeout: 15000 });
+
+    // Now log out and exercise the actual login flow with those credentials
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await goToLogin(page);
+    await page.locator('input[type="email"]').fill(email);
+    await page.locator('input[type="password"]').fill(password);
     await page.locator('button', { hasText: 'Sign in' }).click();
-    await expect(page.locator('text=Good')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('text=Weekly Plan')).toBeVisible();
-    await expect(page.locator('text=⚙️')).toBeVisible();
-    await expect(page.locator('text=🚪')).toBeVisible();
+    // Fresh account -- lands on the onboarding wizard, not the Dashboard
+    // directly (see main.jsx: !user.onboarding_done check).
+    await expect(page.locator('text=Welcome to Momentum')).toBeVisible({ timeout: 10000 });
   });
 
   // Test 7

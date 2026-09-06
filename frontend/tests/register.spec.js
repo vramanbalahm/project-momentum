@@ -10,7 +10,7 @@
 // 15.  Password no number shows error
 // 16.  Password no special character shows error
 // 17.  Duplicate email shows error
-// 18.  Valid registration lands on Dashboard
+// 18.  Valid registration lands on the onboarding wizard
 // 19.  Veg is selected by default
 // 20.  Clicking Non-Veg toggles selection
 // 21.  Clicking Vegan toggles selection
@@ -23,7 +23,6 @@
 //  - Frontend running: npm run dev (http://localhost:5173)
 //  - Backend running: uvicorn main:app --reload (http://localhost:8000)
 //  - EMAIL_VERIFY_ENABLED=false and RATE_LIMIT_ENABLED=false in backend .env
-//  - EXISTING_EMAIL below must be a real account already in your DB
 //
 // ── Cleanup after running test 17 and 18 ─────────────────────────────────────
 // Run this in pgAdmin after the test suite to remove test registrations:
@@ -40,8 +39,6 @@
 
 import { test, expect } from '@playwright/test';
 
-// Set in frontend/.env.test — same account used for login tests
-const EXISTING_EMAIL = process.env.TEST_EMAIL || 'testadmin@momentum-test.com';
 const TEST_DOMAIN    = '@playwright-test.com';
 
 function uniqueEmail() {
@@ -157,22 +154,34 @@ test.describe('Register Screen', () => {
 
   // Test 17
   test('duplicate email shows already registered error', async ({ page }) => {
-    await fillForm(page, { email: EXISTING_EMAIL });
+    // Self-contained: register a fresh account first to guarantee it exists,
+    // rather than depending on an external seed account (EXISTING_EMAIL)
+    // that no setup script actually creates.
+    const email = uniqueEmail();
+    await fillForm(page, { email });
+    await page.locator('button', { hasText: 'Continue' }).click();
+    await expect(page.locator('text=Welcome to Momentum')).toBeVisible({ timeout: 15000 });
+
+    await page.evaluate(() => localStorage.clear());
+    await goToRegister(page);
+    await fillForm(page, { email });
     await page.locator('button', { hasText: 'Continue' }).click();
     await expect(page.locator('text=already registered').first()).toBeVisible({ timeout: 10000 });
   });
 
   // Test 18 — creates a real user, clean up with SQL in header comment
-  test('valid registration lands on Dashboard', async ({ page }) => {
+  test('valid registration lands on the onboarding wizard', async ({ page }) => {
     await fillForm(page, {
       email:    uniqueEmail(),
       name:     'Playwright User',
       houseName: 'PW Test House'
     });
     await page.locator('button', { hasText: 'Continue' }).click();
-    await expect(page.locator('text=MOMENTUM')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('text=Weekly Plan')).toBeVisible();
-    await expect(page.locator('text=⚙️')).toBeVisible();
+    // A fresh registration has onboarding_done = false, so it lands on the
+    // onboarding wizard first -- not directly on the Dashboard. This is a
+    // real, intentional flow (see main.jsx: !user.onboarding_done check),
+    // not a bug.
+    await expect(page.locator('text=Welcome to Momentum')).toBeVisible({ timeout: 15000 });
   });
 
   // Test 19
