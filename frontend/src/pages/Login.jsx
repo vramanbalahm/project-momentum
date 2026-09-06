@@ -27,9 +27,7 @@ export default function Login({ onSwitchToRegister }) {
 
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <div style={{ display: "inline-block", background: "#FAF9F5", borderRadius: 16, padding: "16px 20px", marginBottom: 8 }}>
-            <img src="/assets/branding/ladleful-logo.png" alt="Ladleful" style={{ height: 64, display: "block" }} />
-          </div>
+          <img src="/assets/branding/ladleful-logo.png" alt="Ladleful" style={{ height: 80, display: "block", margin: "0 auto 8px" }} />
           <div style={{ color: "#5DCAA5", fontSize: 13, marginTop: 8 }}>Your weekly meal planner</div>
         </div>
 

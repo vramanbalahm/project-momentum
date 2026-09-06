@@ -163,9 +163,7 @@ export default function Register({ onSwitchToLogin }) {
       <div style={{ width: "100%", maxWidth: 400, padding: "0 24px" }}>
 
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{ display: "inline-block", background: "#FAF9F5", borderRadius: 14, padding: "12px 16px", marginBottom: 6 }}>
-            <img src="/assets/branding/ladleful-logo.png" alt="Ladleful" style={{ height: 52, display: "block" }} />
-          </div>
+          <img src="/assets/branding/ladleful-logo.png" alt="Ladleful" style={{ height: 64, display: "block", margin: "0 auto 6px" }} />
           <div style={{ color: "#5DCAA5", fontSize: 12, marginTop: 6 }}>Create your household</div>
         </div>
 
