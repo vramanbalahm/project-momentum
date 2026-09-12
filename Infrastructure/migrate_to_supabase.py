@@ -33,6 +33,13 @@ except ImportError:
 
 TABLES = [
     {
+        "table":    "cuisine_regions",
+        "conflict": "state, region, sub_region",
+        "constraint": "uq_cuisine_regions_natural_key",
+        "update":   ["is_active", "sort_order"],
+        "order_by": "state, region, sort_order",
+    },
+    {
         "table":    "ingredient_catalog",
         "conflict": "id",
         "update":   ["name_en", "name_ta", "category", "is_common_allergen"],
