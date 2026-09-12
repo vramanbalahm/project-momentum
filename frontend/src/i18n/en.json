@@ -122,6 +122,8 @@
       "reviewProgressDesc": "Reviewer stats & progress",
       "recipeReview": "Recipe Review",
       "recipeReviewDesc": "Review and approve recipes",
+      "platformAdmin": "Platform Admin",
+      "platformAdminDesc": "Platform-level tools",
       "myPantry": "My Pantry",
       "myPantryDesc": "What's available",
       "myConfig": "My Config",

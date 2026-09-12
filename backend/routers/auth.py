@@ -213,6 +213,58 @@ async def register(req: RegisterRequest, request: Request, db: Session = Depends
     return issue_tokens(db, user_id, house_id, "household_admin")
 
 
+@router.post("/admin/backfill-holidays")
+async def backfill_holidays(
+    current_user: dict = Depends(require_role("platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Platform admin only. Copies the current year's government-published
+    holidays into every EXISTING household's own events -- for
+    households that registered before the automatic at-registration
+    copy (see /register) existed, or for a new year's holidays once
+    seed_tn_holidays.py has been run for it.
+
+    Explicitly admin-triggered, not automatic -- Vijey's call, so a
+    human decides when this runs rather than it happening silently.
+
+    Safe to run repeatedly: skips any household+event_code+event_year
+    combination that already exists, so it never duplicates events for
+    a household that already has some or all of this year's holidays
+    (e.g. anyone who registered after the at-registration copy went live).
+    """
+    current_year = datetime.now().year
+    result = db.execute(text("""
+        INSERT INTO event_master
+            (house_id, event_name, local_name, event_date, event_type,
+             is_sattvic_required, recurring_annual, event_code,
+             source, event_year, is_active)
+        SELECT
+            h.household_id, t.event_name, t.local_name, t.event_date, t.event_type,
+            t.is_sattvic_required, t.recurring_annual, t.event_code,
+            'ADMIN', t.event_year, true
+        FROM household_master h
+        CROSS JOIN event_master t
+        WHERE t.house_id IS NULL
+        AND t.source = 'ADMIN'
+        AND t.panchangam_type_id IS NULL
+        AND t.event_year = :year
+        AND NOT EXISTS (
+            SELECT 1 FROM event_master e2
+            WHERE e2.house_id = h.household_id
+            AND e2.event_code = t.event_code
+            AND e2.event_year = t.event_year
+        )
+    """), {"year": current_year})
+    db.commit()
+
+    return {
+        "message": f"Backfilled {result.rowcount} holiday event(s) across existing households for {current_year}.",
+        "events_inserted": result.rowcount,
+        "year": current_year
+    }
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     check_rate_limit(request.client.host)

@@ -18,6 +18,7 @@ import RecipeReview from './pages/RecipeReview.jsx'
 import HelpScreen from './pages/HelpScreen.jsx'
 import HouseholdSettings from './pages/HouseholdSettings.jsx'
 import ReviewerProgress from './pages/ReviewerProgress.jsx'
+import PlatformAdmin from './pages/PlatformAdmin.jsx'
 import MyPantry from './pages/MyPantry.jsx'
 import DishSearch from './pages/DishSearch.jsx'
 import ConfigSnapshot from './pages/ConfigSnapshot.jsx'
@@ -67,6 +68,7 @@ function AuthGate() {
   if (screen === 'recipe_review') return (
     <RecipeReview onBack={() => { setReviewerNavParams({}); setScreen('dashboard'); }} onHelp={(recipeId) => { setHelpReturnRecipeId(recipeId); setScreen('help'); }} helpReturnRecipeId={helpReturnRecipeId} initialTab={reviewerNavParams.initialTab || 'under_review'} filterReviewerId={reviewerNavParams.filterReviewerId || null} />
   );
+  if (screen === 'platform_admin') return <PlatformAdmin onBack={() => setScreen('dashboard')} />;
   if (screen === 'help') return (
     <HelpScreen onBack={() => { setScreen('recipe_review'); }} returnRecipeId={helpReturnRecipeId} />
   );

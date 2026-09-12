@@ -25,6 +25,7 @@ export default function Dashboard({ onNavigate }) {
 
   const isAdmin = user?.role === "household_admin" || user?.role === "platform_admin";
   const isReviewer = user?.role === "platform_admin" || user?.role === "reviewer";
+  const isPlatformAdmin = user?.role === "platform_admin";
   const isReviewerOnly = user?.role === "reviewer"; // pure reviewer — no household access
 
   // Smart Weekly Plan navigation — admin checks availability first, member goes straight to planner
@@ -136,6 +137,15 @@ export default function Dashboard({ onNavigate }) {
       color: "#E1F5EE",
       available: true,
       hidden: !isReviewer,
+    },
+    {
+      id: "platform_admin",
+      icon: "🛠️",
+      label: t("dashboard.tiles.platformAdmin"),
+      desc: t("dashboard.tiles.platformAdminDesc"),
+      color: "#F1EFE8",
+      available: true,
+      hidden: !isPlatformAdmin,
     },
     {
       id: "reviewer_progress",
