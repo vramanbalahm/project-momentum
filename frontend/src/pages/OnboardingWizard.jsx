@@ -439,7 +439,7 @@ export default function OnboardingWizard({ onComplete }) {
             <LunarEditor
               onBack={() => setStep(2)}
               onSkip={() => setStep(4)}
-              onDone={() => setStep(4)}
+              onDone={() => { setCompletedSteps(s => [...new Set([...s, 3])]); setStep(4); }}
             />
           )}
 
@@ -464,7 +464,7 @@ export default function OnboardingWizard({ onComplete }) {
                 {[
                   [t("onboarding.members.title"), completedSteps.includes(1) || data?.wizard_status?.members_done],
                   [t("onboarding.satvik.title"), completedSteps.includes(2) || data?.wizard_status?.satvik_done],
-                  [t("onboarding.lunar.title"), !!panchangamId],
+                  [t("onboarding.lunar.title"), completedSteps.includes(3) || !!panchangamId],
                   [t("onboarding.events.title"), completedSteps.includes(4) || data?.wizard_status?.events_done],
                 ].map(([label, done]) => (
                   <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `0.5px solid ${C.border}` }}>
