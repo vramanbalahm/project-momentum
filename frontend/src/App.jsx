@@ -890,7 +890,7 @@ export default function App({ onBack }) {
                       {dayNum}
                     </div>
                     <div style={{ height: 3, borderRadius: 2, background: active ? "rgba(255,255,255,0.2)" : "#EDE8E0", marginTop: 4 }} />
-                    {hasEvent && isCurrentWeek && (() => {
+                    {hasEvent && isPlannableWeek && (() => {
                       const ev = demoEvents.find(e => e.dayName === day);
                       return ev ? (
                         <div style={{ marginTop: 3, lineHeight: 1 }}>
@@ -1019,7 +1019,7 @@ export default function App({ onBack }) {
                       }}>
                         {dayNum}
                       </div>
-                      {isCurrentWeek && demoEvents.some(ev => ev.dayName === day) && (
+                      {isPlannableWeek && demoEvents.some(ev => ev.dayName === day) && (
                         <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#EF9F27", margin: "2px auto 0" }} />
                       )}
                     </div>
