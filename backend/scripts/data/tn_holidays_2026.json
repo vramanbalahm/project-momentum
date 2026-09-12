@@ -1,0 +1,29 @@
+{
+  "source_document": "Government of Tamil Nadu G.O.(Ms.) No.708, Public (Miscellaneous) Department, dated 11 November 2025",
+  "year": 2026,
+  "holidays": [
+    {"event_code": "NEW_YEAR_DAY", "event_name": "New Year's Day", "event_date": "2026-01-01", "event_type": "Social", "is_sattvic_required": false},
+    {"event_code": "PONGAL", "event_name": "Pongal", "event_date": "2026-01-15", "event_type": "Lunar", "is_sattvic_required": true},
+    {"event_code": "THIRUVALLUVAR_DAY", "event_name": "Thiruvalluvar Day", "event_date": "2026-01-16", "event_type": "Social", "is_sattvic_required": false},
+    {"event_code": "UZHAVAR_THIRUNAL", "event_name": "Uzhavar Thirunal", "event_date": "2026-01-17", "event_type": "Social", "is_sattvic_required": false},
+    {"event_code": "REPUBLIC_DAY", "event_name": "Republic Day", "event_date": "2026-01-26", "event_type": "Social", "is_sattvic_required": false},
+    {"event_code": "THAI_POOSAM", "event_name": "Thai Poosam", "event_date": "2026-02-01", "event_type": "Lunar", "is_sattvic_required": true},
+    {"event_code": "TELUGU_NEW_YEAR", "event_name": "Telugu New Year's Day", "event_date": "2026-03-19", "event_type": "Lunar", "is_sattvic_required": false},
+    {"event_code": "RAMZAN", "event_name": "Ramzan (Idu'l Fitr)", "event_date": "2026-03-21", "event_type": "Social", "is_sattvic_required": false},
+    {"event_code": "MAHAVEER_JAYANTHI", "event_name": "Mahaveer Jayanthi", "event_date": "2026-03-31", "event_type": "Social", "is_sattvic_required": false},
+    {"event_code": "GOOD_FRIDAY", "event_name": "Good Friday", "event_date": "2026-04-03", "event_type": "Social", "is_sattvic_required": false},
+    {"event_code": "TAMIL_NEW_YEAR", "event_name": "Tamil New Year's Day / Dr. B.R. Ambedkar's Birthday", "event_date": "2026-04-14", "event_type": "Lunar", "is_sattvic_required": true},
+    {"event_code": "MAY_DAY", "event_name": "May Day", "event_date": "2026-05-01", "event_type": "Social", "is_sattvic_required": false},
+    {"event_code": "BAKRID", "event_name": "Bakrid (Idul Azha)", "event_date": "2026-05-28", "event_type": "Social", "is_sattvic_required": false},
+    {"event_code": "MUHARRAM", "event_name": "Muharram (Yaom-E-Shahadath)", "event_date": "2026-06-26", "event_type": "Social", "is_sattvic_required": false},
+    {"event_code": "INDEPENDENCE_DAY", "event_name": "Independence Day", "event_date": "2026-08-15", "event_type": "Social", "is_sattvic_required": false},
+    {"event_code": "MILAD_UN_NABI", "event_name": "Milad-un-Nabi (Prophet's Birthday)", "event_date": "2026-08-26", "event_type": "Social", "is_sattvic_required": false},
+    {"event_code": "KRISHNA_JAYANTHI", "event_name": "Krishna Jayanthi", "event_date": "2026-09-04", "event_type": "Lunar", "is_sattvic_required": true},
+    {"event_code": "VINAYAGAR_CHATHURTHI", "event_name": "Vinayakar Chathurthi", "event_date": "2026-09-14", "event_type": "Lunar", "is_sattvic_required": true},
+    {"event_code": "GANDHI_JAYANTHI", "event_name": "Gandhi Jayanthi", "event_date": "2026-10-02", "event_type": "Social", "is_sattvic_required": false},
+    {"event_code": "AYUTHA_POOJA", "event_name": "Ayutha Pooja", "event_date": "2026-10-19", "event_type": "Lunar", "is_sattvic_required": true},
+    {"event_code": "VIJAYA_DASAMI", "event_name": "Vijaya Dasami", "event_date": "2026-10-20", "event_type": "Lunar", "is_sattvic_required": true},
+    {"event_code": "DEEPAVALI", "event_name": "Deepavali", "event_date": "2026-11-08", "event_type": "Lunar", "is_sattvic_required": true},
+    {"event_code": "CHRISTMAS", "event_name": "Christmas", "event_date": "2026-12-25", "event_type": "Social", "is_sattvic_required": false}
+  ]
+}
