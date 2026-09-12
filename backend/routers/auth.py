@@ -500,15 +500,22 @@ async def list_members(
     current_user: dict = Depends(require_role("household_admin", "platform_admin")),
     db: Session = Depends(get_db)
 ):
-    """List all members in the household."""
+    """List all members in the household, including their set preferences
+    (age_group/gender/dietary_preference) so the frontend can show what's
+    actually available to copy before an admin selects a 'copy from'
+    source — rather than silently copying unset/null fields."""
     rows = db.execute(text("""
-        SELECT user_id, name, email, role, is_active, created_at
-        FROM users
-        WHERE house_id = CAST(:hid AS uuid)
-        ORDER BY created_at
+        SELECT u.user_id, u.name, u.email, u.role, u.is_active,
+               mp.age_group, mp.gender, mp.dietary_preference
+        FROM users u
+        LEFT JOIN member_preferences mp ON mp.user_id = u.user_id
+        WHERE u.house_id = CAST(:hid AS uuid)
+        ORDER BY u.created_at
     """), {"hid": current_user["house_id"]}).fetchall()
     return [{"user_id": str(r.user_id), "name": r.name, "email": r.email,
-             "role": r.role, "is_active": r.is_active} for r in rows]
+             "role": r.role, "is_active": r.is_active,
+             "age_group": r.age_group, "gender": r.gender,
+             "dietary_preference": r.dietary_preference} for r in rows]
 
 
 @router.put("/members/role", status_code=200)

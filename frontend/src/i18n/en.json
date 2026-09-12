@@ -346,6 +346,7 @@
   "manageMembers": {
     "title": "Manage Members",
     "addMember": "+ Add member",
+    "notSetYet": "not set yet",
     "cancel": "Cancel",
     "loading": "Loading...",
     "newMember": "New member",

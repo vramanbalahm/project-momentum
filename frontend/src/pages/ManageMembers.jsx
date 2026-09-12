@@ -222,16 +222,19 @@ export default function ManageMembers({ onBack }) {
         method: "POST",
         body: JSON.stringify(addForm)
       });
-      // If preferences were copied — save them against the new member
+      // If preferences were copied — save only the fields that were
+      // actually set on the source member, not blank/unset ones
       if (addFormPrefs && newMember?.user_id) {
-        await apiFetch(`/auth/my-profile?target_user_id=${newMember.user_id}`, {
-          method: "PUT",
-          body: JSON.stringify({
-            dietary_preference: addFormPrefs.dietary_preference,
-            age_group:          addFormPrefs.age_group,
-            gender:             addFormPrefs.gender,
-          })
-        });
+        const toCopy = {};
+        if (addFormPrefs.dietary_preference) toCopy.dietary_preference = addFormPrefs.dietary_preference;
+        if (addFormPrefs.age_group)          toCopy.age_group          = addFormPrefs.age_group;
+        if (addFormPrefs.gender)             toCopy.gender             = addFormPrefs.gender;
+        if (Object.keys(toCopy).length > 0) {
+          await apiFetch(`/auth/my-profile?target_user_id=${newMember.user_id}`, {
+            method: "PUT",
+            body: JSON.stringify(toCopy)
+          });
+        }
         if (addFormPrefs.restrictionValue && Object.keys(addFormPrefs.restrictionValue).length > 0) {
           await apiFetch("/auth/my-profile/restrictions", {
             method: "POST",
@@ -300,9 +303,14 @@ export default function ManageMembers({ onBack }) {
                   style={{ ...inputStyle, marginBottom: 0, appearance: "none", cursor: "pointer" }}
                 >
                   <option value="">{t("manageMembers.dontCopy")}</option>
-                  {members.map(m => (
-                    <option key={m.user_id} value={m.user_id}>{m.name}</option>
-                  ))}
+                  {members.map(m => {
+                    const details = [m.gender, m.age_group].filter(Boolean).join(", ");
+                    return (
+                      <option key={m.user_id} value={m.user_id}>
+                        {m.name}{details ? ` (${details})` : ` (${t("manageMembers.notSetYet")})`}
+                      </option>
+                    );
+                  })}
                 </select>
                 {addFormPrefs && (
                   <div style={{ marginTop: 6, fontSize: 11, color: "#0F6E56", background: "#E1F5EE", borderRadius: 8, padding: "6px 10px" }}>
