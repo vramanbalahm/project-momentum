@@ -850,8 +850,11 @@ export default function App({ onBack }) {
             })()}
           </div>
 
-          {/* Copy to Current Week banner — shown at top when viewing past/future week */}
-          {!isCurrentWeek && (
+          {/* Copy to Current Week banner — shown when viewing a genuinely
+              non-plannable week (past, or 2+ weeks ahead). Next week has its
+              own Generate Plan flow now (item 6), so this stays hidden there
+              to avoid both showing at once. */}
+          {!isPlannableWeek && (
             <div style={{ margin: "4px 12px", padding: "8px 12px", background: "#FFF3DC", borderRadius: 10, border: "1px solid #FAC775", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ fontSize: 11, color: "#854F0B", fontWeight: 500 }}>{weekOffset < 0 ? t("weeklyPlan.viewingPast") : t("weeklyPlan.viewingFuture")}</div>
               <button
@@ -1083,8 +1086,11 @@ export default function App({ onBack }) {
             </div>
           ))}
 
-          {/* Past week → Copy button only (admin). Current week → normal CTA (admin). Members see nothing. */}
-          {isAdmin && !isCurrentWeek && (
+          {/* Past/far-future week -> Copy button only (admin). Current or next
+              week -> normal Generate/Review CTA (admin). Members see nothing.
+              Mutually exclusive with isPlannableWeek below -- previously both
+              could show at once on next week, crowding three buttons into one row. */}
+          {isAdmin && !isPlannableWeek && (
             <button
               onClick={() => setShowCopyConfirm(true)}
               style={{
