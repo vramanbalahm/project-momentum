@@ -190,9 +190,12 @@ async def register(req: RegisterRequest, request: Request, db: Session = Depends
     # Diwali, Republic Day, etc.) into this household's own events --
     # civil dates, the same for every household regardless of Panchangam
     # choice, so this happens once here rather than being tied to
-    # whatever they later do on the Lunar Calendar step. They can edit,
-    # pause, or delete any of these freely afterward -- this only seeds
-    # their initial set, source='ADMIN' preserved as provenance.
+    # whatever they later do on the Lunar Calendar step. Copied in as
+    # source='USER' (not 'ADMIN') so they show up in EventEditor.jsx,
+    # which only displays USER-sourced rows -- and semantically correct
+    # anyway, since the household can freely edit, pause, or delete any
+    # of these afterward, same as anything they'd entered themselves.
+    # The master template rows they're copied FROM stay source='ADMIN'.
     current_year = datetime.now().year
     db.execute(text("""
         INSERT INTO event_master
@@ -202,7 +205,7 @@ async def register(req: RegisterRequest, request: Request, db: Session = Depends
         SELECT
             CAST(:hid AS uuid), event_name, local_name, event_date, event_type,
             is_sattvic_required, recurring_annual, event_code,
-            'ADMIN', event_year, true
+            'USER', event_year, true
         FROM event_master
         WHERE house_id IS NULL
         AND source = 'ADMIN'
@@ -242,7 +245,7 @@ async def backfill_holidays(
         SELECT
             h.household_id, t.event_name, t.local_name, t.event_date, t.event_type,
             t.is_sattvic_required, t.recurring_annual, t.event_code,
-            'ADMIN', t.event_year, true
+            'USER', t.event_year, true
         FROM household_master h
         CROSS JOIN event_master t
         WHERE t.house_id IS NULL
