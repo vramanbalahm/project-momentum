@@ -822,15 +822,26 @@ export default function App({ onBack }) {
               )}
             </div>
 
-            {/* Next week — always enabled when going back (offset<0), gated on data for future */}
-            <button
-              onClick={() => { if (weekOffset < 0 || hasNextWeekData) { setWeekOffset(prev => prev + 1); setSelectedDay('Monday'); } }}
-              disabled={weekOffset >= 0 && !hasNextWeekData}
-              style={{ background: "none", border: "none", fontSize: 16, padding: "2px 6px", borderRadius: 8,
-                color: (weekOffset < 0 || hasNextWeekData) ? "#1A3A2E" : "#D0CEC8",
-                cursor: (weekOffset < 0 || hasNextWeekData) ? "pointer" : "not-allowed"
-              }}
-            >››</button>
+            {/* Next week — enabled when: going back toward present (offset<0),
+                stepping from current week to next week (always allowed, so
+                planning ahead is never blocked), or next week already has a
+                saved plan (safe to keep moving forward from there). Anything
+                beyond that requires the week you're currently on to actually
+                have data first — prevents open-ended scrolling into empty
+                future weeks. */}
+            {(() => {
+              const canGoNext = weekOffset < 0 || weekOffset === 0 || hasNextWeekData;
+              return (
+                <button
+                  onClick={() => { if (canGoNext) { setWeekOffset(prev => prev + 1); setSelectedDay('Monday'); } }}
+                  disabled={!canGoNext}
+                  style={{ background: "none", border: "none", fontSize: 16, padding: "2px 6px", borderRadius: 8,
+                    color: canGoNext ? "#1A3A2E" : "#D0CEC8",
+                    cursor: canGoNext ? "pointer" : "not-allowed"
+                  }}
+                >››</button>
+              );
+            })()}
           </div>
 
           {/* Copy to Current Week banner — shown at top when viewing past/future week */}
