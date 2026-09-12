@@ -31,8 +31,16 @@ def load_active_audit_features(db: Session) -> set:
     return {r[0] for r in rows}
 
 
-def load_household_context(db: Session, h_id: str) -> Dict:
-    """Load all household context needed for audit checks in one pass."""
+def load_household_context(db: Session, h_id: str, week_start: str = None) -> Dict:
+    """
+    Load all household context needed for audit checks in one pass.
+
+    week_start (YYYY-MM-DD), when provided, anchors the Satvik-date window
+    to the week actually being audited -- e.g. next week's plan, not always
+    literal today. Falls back to CURRENT_DATE when not provided, matching
+    the original behavior for any caller that doesn't have a specific week
+    in mind.
+    """
 
     # Effective diet
     diet_row = db.execute(text("""
@@ -79,14 +87,24 @@ def load_household_context(db: Session, h_id: str) -> Dict:
     """), {"h_id": h_id}).fetchall()
     recent_meals = {r[0]: r[1] for r in history_rows}  # dish_name -> last served date
 
-    # Satvik dates this week — household-specific lunar events
-    satvik_rows = db.execute(text("""
-        SELECT DISTINCT event_date::text FROM event_master
-        WHERE house_id = CAST(:h_id AS uuid)
-        AND is_active = TRUE
-        AND is_sattvic_required = TRUE
-        AND event_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
-    """), {"h_id": h_id}).fetchall()
+    # Satvik dates this week — household-specific lunar events. Anchored to
+    # the actual week being audited when known, not always literal today.
+    if week_start:
+        satvik_rows = db.execute(text("""
+            SELECT DISTINCT event_date::text FROM event_master
+            WHERE house_id = CAST(:h_id AS uuid)
+            AND is_active = TRUE
+            AND is_sattvic_required = TRUE
+            AND event_date BETWEEN CAST(:week_start AS date) AND CAST(:week_start AS date) + INTERVAL '7 days'
+        """), {"h_id": h_id, "week_start": week_start}).fetchall()
+    else:
+        satvik_rows = db.execute(text("""
+            SELECT DISTINCT event_date::text FROM event_master
+            WHERE house_id = CAST(:h_id AS uuid)
+            AND is_active = TRUE
+            AND is_sattvic_required = TRUE
+            AND event_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'
+        """), {"h_id": h_id}).fetchall()
     satvik_dates = {r[0] for r in satvik_rows}
 
     return {
@@ -243,7 +261,16 @@ def execute_audit(db: Session, h_id: str, changes: list) -> List[Dict]:
     Returns list of results with friendly issue messages.
     """
     active_features = load_active_audit_features(db)
-    ctx             = load_household_context(db, h_id)
+
+    # Derive which week is actually being audited from the incoming changes'
+    # own dates -- previously load_household_context always assumed "today",
+    # so auditing a future week's plan (e.g. next week) checked Satvik-day
+    # compliance against the wrong week's Satvik dates entirely, regardless
+    # of what date each change correctly carried.
+    change_dates = [c.date for c in changes if hasattr(c, "date") and c.date]
+    week_start = min(change_dates) if change_dates else None
+
+    ctx             = load_household_context(db, h_id, week_start)
     seen_this_week  = set()
     result_map      = []
 

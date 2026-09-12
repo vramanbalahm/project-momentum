@@ -381,7 +381,7 @@ export default function App({ onBack }) {
       return {
         day, type,
         to_meal:         mains[0]?.name || "Skipped",
-        date:            getTargetDate(day),
+        date:            getOffsetTargetDate(day),
         recipe_id:       recipe_id,
         side_recipe_ids: side_recipe_ids,
       };
@@ -408,7 +408,7 @@ export default function App({ onBack }) {
   const [showRegenWarning, setShowRegenWarning] = useState(false);
 
   const handleGenerateClick = () => {
-    if (!isAdmin || weekOffset !== 0) return;
+    if (!isAdmin || !isPlannableWeek) return;
     // Check if plan already has meals — saved OR unsaved, both count as "data already found"
     const hasMeals = Object.keys(blueprint).length > 0;
     if (hasMeals) {
@@ -422,7 +422,7 @@ export default function App({ onBack }) {
     setShowQuestionnaire(false);
     setIsGenerating(true);
     try {
-      const weekStart = toLocalDateString(getCurrentWeekMonday());
+      const weekStart = toLocalDateString(getOffsetWeekMonday());
 
       const resp = await axios.post(`${API_BASE}/recommendation/generate`, {
         week_start: weekStart,
@@ -481,7 +481,7 @@ export default function App({ onBack }) {
         const mainItems = mainsArr.map((m, idx) => ({ recipe_id: m.recipe_id || "", dish_type: "Main", dish_sequence: idx + 1 }));
         const sideItems = sidesArr.map((s, idx) => ({ recipe_id: s.recipe_id || "", dish_type: "Side", dish_sequence: mainsArr.length + idx + 1 }));
         return {
-          date: getTargetDate(day), type,
+          date:            getOffsetTargetDate(day), type,
           main: mainItems[0] || null,
           mains: mainItems,
           sides: sideItems,
@@ -533,7 +533,7 @@ export default function App({ onBack }) {
     }
 
     // 3. Run audit on updated blueprint
-    const auditResult = await auditBlueprint(newBlueprint, getTargetDate);
+    const auditResult = await auditBlueprint(newBlueprint, getOffsetTargetDate);
     if (auditResult.success) {
       setAuditResults(auditResult.results);
       setIsAudited(true);
