@@ -28,6 +28,10 @@ export default function OnboardingWizard({ onComplete }) {
   // Step 2 — Members state
   const [members, setMembers]   = useState([]);
   const [editMember, setEditMember] = useState(null);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [addMemberForm, setAddMemberForm] = useState({ name: "", email: "", password: "" });
+  const [addMemberError, setAddMemberError] = useState(null);
+  const [addingMember, setAddingMember] = useState(false);
   const [copyFrom, setCopyFrom] = useState(null);
   const [copyTo, setCopyTo]     = useState({});
 
@@ -105,6 +109,37 @@ export default function OnboardingWizard({ onComplete }) {
       setStep(2);
     } catch (e) { setError(e.message); }
     finally { setSaving(false); }
+  };
+
+  const handleAddMember = async () => {
+    setAddMemberError(null);
+    if (!addMemberForm.name || !addMemberForm.password) {
+      setAddMemberError(t("manageMembers.allFieldsRequired"));
+      return;
+    }
+    if (addMemberForm.password.length < 8) {
+      setAddMemberError(t("manageMembers.passwordMin8"));
+      return;
+    }
+    setAddingMember(true);
+    try {
+      const newMember = await apiFetch("/auth/members/create", {
+        method: "POST",
+        body: JSON.stringify(addMemberForm),
+      });
+      setMembers(ms => [...ms, {
+        user_id: newMember.user_id,
+        name: addMemberForm.name,
+        dietary_preference: "Veg",
+        restrictions: [],
+      }]);
+      setAddMemberForm({ name: "", email: "", password: "" });
+      setShowAddMember(false);
+    } catch (e) {
+      setAddMemberError(e.message);
+    } finally {
+      setAddingMember(false);
+    }
   };
 
   // saveSatvik/savePanchangam/saveEvents moved into editor components
@@ -249,6 +284,36 @@ export default function OnboardingWizard({ onComplete }) {
                 })}
               </div>
 
+              {/* Add Member */}
+              {!showAddMember ? (
+                <button onClick={() => setShowAddMember(true)}
+                  style={{ width: "100%", padding: 10, marginBottom: 10, border: `1px dashed ${C.teal}`, borderRadius: 10, background: "transparent", color: C.deepTeal, fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
+                  {t("manageMembers.addMember")}
+                </button>
+              ) : (
+                <div style={{ ...cardStyle, background: "#FFF9F2" }}>
+                  <input type="text" placeholder={t("manageMembers.namePlaceholder")} value={addMemberForm.name}
+                    onChange={e => setAddMemberForm(f => ({ ...f, name: e.target.value }))}
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, boxSizing: "border-box", marginBottom: 10 }} />
+                  <input type="email" placeholder={t("manageMembers.emailPlaceholder")} value={addMemberForm.email}
+                    onChange={e => setAddMemberForm(f => ({ ...f, email: e.target.value }))}
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, boxSizing: "border-box", marginBottom: 10 }} />
+                  <input type="password" placeholder={t("manageMembers.passwordPlaceholder")} value={addMemberForm.password}
+                    onChange={e => setAddMemberForm(f => ({ ...f, password: e.target.value }))}
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, boxSizing: "border-box", marginBottom: 10 }} />
+                  {addMemberError && <div style={{ fontSize: 12, color: "#993C1D", marginBottom: 10 }}>{addMemberError}</div>}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => { setShowAddMember(false); setAddMemberError(null); }}
+                      style={{ flex: 1, padding: 10, border: `0.5px solid ${C.border}`, borderRadius: 10, background: "transparent", color: C.muted, fontSize: 13, cursor: "pointer" }}>
+                      {t("manageMembers.cancel")}
+                    </button>
+                    <button onClick={handleAddMember} disabled={addingMember}
+                      style={{ flex: 1, padding: 10, border: "none", borderRadius: 10, background: C.green, color: C.mint, fontSize: 13, fontWeight: 500, cursor: addingMember ? "not-allowed" : "pointer", opacity: addingMember ? 0.7 : 1 }}>
+                      {addingMember ? t("manageMembers.adding") : t("manageMembers.addBtn")}
+                    </button>
+                  </div>
+                </div>
+              )}
               {/* Copy preference section */}
               {members.length > 1 && (
                 <div style={{ background: "#F7F4EE", border: `0.5px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
