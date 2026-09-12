@@ -219,6 +219,7 @@
     "title": "Your week awaits",
     "backToDashboard": "← Dashboard",
     "availability": "👥 Availability",
+    "inventory": "Inventory / Pantry",
     "availabilityNotSet": "Availability not set for this week yet",
     "reviewPlan": "Review plan",
     "savePlan": "Save plan",

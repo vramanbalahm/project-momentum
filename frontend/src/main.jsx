@@ -61,7 +61,7 @@ function AuthGate() {
   if (!user?.onboarding_done) return <OnboardingWizard onComplete={() => window.location.reload()} />;
 
   // Authenticated — route to correct screen
-  if (screen === 'weekly_plan') return <App onBack={() => setScreen('dashboard')} />;
+  if (screen === 'weekly_plan') return <App onBack={() => setScreen('dashboard')} onNavigate={setScreen} />;
   if (screen === 'family_profile') return <FamilyProfile onBack={() => setScreen('dashboard')} />;
   if (screen === 'my_profile') return <MyProfile onBack={() => setScreen('settings')} />;
   if (screen === 'manage_members') return <ManageMembers onBack={() => setScreen('dashboard')} />;

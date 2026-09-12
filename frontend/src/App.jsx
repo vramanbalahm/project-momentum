@@ -152,7 +152,7 @@ const WeekThumbCard = ({ meal, slotId, onClick, isSelected = false, isSwapMode =
   );
 };
 
-export default function App({ onBack }) {
+export default function App({ onBack, onNavigate }) {
   const { user, logout } = useAuth();
   const { t, i18n } = useTranslation();
   const HH_ID = user?.house_id; // declared early — used in useEffects below
@@ -781,11 +781,15 @@ export default function App({ onBack }) {
             </div>
           </div>
 
-          {/* Context icons — compact icon-only row */}
+          {/* Context icons — compact icon-only row. Previously purely
+              decorative (cursor:pointer with no onClick at all) -- now wired
+              to real actions. Middle icon (was 🧊, unclear original intent)
+              removed per Vijey to free up the limited header real estate. */}
           <div style={{ display: "flex", gap: 16, marginTop: 6 }}>
-            {["🛒", "🧊", "👨‍👩‍👧"].map((icon, i) => (
-              <span key={i} style={{ fontSize: 18, cursor: "pointer", opacity: 0.85 }}>{icon}</span>
-            ))}
+            <span onClick={() => onNavigate && onNavigate('my_pantry')} style={{ fontSize: 18, cursor: "pointer", opacity: 0.85 }} title={t("weeklyPlan.inventory")}>🛒</span>
+            {isAdmin && isPlannableWeek && (
+              <span onClick={() => setShowAvailabilityOverlay(true)} style={{ fontSize: 18, cursor: "pointer", opacity: 0.85 }} title={t("weeklyPlan.availability")}>👨‍👩‍👧</span>
+            )}
           </div>
         </div>
 
