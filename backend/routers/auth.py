@@ -186,6 +186,30 @@ async def register(req: RegisterRequest, request: Request, db: Session = Depends
         WHERE household_id = CAST(:hid AS uuid)
     """), {"uid": user_id, "hid": house_id})
 
+    # Pre-populate this year's government-published holidays (Pongal,
+    # Diwali, Republic Day, etc.) into this household's own events --
+    # civil dates, the same for every household regardless of Panchangam
+    # choice, so this happens once here rather than being tied to
+    # whatever they later do on the Lunar Calendar step. They can edit,
+    # pause, or delete any of these freely afterward -- this only seeds
+    # their initial set, source='ADMIN' preserved as provenance.
+    current_year = datetime.now().year
+    db.execute(text("""
+        INSERT INTO event_master
+            (house_id, event_name, local_name, event_date, event_type,
+             is_sattvic_required, recurring_annual, event_code,
+             source, event_year, is_active)
+        SELECT
+            CAST(:hid AS uuid), event_name, local_name, event_date, event_type,
+            is_sattvic_required, recurring_annual, event_code,
+            'ADMIN', event_year, true
+        FROM event_master
+        WHERE house_id IS NULL
+        AND source = 'ADMIN'
+        AND panchangam_type_id IS NULL
+        AND event_year = :year
+    """), {"hid": house_id, "year": current_year})
+
     return issue_tokens(db, user_id, house_id, "household_admin")
 
 
