@@ -179,6 +179,21 @@ export default function LunarEditor({ onBack, onSkip, onDone, nextLabel }) {
 
       <div style={{ flex: 1, overflowY: "auto", maxHeight: 360 }}>
 
+        {/* None option — shown first so people who don't follow a Panchangam see it right away */}
+        <div
+          onClick={() => handlePanchangamSelect(null)}
+          style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", marginBottom: 16, background: panchangamId === null ? "#E1F5EE" : "#F7F4EE", border: `0.5px solid ${panchangamId === null ? C.teal : C.border}`, borderRadius: 12, cursor: "pointer" }}
+        >
+          <div style={{ fontSize: 22, width: 32, textAlign: "center" }}>🚫</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: panchangamId === null ? C.deepTeal : C.text }}>{t("lunarEditor.noFollow")}</div>
+            <div style={{ fontSize: 11, color: C.muted }}>{t("lunarEditor.noFollowDesc")}</div>
+          </div>
+          {panchangamId === null && (
+            <div style={{ width: 18, height: 18, borderRadius: "50%", background: C.teal, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "white" }}>✓</div>
+          )}
+        </div>
+
         {/* Panchangam type selection */}
         {panchangamTypes.map((pt, idx) => (
           <div key={pt.id}
@@ -197,21 +212,6 @@ export default function LunarEditor({ onBack, onSkip, onDone, nextLabel }) {
             )}
           </div>
         ))}
-
-        {/* None option */}
-        <div
-          onClick={() => handlePanchangamSelect(null)}
-          style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", marginBottom: 16, background: panchangamId === null ? "#E1F5EE" : "#F7F4EE", border: `0.5px solid ${panchangamId === null ? C.teal : C.border}`, borderRadius: 12, cursor: "pointer" }}
-        >
-          <div style={{ fontSize: 22, width: 32, textAlign: "center" }}>🚫</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: panchangamId === null ? C.deepTeal : C.text }}>{t("lunarEditor.noFollow")}</div>
-            <div style={{ fontSize: 11, color: C.muted }}>{t("lunarEditor.noFollowDesc")}</div>
-          </div>
-          {panchangamId === null && (
-            <div style={{ width: 18, height: 18, borderRadius: "50%", background: C.teal, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "white" }}>✓</div>
-          )}
-        </div>
 
         {/* Observation toggles — shown only when panchangam is selected and observations exist */}
         {panchangamId && observations.length > 0 && (
