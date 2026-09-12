@@ -17,6 +17,7 @@ import MemberAvailability from './pages/MemberAvailability.jsx'
 import RecipeReview from './pages/RecipeReview.jsx'
 import HelpScreen from './pages/HelpScreen.jsx'
 import HouseholdSettings from './pages/HouseholdSettings.jsx'
+import SettingsMenu from './pages/SettingsMenu.jsx'
 import ReviewerProgress from './pages/ReviewerProgress.jsx'
 import PlatformAdmin from './pages/PlatformAdmin.jsx'
 import MyPantry from './pages/MyPantry.jsx'
@@ -63,7 +64,7 @@ function AuthGate() {
   // Authenticated — route to correct screen
   if (screen === 'weekly_plan') return <App onBack={() => setScreen('dashboard')} />;
   if (screen === 'family_profile') return <FamilyProfile onBack={() => setScreen('dashboard')} />;
-  if (screen === 'my_profile') return <MyProfile onBack={() => setScreen('dashboard')} />;
+  if (screen === 'my_profile') return <MyProfile onBack={() => setScreen('settings')} />;
   if (screen === 'manage_members') return <ManageMembers onBack={() => setScreen('dashboard')} />;
   if (screen === 'recipe_review') return (
     <RecipeReview onBack={() => { setReviewerNavParams({}); setScreen('dashboard'); }} onHelp={(recipeId) => { setHelpReturnRecipeId(recipeId); setScreen('help'); }} helpReturnRecipeId={helpReturnRecipeId} initialTab={reviewerNavParams.initialTab || 'under_review'} filterReviewerId={reviewerNavParams.filterReviewerId || null} />
@@ -73,9 +74,10 @@ function AuthGate() {
     <HelpScreen onBack={() => { setScreen('recipe_review'); }} returnRecipeId={helpReturnRecipeId} />
   );
   if (screen === 'household_settings') return <HouseholdSettings onBack={() => setScreen('dashboard')} />;
+  if (screen === 'settings') return <SettingsMenu onBack={() => setScreen('dashboard')} onNavigate={setScreen} />;
   if (screen === 'my_pantry') return <MyPantry onBack={() => setScreen('dashboard')} />;
   if (screen === 'dish_search') return <DishSearch onBack={() => setScreen('dashboard')} />;
-  if (screen === 'my_config') return <ConfigSnapshot onBack={() => setScreen('dashboard')} />;
+  if (screen === 'my_config') return <ConfigSnapshot onBack={() => setScreen('settings')} />;
   if (screen === 'reviewer_progress') return <ReviewerProgress onBack={() => setScreen('dashboard')} onNavigate={(params) => { setReviewerNavParams(params); setScreen('recipe_review'); }} />;
   if (screen === 'member_availability') return (
     <MemberAvailability

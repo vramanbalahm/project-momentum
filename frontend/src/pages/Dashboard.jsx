@@ -106,14 +106,6 @@ export default function Dashboard({ onNavigate }) {
       available: isAdmin,
     },
     {
-      id: "my_config",
-      label: t("dashboard.tiles.myConfig"),
-      desc: t("dashboard.tiles.myConfigDesc"),
-      icon: "🔍",
-      color: "#EEF0FE",
-      available: true,
-    },
-    {
       id: "my_pantry",
       label: t("dashboard.tiles.myPantry"),
       desc: t("dashboard.tiles.myPantryDesc"),
@@ -122,12 +114,12 @@ export default function Dashboard({ onNavigate }) {
       available: true,
     },
     {
-      id: "household_settings",
+      id: "settings",
       icon: "⚙️",
-      label: t("dashboard.tiles.householdSettings"),
-      desc: isAdmin ? t("dashboard.tiles.householdSettingsDesc") : t("dashboard.menu.adminOnly"),
+      label: t("dashboard.tiles.settings"),
+      desc: t("dashboard.tiles.settingsDesc"),
       color: "#FAEEDA",
-      available: isAdmin,
+      available: true,
     },
     {
       id: "recipe_review",
@@ -253,16 +245,6 @@ export default function Dashboard({ onNavigate }) {
                         {isAdmin ? "Household Admin" : isReviewer ? "Reviewer" : "Member"}
                       </div>
                     </div>
-
-                    {/* My Profile — not for reviewer */}
-                    {!isReviewerOnly && (
-                      <SettingsItem
-                        icon="👤"
-                        label={t("dashboard.menu.myProfile")}
-                        available={true}
-                        onClick={() => { setMenuOpen(false); onNavigate("my_profile"); }}
-                      />
-                    )}
 
                     {/* Member Availability — not for reviewer */}
                     {!isReviewerOnly && (

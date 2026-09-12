@@ -127,7 +127,9 @@
       "myPantry": "My Pantry",
       "myPantryDesc": "What's available",
       "myConfig": "My Config",
-      "myConfigDesc": "View all settings"
+      "myConfigDesc": "View all settings",
+      "settings": "Settings",
+      "settingsDesc": "Profile, config & household settings"
     },
     "menu": {
       "myProfile": "My Profile",
@@ -423,6 +425,22 @@
     "loadError": "Failed to load availability.",
     "awayLabel": "Away",
     "presentLabel": "Present"
+  },
+  "settingsMenu": {
+    "title": "Settings",
+    "subtitle": "Your profile, config & household settings",
+    "myProfile": {
+      "label": "My Profile",
+      "desc": "Your name, phone & personal preferences"
+    },
+    "myConfig": {
+      "label": "My Config",
+      "desc": "View all your current settings at a glance"
+    },
+    "householdSettings": {
+      "label": "Household Settings",
+      "desc": "Satvik, lunar calendar & events"
+    }
   },
   "householdSettings": {
     "title": "Household Settings",

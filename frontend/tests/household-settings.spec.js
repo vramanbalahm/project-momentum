@@ -30,7 +30,9 @@ async function loginAsMember(page) {
 }
 
 async function goToHouseholdSettings(page) {
-  await page.locator('[data-testid="tile-household_settings"]').click();
+  await page.locator('[data-testid="tile-settings"]').click();
+  await page.waitForSelector('[data-testid="settings-row-household_settings"]', { timeout: 8000 });
+  await page.locator('[data-testid="settings-row-household_settings"]').click();
   // Wait for header text that only appears on the settings screen, not the menu items list
   await page.waitForSelector('text=Configure your household preferences', { timeout: 8000 });
 }
@@ -55,25 +57,31 @@ async function goToEventsEditor(page) {
 
 // ── Dashboard tile visibility ─────────────────────────────────────────────────
 
-test.describe('Household Settings tile visibility', () => {
+test.describe('Settings tile and Household Settings row visibility', () => {
 
   // Test 1
-  test('tile is visible for household admin', async ({ page }) => {
+  test('Settings tile is visible to household admin, with Household Settings row enabled', async ({ page }) => {
     await loginAsAdmin(page);
-    await expect(page.locator('[data-testid="tile-household_settings"]')).toBeVisible();
+    await expect(page.locator('[data-testid="tile-settings"]')).toBeVisible();
+    await page.locator('[data-testid="tile-settings"]').click();
+    const row = page.locator('[data-testid="settings-row-household_settings"]');
+    await expect(row).toBeVisible();
+    const opacity = await row.evaluate(el => getComputedStyle(el).opacity);
+    expect(parseFloat(opacity)).toBe(1);
   });
 
   // Test 2
-  test('tile is NOT available for plain household member', async ({ page }) => {
+  test('Settings tile is visible to a plain household member too, but Household Settings row is disabled', async ({ page }) => {
     await loginAsMember(page);
-    const tile = page.locator('[data-testid="tile-household_settings"]');
-    const count = await tile.count();
-    if (count > 0) {
-      // Tile exists but should be dimmed (opacity < 1) for non-admin
-      const opacity = await tile.evaluate(el => getComputedStyle(el).opacity);
-      expect(parseFloat(opacity)).toBeLessThan(1);
-    }
-    // count === 0 means tile correctly hidden — also passes
+    // The tile itself is open to everyone now -- My Profile and My Config
+    // live behind it too, which every member should be able to reach.
+    await expect(page.locator('[data-testid="tile-settings"]')).toBeVisible();
+    await page.locator('[data-testid="tile-settings"]').click();
+    const row = page.locator('[data-testid="settings-row-household_settings"]');
+    await expect(row).toBeVisible();
+    // Household Settings itself stays admin-only -- dimmed for a plain member
+    const opacity = await row.evaluate(el => getComputedStyle(el).opacity);
+    expect(parseFloat(opacity)).toBeLessThan(1);
   });
 
 });
@@ -88,7 +96,7 @@ test.describe('Household Settings navigation', () => {
 
   // Test 3
   test('tapping tile navigates to Household Settings screen', async ({ page }) => {
-    await page.locator('[data-testid="tile-household_settings"]').click();
+    await goToHouseholdSettings(page);
     await expect(page.locator('text=Configure your household preferences')).toBeVisible({ timeout: 8000 });
   });
 
