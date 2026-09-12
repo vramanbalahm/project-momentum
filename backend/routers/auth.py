@@ -7,6 +7,7 @@ from typing import Optional
 from uuid import uuid4
 import hashlib
 import os
+import secrets
 
 from database import SessionLocal
 from services.otp_service import generate_otp, verify_otp
@@ -83,7 +84,7 @@ class TokenResponse(BaseModel):
 
 class CreateMemberRequest(BaseModel):
     email: Optional[EmailStr] = None
-    password: str
+    password: Optional[str] = None
     name: str
 
 class ChangePasswordRequest(BaseModel):
@@ -313,9 +314,24 @@ async def create_member(
     """
     Admin-only — creates a household_member under the same household.
     Members cannot self-register into an existing household.
+
+    email + password are a pair: both required together (real,
+    login-capable member), or neither provided (profile-only member --
+    tracked for meal planning only, cannot log in). When no email is
+    given, a non-deliverable placeholder email and a random password
+    are generated server-side and never surfaced anywhere -- the admin
+    never needs to think about credentials for a profile-only member.
     """
-    # Check email not taken — only if email provided
-    if req.email:
+    user_id = str(uuid4())
+    is_profile_only = not req.email
+
+    if is_profile_only:
+        # Placeholder email is unique by construction (uses this member's
+        # own fresh user_id) and uses a non-resolvable domain so it can
+        # never be mistaken for a real, reachable address.
+        email_to_store = f"member-{user_id}@no-login.ladleful.internal"
+        password_to_store = secrets.token_urlsafe(32)  # random, never shown or logged
+    else:
         existing = db.execute(text(
             "SELECT user_id FROM users WHERE email = :email"
         ), {"email": req.email}).fetchone()
@@ -324,12 +340,14 @@ async def create_member(
                 status_code=409,
                 detail="This email is already registered in the system."
             )
+        if not req.password:
+            raise HTTPException(status_code=422, detail="Password is required when an email is provided.")
+        pwd_errors = validate_password(req.password)
+        if pwd_errors:
+            raise HTTPException(status_code=422, detail=" ".join(pwd_errors))
+        email_to_store = req.email
+        password_to_store = req.password
 
-    pwd_errors = validate_password(req.password)
-    if pwd_errors:
-        raise HTTPException(status_code=422, detail=" ".join(pwd_errors))
-
-    user_id = str(uuid4())
     db.execute(text("""
         INSERT INTO users
             (user_id, house_id, email, name, password_hash, role, is_active, created_by)
@@ -339,14 +357,15 @@ async def create_member(
     """), {
         "uid": user_id,
         "hid": current_user["house_id"],
-        "email": req.email,
+        "email": email_to_store,
         "name": req.name,
-        "pwd": hash_password(req.password),
+        "pwd": hash_password(password_to_store),
         "admin": current_user["user_id"]
     })
     db.commit()
 
-    return {"user_id": user_id, "message": f"Member {req.name} created successfully."}
+    return {"user_id": user_id, "message": f"Member {req.name} created successfully.",
+            "is_profile_only": is_profile_only}
 
 
 @router.post("/change-password", status_code=204)
@@ -503,7 +522,11 @@ async def list_members(
     """List all members in the household, including their set preferences
     (age_group/gender/dietary_preference) so the frontend can show what's
     actually available to copy before an admin selects a 'copy from'
-    source — rather than silently copying unset/null fields."""
+    source — rather than silently copying unset/null fields.
+
+    Profile-only members (no real email, created without login access)
+    have their auto-generated placeholder email masked out entirely --
+    it's an internal implementation detail, never meant to be shown."""
     rows = db.execute(text("""
         SELECT u.user_id, u.name, u.email, u.role, u.is_active,
                mp.age_group, mp.gender, mp.dietary_preference
@@ -512,10 +535,18 @@ async def list_members(
         WHERE u.house_id = CAST(:hid AS uuid)
         ORDER BY u.created_at
     """), {"hid": current_user["house_id"]}).fetchall()
-    return [{"user_id": str(r.user_id), "name": r.name, "email": r.email,
-             "role": r.role, "is_active": r.is_active,
-             "age_group": r.age_group, "gender": r.gender,
-             "dietary_preference": r.dietary_preference} for r in rows]
+    result = []
+    for r in rows:
+        is_profile_only = bool(r.email) and r.email.endswith("@no-login.ladleful.internal")
+        result.append({
+            "user_id": str(r.user_id), "name": r.name,
+            "email": None if is_profile_only else r.email,
+            "is_profile_only": is_profile_only,
+            "role": r.role, "is_active": r.is_active,
+            "age_group": r.age_group, "gender": r.gender,
+            "dietary_preference": r.dietary_preference,
+        })
+    return result
 
 
 @router.put("/members/role", status_code=200)

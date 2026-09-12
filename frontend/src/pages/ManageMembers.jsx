@@ -51,6 +51,7 @@ export default function ManageMembers({ onBack }) {
   const [success, setSuccess] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [addForm, setAddForm] = useState({ name: "", email: "", password: "" });
+  const [profileOnly, setProfileOnly] = useState(false);
   const [adding, setAdding] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [confirmModal, setConfirmModal]   = useState(null); // { title, desc, onConfirm }
@@ -214,13 +215,16 @@ export default function ManageMembers({ onBack }) {
 
   const handleAddMember = async () => {
     setError(null);
-    if (!addForm.name || !addForm.password) { setError(t("manageMembers.allFieldsRequired")); return; }
-    if (addForm.password.length < 8) { setError(t("manageMembers.passwordMin8")); return; }
+    if (!addForm.name) { setError(t("manageMembers.allFieldsRequired")); return; }
+    if (!profileOnly) {
+      if (!addForm.email || !addForm.password) { setError(t("manageMembers.allFieldsRequired")); return; }
+      if (addForm.password.length < 8) { setError(t("manageMembers.passwordMin8")); return; }
+    }
     setAdding(true);
     try {
       const newMember = await apiFetch("/auth/members/create", {
         method: "POST",
-        body: JSON.stringify(addForm)
+        body: JSON.stringify(profileOnly ? { name: addForm.name } : addForm)
       });
       // If preferences were copied — save only the fields that were
       // actually set on the source member, not blank/unset ones
@@ -248,6 +252,7 @@ export default function ManageMembers({ onBack }) {
       setSuccess(`${addForm.name} added successfully!`);
       setTimeout(() => setSuccess(null), 4000);
       setAddForm({ name: "", email: "", password: "" });
+      setProfileOnly(false);
       setAddFormPrefs(null);
       setCopyFrom(null);
       setShowAddForm(false);
@@ -290,8 +295,24 @@ export default function ManageMembers({ onBack }) {
           <div style={{ background: "#FFF9F2", borderRadius: 16, padding: "20px 16px", marginBottom: 16, border: "0.5px solid #EDE8E0" }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "#2C2C2A", marginBottom: 14 }}>{t("manageMembers.newMember")}</div>
             <input type="text" placeholder={t("manageMembers.namePlaceholder")} value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))} style={inputStyle} />
-            <input type="email" placeholder={t("manageMembers.emailPlaceholder")} value={addForm.email} onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))} style={inputStyle} />
-            <input type="password" placeholder={t("manageMembers.passwordPlaceholder")} value={addForm.password} onChange={e => setAddForm(p => ({ ...p, password: e.target.value }))} style={{ ...inputStyle, marginBottom: 14 }} />
+
+            <div onClick={() => setProfileOnly(v => !v)}
+              style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 10, background: "#F1EFE8", borderRadius: 10, cursor: "pointer" }}>
+              <div style={{ width: 36, height: 20, borderRadius: 10, background: profileOnly ? "#1A3A2E" : "#D0CEC8", position: "relative", flexShrink: 0, transition: "background 0.15s" }}>
+                <div style={{ width: 16, height: 16, borderRadius: "50%", background: "white", position: "absolute", top: 2, left: profileOnly ? 18 : 2, transition: "left 0.15s" }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "#2C2C2A" }}>{t("manageMembers.profileOnly")}</div>
+                <div style={{ fontSize: 10, color: "#888780" }}>{t("manageMembers.profileOnlyHint")}</div>
+              </div>
+            </div>
+
+            {!profileOnly && (
+              <>
+                <input type="email" placeholder={t("manageMembers.emailPlaceholder")} value={addForm.email} onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))} style={inputStyle} />
+                <input type="password" placeholder={t("manageMembers.passwordPlaceholder")} value={addForm.password} onChange={e => setAddForm(p => ({ ...p, password: e.target.value }))} style={{ ...inputStyle, marginBottom: 14 }} />
+              </>
+            )}
 
             {/* Copy preferences from existing member */}
             {members.length > 0 && (
@@ -341,7 +362,7 @@ export default function ManageMembers({ onBack }) {
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#2C2C2A" }}>
                       {m.name} {isMe && <span style={{ fontSize: 10, color: "#888780" }}>({t("manageMembers.you")})</span>}
                     </div>
-                    <div style={{ fontSize: 11, color: "#888780", marginTop: 2 }}>{m.email}</div>
+                    <div style={{ fontSize: 11, color: "#888780", marginTop: 2 }}>{m.is_profile_only ? `🚫 ${t("manageMembers.noLogin")}` : m.email}</div>
                     <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                       <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 8, background: isAdmin ? "#E1F5EE" : "#F1EFE8", color: isAdmin ? "#1A3A2E" : "#888780" }}>
                         {isAdmin ? t("manageMembers.admin") : t("manageMembers.member")}

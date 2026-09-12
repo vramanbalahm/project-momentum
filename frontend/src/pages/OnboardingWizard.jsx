@@ -30,6 +30,7 @@ export default function OnboardingWizard({ onComplete }) {
   const [editMember, setEditMember] = useState(null);
   const [showAddMember, setShowAddMember] = useState(false);
   const [addMemberForm, setAddMemberForm] = useState({ name: "", email: "", password: "" });
+  const [addMemberProfileOnly, setAddMemberProfileOnly] = useState(false);
   const [addMemberError, setAddMemberError] = useState(null);
   const [addingMember, setAddingMember] = useState(false);
   const [copyFrom, setCopyFrom] = useState(null);
@@ -113,19 +114,25 @@ export default function OnboardingWizard({ onComplete }) {
 
   const handleAddMember = async () => {
     setAddMemberError(null);
-    if (!addMemberForm.name || !addMemberForm.password) {
+    if (!addMemberForm.name) {
       setAddMemberError(t("manageMembers.allFieldsRequired"));
       return;
     }
-    if (addMemberForm.password.length < 8) {
-      setAddMemberError(t("manageMembers.passwordMin8"));
-      return;
+    if (!addMemberProfileOnly) {
+      if (!addMemberForm.email || !addMemberForm.password) {
+        setAddMemberError(t("manageMembers.allFieldsRequired"));
+        return;
+      }
+      if (addMemberForm.password.length < 8) {
+        setAddMemberError(t("manageMembers.passwordMin8"));
+        return;
+      }
     }
     setAddingMember(true);
     try {
       const newMember = await apiFetch("/auth/members/create", {
         method: "POST",
-        body: JSON.stringify(addMemberForm),
+        body: JSON.stringify(addMemberProfileOnly ? { name: addMemberForm.name } : addMemberForm),
       });
       setMembers(ms => [...ms, {
         user_id: newMember.user_id,
@@ -134,6 +141,7 @@ export default function OnboardingWizard({ onComplete }) {
         restrictions: [],
       }]);
       setAddMemberForm({ name: "", email: "", password: "" });
+      setAddMemberProfileOnly(false);
       setShowAddMember(false);
     } catch (e) {
       setAddMemberError(e.message);
@@ -295,12 +303,28 @@ export default function OnboardingWizard({ onComplete }) {
                   <input type="text" placeholder={t("manageMembers.namePlaceholder")} value={addMemberForm.name}
                     onChange={e => setAddMemberForm(f => ({ ...f, name: e.target.value }))}
                     style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, boxSizing: "border-box", marginBottom: 10 }} />
-                  <input type="email" placeholder={t("manageMembers.emailPlaceholder")} value={addMemberForm.email}
-                    onChange={e => setAddMemberForm(f => ({ ...f, email: e.target.value }))}
-                    style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, boxSizing: "border-box", marginBottom: 10 }} />
-                  <input type="password" placeholder={t("manageMembers.passwordPlaceholder")} value={addMemberForm.password}
-                    onChange={e => setAddMemberForm(f => ({ ...f, password: e.target.value }))}
-                    style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, boxSizing: "border-box", marginBottom: 10 }} />
+
+                  <div onClick={() => setAddMemberProfileOnly(v => !v)}
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", marginBottom: 10, background: "#F1EFE8", borderRadius: 10, cursor: "pointer" }}>
+                    <div style={{ width: 36, height: 20, borderRadius: 10, background: addMemberProfileOnly ? C.green : "#D0CEC8", position: "relative", flexShrink: 0, transition: "background 0.15s" }}>
+                      <div style={{ width: 16, height: 16, borderRadius: "50%", background: "white", position: "absolute", top: 2, left: addMemberProfileOnly ? 18 : 2, transition: "left 0.15s" }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: C.text }}>{t("manageMembers.profileOnly")}</div>
+                      <div style={{ fontSize: 10, color: C.muted }}>{t("manageMembers.profileOnlyHint")}</div>
+                    </div>
+                  </div>
+
+                  {!addMemberProfileOnly && (
+                    <>
+                      <input type="email" placeholder={t("manageMembers.emailPlaceholder")} value={addMemberForm.email}
+                        onChange={e => setAddMemberForm(f => ({ ...f, email: e.target.value }))}
+                        style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, boxSizing: "border-box", marginBottom: 10 }} />
+                      <input type="password" placeholder={t("manageMembers.passwordPlaceholder")} value={addMemberForm.password}
+                        onChange={e => setAddMemberForm(f => ({ ...f, password: e.target.value }))}
+                        style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, boxSizing: "border-box", marginBottom: 10 }} />
+                    </>
+                  )}
                   {addMemberError && <div style={{ fontSize: 12, color: "#993C1D", marginBottom: 10 }}>{addMemberError}</div>}
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => { setShowAddMember(false); setAddMemberError(null); }}
