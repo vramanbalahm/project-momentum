@@ -59,7 +59,7 @@ function formatDisplayDate(isoStr) {
 // Build a set key for (date, slot)
 function slotKey(date, slot) { return `${date}__${slot}`; }
 
-export default function MemberAvailability({ onBack, onProceed }) {
+export default function MemberAvailability({ onBack, onProceed, weekOffset = 0 }) {
   const { apiFetch } = useAuth();
   const { t } = useTranslation();
 
@@ -81,7 +81,9 @@ export default function MemberAvailability({ onBack, onProceed }) {
     setLoading(true);
     setError(null);
     try {
-      const monday = getMonday();
+      const baseDate = new Date();
+      baseDate.setDate(baseDate.getDate() + weekOffset * 7);
+      const monday = getMonday(baseDate);
       const data = await apiFetch(`/availability/week?week_start=${dateStr(monday)}`);
       setWeekStart(data.week_start);
       setMembers(data.members || []);
@@ -98,7 +100,7 @@ export default function MemberAvailability({ onBack, onProceed }) {
     } finally {
       setLoading(false);
     }
-  }, [apiFetch]);
+  }, [apiFetch, weekOffset]);
 
   useEffect(() => { load(); }, [load]);
 

@@ -635,6 +635,20 @@ export default function App({ onBack }) {
       .catch(() => setWeekEvents([]));
   }, [weekOffset, HH_ID]);
 
+  // Whether availability has actually been configured for the currently
+  // viewed week -- drives the red indicator on the Availability button,
+  // so it's clear at a glance when a week's availability hasn't been set
+  // yet (as opposed to genuinely confirming everyone's present).
+  const [availabilitySet, setAvailabilitySet] = useState(true);
+
+  useEffect(() => {
+    if (!HH_ID || !isPlannableWeek) return;
+    const ws = toLocalDateString(getOffsetWeekMonday());
+    axios.get(`${API_BASE}/availability/week?week_start=${ws}`)
+      .then(r => setAvailabilitySet(!!r.data.has_saved))
+      .catch(() => setAvailabilitySet(true)); // fail open -- don't falsely flag on a network hiccup
+  }, [weekOffset, HH_ID, isPlannableWeek, showAvailabilityOverlay]);
+
   // Map event_master rows to day-keyed structure
   const demoEvents = weekEvents.map(ev => ({
     dayName: ev.day_name,
@@ -680,6 +694,7 @@ export default function App({ onBack }) {
                 <button
                   onClick={() => setShowAvailabilityOverlay(true)}
                   style={{
+                    position: "relative",
                     background: "rgba(159,225,203,0.15)", color: "#9FE1CB",
                     border: "0.5px solid rgba(159,225,203,0.3)",
                     borderRadius: 12, padding: "8px 12px",
@@ -687,6 +702,13 @@ export default function App({ onBack }) {
                   }}
                 >
                   {t("weeklyPlan.availability")}
+                  {!availabilitySet && (
+                    <span style={{
+                      position: "absolute", top: -3, right: -3,
+                      width: 9, height: 9, borderRadius: "50%",
+                      background: "#E24B4A", border: "1.5px solid #1A3A2E"
+                    }} title={t("weeklyPlan.availabilityNotSet")} />
+                  )}
                 </button>
               )}
               {/* Generate Plan button — admin only, current or next week */}
@@ -1279,6 +1301,7 @@ export default function App({ onBack }) {
             <MemberAvailability
               onBack={() => setShowAvailabilityOverlay(false)}
               onProceed={() => setShowAvailabilityOverlay(false)}
+              weekOffset={weekOffset}
             />
           </div>
         )}

@@ -246,16 +246,6 @@ export default function Dashboard({ onNavigate }) {
                       </div>
                     </div>
 
-                    {/* Member Availability — not for reviewer */}
-                    {!isReviewerOnly && (
-                      <SettingsItem
-                        icon="🗓️"
-                        label={t("dashboard.menu.memberAvailability")}
-                        available={true}
-                        onClick={() => { setMenuOpen(false); onNavigate("member_availability"); }}
-                      />
-                    )}
-
                     {/* Recipe Review — platform admin and reviewer only */}
                     {isReviewer && (
                       <SettingsItem

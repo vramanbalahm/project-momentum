@@ -13,7 +13,6 @@ import FamilyProfile from './pages/FamilyProfile.jsx'
 import ManageMembers from './pages/ManageMembers.jsx'
 import OnboardingWizard from './pages/OnboardingWizard.jsx'
 import MyProfile from './pages/MyProfile.jsx'
-import MemberAvailability from './pages/MemberAvailability.jsx'
 import RecipeReview from './pages/RecipeReview.jsx'
 import HelpScreen from './pages/HelpScreen.jsx'
 import HouseholdSettings from './pages/HouseholdSettings.jsx'
@@ -29,7 +28,7 @@ function AuthGate() {
   const { isAuthenticated, loading: authLoading, user } = useAuth();
   const [authScreen, setAuthScreen] = useState('login');
   const [screen, setScreen] = useState('dashboard');
-  const [reviewerNavParams, setReviewerNavParams] = useState({}); // dashboard | weekly_plan | family_profile | manage_members | member_availability | recipe_review
+  const [reviewerNavParams, setReviewerNavParams] = useState({}); // dashboard | weekly_plan | family_profile | manage_members | recipe_review
   const [helpReturnRecipeId, setHelpReturnRecipeId] = useState(null);
 
   if (authLoading) {
@@ -79,13 +78,6 @@ function AuthGate() {
   if (screen === 'dish_search') return <DishSearch onBack={() => setScreen('dashboard')} />;
   if (screen === 'my_config') return <ConfigSnapshot onBack={() => setScreen('settings')} />;
   if (screen === 'reviewer_progress') return <ReviewerProgress onBack={() => setScreen('dashboard')} onNavigate={(params) => { setReviewerNavParams(params); setScreen('recipe_review'); }} />;
-  if (screen === 'member_availability') return (
-    <MemberAvailability
-      onBack={() => setScreen('dashboard')}
-      onProceed={() => setScreen('weekly_plan')}
-    />
-  );
-
   return <Dashboard onNavigate={setScreen} />;
 }
 
