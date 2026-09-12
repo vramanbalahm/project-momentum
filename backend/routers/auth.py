@@ -66,8 +66,8 @@ class RegisterRequest(BaseModel):
     primary_region: str = "Tamil Nadu"
     current_city: str = "Bengaluru"
     dietary_preference: str = "Veg"
-    household_allergies: str = None
-    cuisine_sub_region_id: int = None
+    household_allergies: Optional[str] = None
+    cuisine_sub_region_id: Optional[int] = None
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -417,13 +417,13 @@ async def verify_otp_endpoint(req: VerifyOtpRequest):
 # ── Profile update (admin only) ────────────────────────────────────────────────
 
 class ProfileUpdateRequest(BaseModel):
-    house_name: str = None
-    primary_region: str = None
-    current_city: str = None
-    dietary_preference: str = None
-    cuisine_sub_region_id: int = None
-    household_allergies: str = None  # comma-separated list
-    preferred_language: str = None
+    house_name: Optional[str] = None
+    primary_region: Optional[str] = None
+    current_city: Optional[str] = None
+    dietary_preference: Optional[str] = None
+    cuisine_sub_region_id: Optional[int] = None
+    household_allergies: Optional[str] = None  # comma-separated list
+    preferred_language: Optional[str] = None
 
 @router.put("/profile", status_code=200)
 async def update_profile(
@@ -598,11 +598,11 @@ async def deactivate_member(
 # ── My Profile ────────────────────────────────────────────────────────────────
 
 class MyProfileUpdateRequest(BaseModel):
-    name:         str = None   # Admin can update any member's name; user can update own
-    age_group:    str = None   # Child | Teen | Adult | Senior
-    gender:       str = None   # Male | Female | Transgender | Prefer not to say
-    phone_number: str = None
-    dietary_preference: str = None
+    name:         Optional[str] = None   # Admin can update any member's name; user can update own
+    age_group:    Optional[str] = None   # Child | Teen | Adult | Senior
+    gender:       Optional[str] = None   # Male | Female | Transgender | Prefer not to say
+    phone_number: Optional[str] = None
+    dietary_preference: Optional[str] = None
     # Restrictions handled separately via /onboarding/members
 
 @router.get("/my-profile")
@@ -753,7 +753,7 @@ class SelfRestrictionItem(BaseModel):
 
 class SaveSelfRestrictionsRequest(BaseModel):
     restrictions: list
-    target_user_id: str = None  # admin can save for another member
+    target_user_id: Optional[str] = None  # admin can save for another member
 
 @router.post("/my-profile/restrictions", status_code=200)
 async def save_my_restrictions(
