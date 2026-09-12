@@ -244,6 +244,12 @@ export default function App({ onBack }) {
   };
 
   const isCurrentWeek = weekOffset === 0;
+  // Matches exactly the range forward navigation now allows reaching (item 6
+  // fix) -- current week + next week are both actively plannable. Everything
+  // date-based (today highlighting, today's events) stays tied to the
+  // literal isCurrentWeek; everything action-based (generate/save/edit)
+  // uses this instead.
+  const isPlannableWeek = isCurrentWeek || weekOffset === 1;
 
   // Copy previous week blueprint into current week draft
   const copyToCurrentWeek = () => {
@@ -657,7 +663,7 @@ export default function App({ onBack }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div>
               {onBack && <span onClick={() => safeNavigate(onBack)} style={{ color: "#9FE1CB", fontSize: 12, cursor: "pointer", display: "block", marginBottom: 4 }}>{t("weeklyPlan.backToDashboard")}</span>}
-              {isAdmin && isCurrentWeek && ( // TODO: restrict to isPlatformAdmin before release
+              {isPlatformAdmin && isCurrentWeek && (
                 <span
                   onClick={() => setShowResetConfirm(true)}
                   style={{ color: "#E24B4A", fontSize: 10, cursor: "pointer", display: "block", marginTop: 2, opacity: 0.7 }}
@@ -670,7 +676,7 @@ export default function App({ onBack }) {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {/* Availability button — admin only */}
-              {isAdmin && isCurrentWeek && (
+              {isAdmin && isPlannableWeek && (
                 <button
                   onClick={() => setShowAvailabilityOverlay(true)}
                   style={{
@@ -683,8 +689,8 @@ export default function App({ onBack }) {
                   {t("weeklyPlan.availability")}
                 </button>
               )}
-              {/* Generate Plan button — admin only, current week only */}
-              {isAdmin && isCurrentWeek && !isSaved && (
+              {/* Generate Plan button — admin only, current or next week */}
+              {isAdmin && isPlannableWeek && !isSaved && (
                 <button
                   onClick={handleGenerateClick}
                   disabled={isGenerating}
@@ -701,7 +707,7 @@ export default function App({ onBack }) {
                 </button>
               )}
               {/* Save button in header — admin only, hidden when viewing past weeks */}
-              {isAdmin && isCurrentWeek && (
+              {isAdmin && isPlannableWeek && (
                 <button
                   onClick={cta.onClick}
                   style={{
@@ -913,8 +919,8 @@ export default function App({ onBack }) {
 
             /* ── DAY VIEW ── */
             <div style={{ padding: "6px 8px", overflow: "visible" }}>
-              {/* Empty state — past/future week with no plan */}
-              {!isCurrentWeek && Object.keys(blueprint).length === 0 && (
+              {/* Empty state — non-plannable week (past, or 2+ weeks ahead) with no plan */}
+              {!isPlannableWeek && Object.keys(blueprint).length === 0 && (
                 <div style={{ textAlign: "center", padding: "48px 20px", color: "#B4B2A9" }}>
                   <div style={{ fontSize: 32, marginBottom: 12 }}>📭</div>
                   <div style={{ fontSize: 14, fontWeight: 500, color: "#2C2C2A", marginBottom: 6 }}>{t("weeklyPlan.noPlanTitle")}</div>
@@ -926,8 +932,8 @@ export default function App({ onBack }) {
                 </div>
               )}
 
-              {/* Empty state — current week, availability saved, no plan generated yet */}
-              {isCurrentWeek && Object.keys(blueprint).length === 0 && (
+              {/* Empty state — current or next week, availability saved, no plan generated yet */}
+              {isPlannableWeek && Object.keys(blueprint).length === 0 && (
                 <div style={{ textAlign: "center", padding: "48px 20px", color: "#B4B2A9" }}>
                   <div style={{ fontSize: 32, marginBottom: 12 }}>✨</div>
                   <div style={{ fontSize: 14, fontWeight: 500, color: "#2C2C2A", marginBottom: 6 }}>Ready when you are</div>
@@ -950,9 +956,9 @@ export default function App({ onBack }) {
                       type={type}
                       meal={meal}
                       auditResult={auditResult}
-                      isEditable={isCurrentWeek}
+                      isEditable={isPlannableWeek}
                       isHighlighted={demoEvents.some(ev => ev.dayName === selectedDay)}
-                      onClick={(data) => isAdmin && isCurrentWeek && setEditing(data)}
+                      onClick={(data) => isAdmin && isPlannableWeek && setEditing(data)}
                     />
                   </div>
                 ))}
@@ -964,7 +970,7 @@ export default function App({ onBack }) {
             /* ── WEEK VIEW — offset-aware, read-only for past weeks ── */
             <div style={{ padding: "6px 8px", overflow: "visible", flex: 1, display: "flex", flexDirection: "column" }}>
               {/* Empty state for week view */}
-              {!isCurrentWeek && Object.keys(blueprint).length === 0 ? (
+              {!isPlannableWeek && Object.keys(blueprint).length === 0 ? (
                 <div style={{ textAlign: "center", padding: "48px 20px", color: "#B4B2A9" }}>
                   <div style={{ fontSize: 32, marginBottom: 12 }}>📭</div>
                   <div style={{ fontSize: 14, fontWeight: 500, color: "#2C2C2A", marginBottom: 6 }}>{t("weeklyPlan.noPlanTitle")}</div>
@@ -979,13 +985,13 @@ export default function App({ onBack }) {
               <div style={{ fontSize: 11, color: "#B4B2A9", marginBottom: 6, fontStyle: "italic" }}>
                 {!isAdmin
                   ? t("weeklyPlan.viewOnlyDesc")
-                  : isCurrentWeek
+                  : isPlannableWeek
                     ? (swapMode ? "" : t("weeklyPlan.tapToEdit"))
                     : t("weeklyPlan.readOnly")}
               </div>
 
-              {/* Swap / Copy action bar — admin + current week only */}
-              {isAdmin && isCurrentWeek && (
+              {/* Swap / Copy action bar — admin + current/next week only */}
+              {isAdmin && isPlannableWeek && (
                 <SwapCopyBar
                   mode={swapMode}
                   selectedKey={swapSelected}
@@ -1091,7 +1097,7 @@ export default function App({ onBack }) {
               {t("weeklyPlan.copyToCurrentWeek")}
             </button>
           )}
-          {isAdmin && isCurrentWeek && (
+          {isAdmin && isPlannableWeek && (
             <div style={{ display: "flex", gap: 8 }}>
               {!isSaved && (
               <button
