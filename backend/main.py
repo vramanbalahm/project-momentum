@@ -306,6 +306,7 @@ async def get_recipes_for_review(
     meal_slot: str = None,
     sub_region: str = None,
     q: str = None,
+    created_by_ai: bool = None,
     page: int = 1,
     page_size: int = 20,
     filter_reviewer_id: str = None,
@@ -316,6 +317,9 @@ async def get_recipes_for_review(
     Returns paginated recipe list for review screen.
     Accessible to platform_admin and reviewer roles only.
     filter_reviewer_id: platform_admin only — filter by a specific reviewer's user_id.
+    created_by_ai: filter to only AI-created dishes (e.g. new sides discovered by
+        seed_recipe_pairings_groq.py) — lets a reviewer focus a cleanup pass on
+        those specifically rather than scrolling the whole queue.
     q: dish name search. When provided, searches across ALL statuses (not just
        the active tab) so a recipe can be found regardless of where it sits in
        the review pipeline — the tab/status filter is dropped in favor of the
@@ -362,6 +366,9 @@ async def get_recipes_for_review(
     if sub_region:
         conditions.append("r.sub_region ILIKE :sub_region")
         params["sub_region"] = f"%{sub_region}%"
+    if created_by_ai is not None:
+        conditions.append("r.created_by_ai = :created_by_ai")
+        params["created_by_ai"] = created_by_ai
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 

@@ -48,6 +48,7 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
   const [activeTab,   setActiveTab]   = useState(initialTab);
   const [dietFilter,  setDietFilter]  = useState(null);
   const [slotFilter,  setSlotFilter]  = useState(null);
+  const [aiCreatedFilter, setAiCreatedFilter] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [recipes,     setRecipes]     = useState([]);
@@ -83,6 +84,7 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
       });
       if (dietFilter) params.append("diet", dietFilter);
       if (slotFilter) params.append("meal_slot", slotFilter);
+      if (aiCreatedFilter) params.append("created_by_ai", "true");
       if (searchQuery) params.append("q", searchQuery);
       const data = await apiFetch(`/recipes/review?${params}`);
       if (pg === 1) setRecipes(data.recipes);
@@ -94,7 +96,7 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
     } finally {
       setLoading(false);
     }
-  }, [activeTab, dietFilter, slotFilter, searchQuery, apiFetch]);
+  }, [activeTab, dietFilter, slotFilter, aiCreatedFilter, searchQuery, apiFetch]);
 
   useEffect(() => { loadRecipes(1); }, [loadRecipes]);
 
@@ -289,6 +291,13 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
               color: slotFilter === s ? C.mint : C.muted,
             }}>{s}</div>
         ))}
+        <div onClick={() => setAiCreatedFilter(v => !v)}
+          style={{
+            flexShrink: 0, padding: "5px 10px", borderRadius: 16, fontSize: 11, fontWeight: 500,
+            cursor: "pointer", border: `0.5px solid ${C.border}`,
+            background: aiCreatedFilter ? C.green : C.card,
+            color: aiCreatedFilter ? C.mint : C.muted,
+          }}>🤖 AI-created</div>
       </div>
 
       {/* Bulk approve bar */}
