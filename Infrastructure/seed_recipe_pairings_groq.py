@@ -1,39 +1,57 @@
 #!/usr/bin/env python3
 """
 seed_recipe_pairings_groq.py
-Groq/GPT-OSS-120B variant of seed_recipe_pairings_ai.py -- same overall
-design (per real main dish, ask which sides from the vault pair well,
-track genuinely missing sides for manual review), switched to Groq for
-cost (~free within Groq's tier vs metered Anthropic usage) after
-validating output quality through a separate breakfast-list test.
+Asks GPT-OSS-120B (via Groq) for traditional Tamil Brahmin side dishes for
+each main dish, purely from its own culinary knowledge -- the model is
+NOT shown our existing vault or any compatibility matrix, so it can't be
+constrained or biased by gaps or narrowness already present in our data.
 
-Fixes applied vs. the original Anthropic script, found while validating:
+Reconciliation against our existing data happens entirely on our side,
+with no AI involved in this part (see find_or_create_side()):
+  - If the model's suggested side matches something we already have
+    (exact, case-insensitive, or fuzzy match), the pairing links to that
+    existing dish.
+  - If it doesn't match anything we have, it's inserted as a genuinely
+    new recipe_dna_master row (review_status='under_review', so it lands
+    in the existing Recipe Review queue for curation rather than going
+    live immediately) and the pairing links to that new row.
+  - diet_type for a new dish is guessed from keywords in its name
+    (chicken/mutton/fish/etc. -> Non-Veg, egg -> Eggitarian, else Veg) --
+    not defaulted to Veg unconditionally, since a real non-veg dish
+    mislabeled Veg could get served to a vegetarian household before
+    anyone reviews it.
+
+Earlier design iteration (kept for reference, not what's implemented
+now): pre-filtering which sides the model could choose from, either via
+a dish_pairing_matrix compatibility lookup or by showing it our full
+vault list to match against. Both were dropped -- pre-filtering by a
+possibly-flawed compatibility matrix produced a narrow, repetitive pool
+(confirmed: multiple unrelated main dishes all defaulting to the same
+handful of "avarekai" sides), and showing the model our vault list still
+let its answers be shaped by whatever's already there rather than
+genuine independent judgment.
+
+Robustness fixes found while validating against real batch runs:
 1. already_done check was 'WHERE source IN (ai_seeded, matrix_seeded,
    seeded)' -- since ~97.8% of dishes already have crude matrix_seeded
    rows, this made the script skip almost everything on a fresh run.
-   Now only 'ai_seeded' counts as done, so this actually re-processes
-   every dish that hasn't had real AI review yet, regardless of what
-   crude pairings already exist for it. The recommendation engine
+   Now only 'ai_seeded' counts as done. The recommendation engine
    already correctly prioritizes ai_seeded over matrix_seeded when both
-   exist (confirmed in recommend_sides()'s ORDER BY), so old rows don't
-   need to be deleted -- they'll just stop being selected once real ones
+   exist (confirmed in recommend_sides()'s ORDER BY), so old crude rows
+   don't need deleting -- they just stop being selected once real ones
    exist alongside them.
-2. Added explicit per-dish deduplication of the model's suggested sides
-   by name (case-insensitive) before counting/inserting -- the database's
-   ON CONFLICT already prevents true duplicate rows, but a model response
+2. Per-dish deduplication of the model's suggested sides by name
+   (case-insensitive) before counting/inserting -- a model response
    listing the same side twice within one dish's suggestions silently
-   shrinks "4 sides" down to fewer genuinely distinct options.
-3. Added --meal-slot filter (e.g. --meal-slot Breakfast) alongside the
+   shrinks the intended count down to fewer genuinely distinct options.
+3. The model doesn't always follow the requested JSON shape for every
+   item (a plain string instead of {"name":...,"confidence":...} showed
+   up mid-run) -- normalized defensively rather than assumed.
+4. Entire per-dish processing wrapped in try/except so one unexpected
+   failure doesn't halt the whole batch and lose progress already made.
+5. --meal-slot filter (e.g. --meal-slot Breakfast) added alongside the
    existing --category filter, since "Breakfast" is a meal_slots value,
    not a dish_category value in this schema.
-4. Prompt reinforced based on iterative testing against a real breakfast
-   list: explicit accuracy checking (don't mischaracterize what a dish
-   actually is), and a partial-repeat structure for sides (at most 2 of
-   however many suggested may be common staples also used elsewhere; at
-   least the rest must be genuinely dish-specific) -- pure "avoid all
-   repeats" distorted individual correctness in testing, and pure "no
-   constraint" made the model lazy/uniform. This middle ground tested
-   best.
 
 Usage:
     python seed_recipe_pairings_groq.py --db postgresql://postgres@localhost/food_momentum_db --preview
@@ -71,31 +89,28 @@ def get_conn():
     return psycopg2.connect(args.db)
 
 
-def call_groq(main_dish, main_category, available_sides, compatible_cats):
-    """Ask GPT-OSS-120B (via Groq) to evaluate side dish pairings for a main dish."""
-
-    relevant_sides = [s for s in available_sides if s[2] in compatible_cats]
-    relevant_sides = relevant_sides[:60]
-    sides_list = ", ".join([s[1] for s in relevant_sides])
+def call_groq(main_dish, main_category, num_sides=5):
+    """Ask GPT-OSS-120B (via Groq) for traditional side dishes for a main
+    dish -- purely from the model's own knowledge, with NO list of our
+    existing vault sides shown to it at all. Reconciling the model's
+    answer against what we already have (and adding genuinely new sides)
+    happens entirely on our side afterward, in find_or_create_side()."""
 
     prompt = f"""You are a Tamil Nadu cuisine expert, specifically familiar with Tamil Brahmin (Iyer/Iyengar) household cooking traditions in Tamil Nadu.
 
 Main dish: {main_dish} (category: {main_category})
-Available sides in our vault (prefer these, use EXACT names when you do): {sides_list}
 
-Suggest the traditional side dishes/accompaniments that genuinely and authentically pair with this main dish, ordered from most to least traditional/common.
+Give exactly {num_sides} traditional side dishes/accompaniments that genuinely and authentically pair with this main dish, ordered from most to least traditional/common.
 
 Rules:
-- Prefer matching to the available vault sides above when a genuine traditional match exists there.
-- If a truly important traditional pairing is missing from that list, name it anyway in a separate "missing" field -- do not force a worse match from the list just to avoid naming something new.
-- At most 2 of your suggested sides may be common staples that would also suit other dishes (e.g. sambar, coconut chutney). The rest must be genuinely specific to this exact dish's own texture and flavor -- not defaulted from a generic pool.
-- If this dish is traditionally NOT eaten with side dishes at all (e.g. it's normally eaten plain, or mixed with something directly rather than served alongside it), say so honestly rather than forcing matches that don't reflect real practice.
+- Answer purely from genuine Tamil Brahmin culinary tradition. Do not restrict yourself to any particular list -- name whatever is truly the best traditional pairing, even if it's a less common dish.
+- At most 2 of your {num_sides} sides may be common staples that would also suit many other dishes (e.g. sambar, coconut chutney). The rest must be genuinely specific to this exact dish's own texture and flavor -- not defaulted from a generic pool.
+- If this dish is traditionally NOT eaten with side dishes at all (e.g. it's normally eaten plain, or mixed with something directly rather than served alongside it), say so honestly in the reasoning rather than forcing pairings that don't reflect real practice.
 - A side must be an actual dish/preparation -- not a plain condiment or garnish like ghee or salt.
 - Be precise about what the main dish actually is -- do not mischaracterize its nature (texture, whether it's a rice preparation vs. a batter-based item vs. a legume dish, etc.) when reasoning about what pairs with it.
-- Select 3-6 best matching sides from the vault list (if any genuinely fit).
 
 Return ONLY valid JSON, no explanation, no markdown:
-{{"matched":[{{"name":"exact name from list","confidence":0.9,"reason":"one line"}}],"missing":["dish name","dish name"],"overall_reasoning":"one line"}}"""
+{{"sides":[{{"name":"dish name","confidence":0.9,"reason":"one line"}}],"overall_reasoning":"one line"}}"""
 
     import requests
     if not GROQ_API_KEY:
@@ -130,6 +145,80 @@ Return ONLY valid JSON, no explanation, no markdown:
     except Exception as e:
         print(f"  Parse error: {e}\n  Response: {content[:200]}")
         return None
+
+
+# Keyword-based diet_type inference for newly-created side dishes. Not
+# perfect -- it's a starting guess for the reviewer to correct, not a
+# final answer -- but defaulting everything to 'Veg' would be actively
+# wrong for a name like "Chicken Kurma" and could get a real non-veg
+# dish incorrectly served to a vegetarian household before anyone
+# reviews it. Checked in order: non-veg keywords first (most specific/
+# highest-stakes to get right), then egg, else Veg.
+NON_VEG_KEYWORDS = [
+    "chicken", "mutton", "lamb", "goat", "beef", "pork", "fish", "prawn",
+    "shrimp", "crab", "meat", "keema", "kola urundai"
+]
+EGG_KEYWORDS = ["egg"]
+
+def infer_diet_type(dish_name):
+    name_lower = dish_name.lower()
+    if any(kw in name_lower for kw in NON_VEG_KEYWORDS):
+        return "Non-Veg"
+    if any(kw in name_lower for kw in EGG_KEYWORDS):
+        return "Eggitarian"
+    return "Veg"
+
+
+def find_or_create_side(cur, side_name, side_name_to_id, created_this_run):
+    """Reconcile one AI-suggested side name against what we already have.
+
+    Checks, in order: sides already in the vault at the start of this run
+    (exact, then case-insensitive, then fuzzy substring match) -- then
+    sides created earlier in THIS SAME run (so if the same new side is
+    suggested for multiple different mains in one execution, it's reused
+    rather than inserted again as a duplicate row).
+
+    If truly not found anywhere, inserts it as a new recipe_dna_master
+    row with review_status='under_review' -- lands in the existing
+    Recipe Review queue for curation, not treated as production-ready
+    immediately. Returns (recipe_id, was_newly_created).
+    """
+    side_name = side_name.strip()
+    if not side_name:
+        return None, False
+
+    # 1. Exact match against pre-existing vault sides
+    side_id = side_name_to_id.get(side_name)
+    if side_id:
+        return side_id, False
+
+    # 2. Case-insensitive match against pre-existing vault sides
+    for sn, sid in side_name_to_id.items():
+        if sn.lower() == side_name.lower():
+            return sid, False
+
+    # 3. Already created earlier in this same run
+    for sn, sid in created_this_run.items():
+        if sn.lower() == side_name.lower():
+            return sid, False
+
+    # 4. Fuzzy substring match against pre-existing vault sides
+    for sn, sid in side_name_to_id.items():
+        if side_name.lower() in sn.lower() or sn.lower() in side_name.lower():
+            return sid, False
+
+    # 5. Genuinely new -- create it
+    import uuid
+    new_id = str(uuid.uuid4())
+    diet_type = infer_diet_type(side_name)
+    cur.execute("""
+        INSERT INTO recipe_dna_master
+            (recipe_id, dish_name, diet_type, meal_role, review_status, created_by_ai)
+        VALUES
+            (CAST(%s AS uuid), %s, CAST(%s AS diet_pref), ARRAY['side']::text[], 'under_review', true)
+    """, (new_id, side_name, diet_type))
+    created_this_run[side_name] = new_id
+    return new_id, True
 
 
 def dedupe_matched(matched):
@@ -202,10 +291,11 @@ def main():
     side_name_to_id = {row[1]: row[0] for row in sides}
     print(f"Available sides for matching: {len(sides)}\n")
 
-    total_inserted = 0
-    total_skipped  = 0
-    all_missing    = {}
-    all_reasoning  = []
+    total_inserted     = 0
+    total_skipped      = 0
+    new_dishes_created = 0
+    created_this_run   = {}  # name -> recipe_id, for sides created earlier in this run
+    all_reasoning      = []
 
     if args.new_sides:
         side_names = [s.strip() for s in args.new_sides.split(",")]
@@ -254,27 +344,21 @@ def main():
         processed += 1
 
         try:
-            cur.execute("""
-                SELECT side_category FROM dish_pairing_matrix
-                WHERE main_category = %s AND compatibility != 'never'
-            """, (main_cat,))
-            compatible_cats = {r[0] for r in cur.fetchall()}
-            result = call_groq(main_name, main_cat, sides, compatible_cats)
+            result = call_groq(main_name, main_cat, num_sides=5)
 
             if not result:
                 print(f"  ✗ Failed to get response")
                 total_skipped += 1
                 continue
 
-            matched   = dedupe_matched(result.get("matched", []))
-            missing   = result.get("missing", [])
+            matched   = dedupe_matched(result.get("sides", []))
             reasoning = result.get("overall_reasoning", "")
 
-            print(f"  ✓ Matched: {len(matched)} sides | Missing: {len(missing)}")
+            print(f"  ✓ Got {len(matched)} sides")
 
             all_reasoning.append({
                 "main": main_name, "category": main_cat, "reasoning": reasoning,
-                "matched_count": len(matched), "missing_count": len(missing),
+                "matched_count": len(matched),
             })
 
             for m in matched:
@@ -282,51 +366,44 @@ def main():
                 confidence = float(m.get("confidence", 0.80))
                 reason     = m.get("reason", "")
 
-                side_id = side_name_to_id.get(side_name)
-                if not side_id:
-                    for sn, sid in side_name_to_id.items():
-                        if sn.lower() == side_name.lower():
-                            side_id = sid
-                            break
-                if not side_id:
-                    for sn, sid in side_name_to_id.items():
-                        if side_name.lower() in sn.lower() or sn.lower() in side_name.lower():
-                            side_id = sid
-                            break
-
-                if not side_id:
-                    print(f"    ⚠ Side not found in vault: '{side_name}'")
-                    all_missing.setdefault(side_name, []).append(main_name)
-                    continue
-
-                if not args.preview:
-                    try:
-                        cur.execute("""
-                            INSERT INTO recipe_pairing
-                                (main_recipe_id, side_recipe_id, confidence, source, house_id, notes)
-                            VALUES
-                                (CAST(%s AS uuid), CAST(%s AS uuid), %s, 'ai_seeded', NULL, %s)
-                            ON CONFLICT (main_recipe_id, side_recipe_id) WHERE house_id IS NULL
-                            DO UPDATE SET
-                                confidence = GREATEST(recipe_pairing.confidence, EXCLUDED.confidence),
-                                source     = 'ai_seeded',
-                                notes      = EXCLUDED.notes,
-                                updated_at = NOW()
-                        """, (str(main_id), str(side_id), confidence, reason))
-                        total_inserted += cur.rowcount
-                    except Exception as e:
-                        print(f"    ERROR inserting {side_name}: {e}")
-                        conn.rollback()
-                else:
-                    print(f"    → {side_name} ({confidence:.0%}) — {reason}")
+                if args.preview:
+                    # Preview mode: report what WOULD happen, write nothing
+                    existing_id = side_name_to_id.get(side_name)
+                    if not existing_id:
+                        for sn, sid in side_name_to_id.items():
+                            if sn.lower() == side_name.lower() or side_name.lower() in sn.lower() or sn.lower() in side_name.lower():
+                                existing_id = sid
+                                break
+                    if existing_id:
+                        print(f"    → {side_name} ({confidence:.0%}) — matches existing side")
+                    else:
+                        guessed_diet = infer_diet_type(side_name)
+                        print(f"    → {side_name} ({confidence:.0%}) — NEW side, would create as diet_type={guessed_diet}")
                     total_inserted += 1
-
-            for missing_name in missing:
-                if isinstance(missing_name, dict):
-                    missing_name = missing_name.get("name", "")
-                if not isinstance(missing_name, str) or not missing_name.strip():
                     continue
-                all_missing.setdefault(missing_name.strip(), []).append(main_name)
+
+                try:
+                    side_id, was_created = find_or_create_side(cur, side_name, side_name_to_id, created_this_run)
+                    if was_created:
+                        print(f"    + Created new side: '{side_name}' (diet_type={infer_diet_type(side_name)})")
+                        new_dishes_created += 1
+
+                    cur.execute("""
+                        INSERT INTO recipe_pairing
+                            (main_recipe_id, side_recipe_id, confidence, source, house_id, notes)
+                        VALUES
+                            (CAST(%s AS uuid), CAST(%s AS uuid), %s, 'ai_seeded', NULL, %s)
+                        ON CONFLICT (main_recipe_id, side_recipe_id) WHERE house_id IS NULL
+                        DO UPDATE SET
+                            confidence = GREATEST(recipe_pairing.confidence, EXCLUDED.confidence),
+                            source     = 'ai_seeded',
+                            notes      = EXCLUDED.notes,
+                            updated_at = NOW()
+                    """, (str(main_id), str(side_id), confidence, reason))
+                    total_inserted += cur.rowcount
+                except Exception as e:
+                    print(f"    ERROR processing {side_name}: {e}")
+                    conn.rollback()
 
             if not args.preview:
                 conn.commit()
@@ -344,16 +421,16 @@ def main():
 
     print(f"\n{'='*60}")
     print(f"Summary:")
-    print(f"  Pairings inserted:     {total_inserted}")
-    print(f"  Main dishes processed: {processed}")
-    print(f"  Main dishes failed:    {total_skipped}")
-    print(f"  Missing sides found:   {len(all_missing)}")
+    print(f"  Pairings inserted:      {total_inserted}")
+    print(f"  Main dishes processed:  {processed}")
+    print(f"  Main dishes failed:     {total_skipped}")
+    print(f"  New side dishes created: {new_dishes_created}")
     print(f"{'='*60}\n")
 
-    if all_missing:
-        print("Missing sides (review and consider adding to vault):")
-        for name, needed_by in all_missing.items():
-            print(f"  - {name}  (needed by: {', '.join(needed_by)})")
+    if created_this_run:
+        print("New side dishes created (review_status='under_review' -- visible in the Recipe Review queue):")
+        for name in created_this_run:
+            print(f"  - {name}  (guessed diet_type: {infer_diet_type(name)})")
 
     cur.close()
     conn.close()
