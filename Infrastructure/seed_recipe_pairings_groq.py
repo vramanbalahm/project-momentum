@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 seed_recipe_pairings_groq.py
-Asks GPT-OSS-120B (via Groq) for traditional Tamil Brahmin side dishes for
+Asks GPT-OSS-120B (via Groq) for traditional Tamil Nadu side dishes for
 each main dish, purely from its own culinary knowledge -- the model is
 NOT shown our existing vault or any compatibility matrix, so it can't be
 constrained or biased by gaps or narrowness already present in our data.
@@ -97,16 +97,16 @@ def call_groq(main_dish, main_category, num_sides=5):
     answer against what we already have (and adding genuinely new sides)
     happens entirely on our side afterward, in find_or_create_side()."""
 
-    prompt = f"""You are a Tamil Nadu cuisine expert, specifically familiar with Tamil Brahmin (Iyer/Iyengar) household cooking traditions in Tamil Nadu.
+    prompt = f"""You are a Tamil Nadu cuisine expert, with deep knowledge across the full breadth of Tamil Nadu food culture -- home cooking (Brahmin and non-Brahmin households alike), regional specialties, and popular Tamil Nadu street food.
 
 Main dish: {main_dish} (category: {main_category})
 
-Give exactly {num_sides} traditional side dishes/accompaniments that genuinely and authentically pair with this main dish, ordered from most to least traditional/common.
+Give exactly {num_sides} traditional side dishes/accompaniments that genuinely and authentically pair with this main dish in Tamil Nadu, ordered from most to least traditional/common.
 
 Rules:
-- Answer purely from genuine Tamil Brahmin culinary tradition. Do not restrict yourself to any particular list -- name whatever is truly the best traditional pairing, even if it's a less common dish.
+- Judge this dish within its own genuine context -- if it's a home-cooked dish, use home-cooking pairing tradition; if it's a well-established Tamil Nadu street food (e.g. Kothu Parotta), use its own genuine, real-world traditional pairings (e.g. what it's actually served with at a real Tamil Nadu roadside stall or restaurant) rather than judging it by a different tradition it was never part of. Do not restrict yourself to any particular list -- name whatever is truly the best traditional pairing, even if it's a less common dish.
 - At most 2 of your {num_sides} sides may be common staples that would also suit many other dishes (e.g. sambar, coconut chutney). The rest must be genuinely specific to this exact dish's own texture and flavor -- not defaulted from a generic pool.
-- If this dish is traditionally NOT eaten with side dishes at all (e.g. it's normally eaten plain, or mixed with something directly rather than served alongside it), say so honestly in the reasoning rather than forcing pairings that don't reflect real practice.
+- If this dish is genuinely, universally eaten plain in Tamil Nadu (e.g. a Western cereal item like corn flakes, which has no traditional Indian side at all), say so honestly in the reasoning rather than forcing pairings that don't reflect real practice. This should be rare -- most Tamil Nadu dishes, including street food, DO have real traditional pairings; do not use "not eaten with sides" as a way to avoid answering for a dish just because it's outside home-cooking tradition specifically.
 - A side must be an actual dish/preparation -- not a plain condiment or garnish like ghee or salt.
 - Be precise about what the main dish actually is -- do not mischaracterize its nature (texture, whether it's a rice preparation vs. a batter-based item vs. a legume dish, etc.) when reasoning about what pairs with it.
 
@@ -334,7 +334,17 @@ def main():
             WHERE source = 'ai_seeded'
         """)
         already_done = {str(r[0]) for r in cur.fetchall()}
-        print(f"Already AI-reviewed: {len(already_done)} main dishes - skipping these\n")
+
+        # Also skip dishes already confirmed to genuinely have no sides
+        # (e.g. Kothu Parotta, Corn Flakes) -- these never get an
+        # ai_seeded pairing row since there's nothing to insert, so
+        # without this they'd be re-asked about in every single batch.
+        cur.execute("""
+            SELECT recipe_id FROM recipe_dna_master
+            WHERE pairing_ai_checked_at IS NOT NULL
+        """)
+        already_done |= {str(r[0]) for r in cur.fetchall()}
+        print(f"Already AI-reviewed or confirmed no-sides: {len(already_done)} main dishes - skipping these\n")
 
     processed = 0
     for idx, (main_id, main_name, main_cat) in enumerate(mains):
