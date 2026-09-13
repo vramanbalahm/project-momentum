@@ -124,7 +124,7 @@ Return ONLY valid JSON, no explanation, no markdown:
             "model": "openai/gpt-oss-120b",
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.4,
-            "max_tokens": 1500,
+            "max_tokens": 6000,  # reasoning model -- lower values risk it spending the whole budget on hidden reasoning and returning empty visible output (confirmed: "Kothu Parotta" got 0 sides at max_tokens=1500)
             "reasoning_effort": "low"
         },
         timeout=45
