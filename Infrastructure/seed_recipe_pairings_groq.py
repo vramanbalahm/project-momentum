@@ -62,6 +62,7 @@ Usage:
 import argparse
 import json
 import os
+import re
 import time
 from datetime import datetime
 from dotenv import load_dotenv
@@ -161,10 +162,17 @@ NON_VEG_KEYWORDS = [
 EGG_KEYWORDS = ["egg"]
 
 def infer_diet_type(dish_name):
+    """Word-boundary matching, not raw substring -- a naive 'kw in name'
+    check incorrectly matched 'lamb' inside 'Kulambu' (the extremely
+    common Tamil word for gravy/stew, appearing in dozens of genuinely
+    vegetarian dish names like Vatha Kulambu, Puli Kulambu, Kara
+    Kulambu), which would have systematically mislabeled every one of
+    them as Non-Veg. Confirmed and fixed after finding this in a real
+    batch run's output."""
     name_lower = dish_name.lower()
-    if any(kw in name_lower for kw in NON_VEG_KEYWORDS):
+    if any(re.search(r'\b' + re.escape(kw) + r'\b', name_lower) for kw in NON_VEG_KEYWORDS):
         return "Non-Veg"
-    if any(kw in name_lower for kw in EGG_KEYWORDS):
+    if any(re.search(r'\b' + re.escape(kw) + r'\b', name_lower) for kw in EGG_KEYWORDS):
         return "Eggitarian"
     return "Veg"
 
@@ -355,6 +363,13 @@ def main():
             reasoning = result.get("overall_reasoning", "")
 
             print(f"  ✓ Got {len(matched)} sides")
+            if len(matched) == 0:
+                # Could be genuine (model correctly saying "this dish has
+                # no traditional Tamil side" -- plausible for Western
+                # items like cereal/porridge) or a real failure. Show the
+                # model's own reasoning so we can tell which, instead of
+                # guessing.
+                print(f"    (0 sides -- model's reasoning: {reasoning or '[none given]'})")
 
             all_reasoning.append({
                 "main": main_name, "category": main_cat, "reasoning": reasoning,
