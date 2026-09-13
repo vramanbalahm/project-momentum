@@ -341,7 +341,7 @@ def main():
         # without this they'd be re-asked about in every single batch.
         cur.execute("""
             SELECT recipe_id FROM recipe_dna_master
-            WHERE pairing_ai_checked_at IS NOT NULL
+            WHERE pairing_confirmed_no_sides = TRUE
         """)
         already_done |= {str(r[0]) for r in cur.fetchall()}
         print(f"Already AI-reviewed or confirmed no-sides: {len(already_done)} main dishes - skipping these\n")
@@ -387,7 +387,7 @@ def main():
                     # genuinely has no side dish (per Vijey).
                     cur.execute("""
                         UPDATE recipe_dna_master
-                        SET pairing_ai_checked_at = NOW()
+                        SET pairing_confirmed_no_sides = TRUE
                         WHERE recipe_id = CAST(%s AS uuid)
                     """, (str(main_id),))
 
