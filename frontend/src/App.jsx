@@ -689,28 +689,6 @@ export default function App({ onBack, onNavigate }) {
               <div style={{ color: "#FDFCF8", fontSize: 16, fontWeight: 500, letterSpacing: -0.3 }}>{t("weeklyPlan.title")}</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {/* Availability button — admin only */}
-              {isAdmin && isPlannableWeek && (
-                <button
-                  onClick={() => setShowAvailabilityOverlay(true)}
-                  style={{
-                    position: "relative",
-                    background: "rgba(159,225,203,0.15)", color: "#9FE1CB",
-                    border: "0.5px solid rgba(159,225,203,0.3)",
-                    borderRadius: 12, padding: "8px 12px",
-                    fontSize: 12, fontWeight: 500, cursor: "pointer"
-                  }}
-                >
-                  {t("weeklyPlan.availability")}
-                  {!availabilitySet && (
-                    <span style={{
-                      position: "absolute", top: -3, right: -3,
-                      width: 9, height: 9, borderRadius: "50%",
-                      background: "#E24B4A", border: "1.5px solid #1A3A2E"
-                    }} title={t("weeklyPlan.availabilityNotSet")} />
-                  )}
-                </button>
-              )}
               {/* Generate Plan button — admin only, current or next week */}
               {isAdmin && isPlannableWeek && !isSaved && (
                 <button
@@ -788,7 +766,16 @@ export default function App({ onBack, onNavigate }) {
           <div style={{ display: "flex", gap: 16, marginTop: 6 }}>
             <span onClick={() => onNavigate && onNavigate('my_pantry')} style={{ fontSize: 18, cursor: "pointer", opacity: 0.85 }} title={t("weeklyPlan.inventory")}>🛒</span>
             {isAdmin && isPlannableWeek && (
-              <span onClick={() => setShowAvailabilityOverlay(true)} style={{ fontSize: 18, cursor: "pointer", opacity: 0.85 }} title={t("weeklyPlan.availability")}>👨‍👩‍👧</span>
+              <span onClick={() => setShowAvailabilityOverlay(true)} style={{ position: "relative", fontSize: 18, cursor: "pointer", opacity: 0.85 }} title={availabilitySet ? t("weeklyPlan.availability") : t("weeklyPlan.availabilityNotSet")}>
+                👨‍👩‍👧
+                {!availabilitySet && (
+                  <span style={{
+                    position: "absolute", top: -2, right: -4,
+                    width: 8, height: 8, borderRadius: "50%",
+                    background: "#E24B4A", border: "1.5px solid #1A3A2E"
+                  }} />
+                )}
+              </span>
             )}
           </div>
         </div>
