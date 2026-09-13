@@ -380,6 +380,16 @@ def main():
                 # model's own reasoning so we can tell which, instead of
                 # guessing.
                 print(f"    (0 sides -- model's reasoning: {reasoning or '[none given]'})")
+                if not args.preview:
+                    # Persist the confirmation -- lets future runs skip
+                    # re-asking about this dish, and lets the
+                    # recommendation engine know upfront this dish
+                    # genuinely has no side dish (per Vijey).
+                    cur.execute("""
+                        UPDATE recipe_dna_master
+                        SET pairing_ai_checked_at = NOW()
+                        WHERE recipe_id = CAST(%s AS uuid)
+                    """, (str(main_id),))
 
             all_reasoning.append({
                 "main": main_name, "category": main_cat, "reasoning": reasoning,
