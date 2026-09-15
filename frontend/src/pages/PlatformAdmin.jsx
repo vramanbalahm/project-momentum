@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
 const C = {
@@ -14,18 +14,35 @@ const C = {
 // reviewer queue uses) since duplicates often involve under_review
 // dishes that /recipes/search would never surface (it only shows
 // approved ones).
-function DishPicker({ label, selected, onSelect }) {
-  const { apiFetch } = useAuth();
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
+// Merge duplicate dishes -- two independent trigram-powered search boxes
+// (same /recipes/review search already proven working in the reviewer
+// queue), not automatic detection. Automatic clustering (union-find over
+// trigram similarity) was tried and removed after testing confirmed no
+// threshold reliably separates real duplicates from genuinely different
+// Tamil dishes sharing common "template" wording (curry, kootu, kuzhambu,
+// poriyal, etc.) -- e.g. two different-legume Kadala curries scored
+// HIGHER similarity than a real Sambar duplicate worded differently. Per
+// Vijey: search-and-select on both sides, judgment stays with the admin.
+function MergeDishesTool({ apiFetch, onDone }) {
+  const [leftQuery, setLeftQuery] = useState("");
+  const [leftResults, setLeftResults] = useState([]);
+  const [leftSearching, setLeftSearching] = useState(false);
+  const [selectedDuplicates, setSelectedDuplicates] = useState([]); // accumulates across searches
 
-  const search = async (q) => {
-    setQuery(q);
+  const [rightQuery, setRightQuery] = useState("");
+  const [rightResults, setRightResults] = useState([]);
+  const [rightSearching, setRightSearching] = useState(false);
+  const [targetDish, setTargetDish] = useState(null);
+
+  const [confirming, setConfirming] = useState(false);
+  const [merging, setMerging] = useState(false);
+  const [progress, setProgress] = useState(null);
+
+  const runSearch = async (q, setResults, setSearching) => {
     if (q.trim().length < 2) { setResults([]); return; }
     setSearching(true);
     try {
-      const res = await apiFetch(`/recipes/review?q=${encodeURIComponent(q)}&status=all&page_size=8`);
+      const res = await apiFetch(`/recipes/review?q=${encodeURIComponent(q)}&status=all&page_size=15`);
       setResults(res.recipes || []);
     } catch {
       setResults([]);
@@ -34,246 +51,43 @@ function DishPicker({ label, selected, onSelect }) {
     }
   };
 
-  if (selected) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.successBg, border: `0.5px solid ${C.mint}`, borderRadius: 10, padding: "8px 12px" }}>
-        <div>
-          <div style={{ fontSize: 11, color: C.muted }}>{label}</div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{selected.dish_name}</div>
-        </div>
-        <span onClick={() => onSelect(null)} style={{ cursor: "pointer", color: C.muted, fontSize: 14 }}>✕</span>
-      </div>
+  const searchLeft = (q) => { setLeftQuery(q); runSearch(q, setLeftResults, setLeftSearching); };
+  const searchRight = (q) => { setRightQuery(q); runSearch(q, setRightResults, setRightSearching); };
+
+  const isSelected = (id) => selectedDuplicates.some(d => d.recipe_id === id);
+  const toggleDuplicate = (dish) => {
+    setSelectedDuplicates(prev =>
+      prev.some(d => d.recipe_id === dish.recipe_id)
+        ? prev.filter(d => d.recipe_id !== dish.recipe_id)
+        : [...prev, dish]
     );
-  }
+  };
+  const removeDuplicate = (id) => setSelectedDuplicates(prev => prev.filter(d => d.recipe_id !== id));
 
-  return (
-    <div style={{ position: "relative" }}>
-      <input
-        placeholder={label}
-        value={query}
-        onChange={e => search(e.target.value)}
-        style={{ width: "100%", padding: "8px 12px", borderRadius: 10, border: `0.5px solid ${C.border}`, fontSize: 13, boxSizing: "border-box" }}
-      />
-      {(searching || results.length > 0) && query.trim().length >= 2 && (
-        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "white", border: `0.5px solid ${C.border}`, borderRadius: 10, marginTop: 4, maxHeight: 180, overflowY: "auto", zIndex: 5, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
-          {searching && <div style={{ padding: 10, fontSize: 12, color: C.muted }}>Searching…</div>}
-          {!searching && results.length === 0 && <div style={{ padding: 10, fontSize: 12, color: C.muted }}>No matches</div>}
-          {!searching && results.map(r => (
-            <div key={r.recipe_id} onClick={() => { onSelect(r); setQuery(""); setResults([]); }}
-              style={{ padding: "8px 12px", fontSize: 12, cursor: "pointer", borderBottom: `0.5px solid ${C.border}` }}>
-              {r.dish_name} <span style={{ color: C.muted }}>({r.review_status})</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MergeDishesTool({ apiFetch, onDone }) {
-  const [dishA, setDishA] = useState(null);
-  const [dishB, setDishB] = useState(null);
-  const [keeperId, setKeeperId] = useState(null);
-  const [confirming, setConfirming] = useState(false);
-  const [merging, setMerging] = useState(false);
-
-  const bothSelected = dishA && dishB;
-  const keeper = keeperId === dishA?.recipe_id ? dishA : keeperId === dishB?.recipe_id ? dishB : null;
-  const duplicate = keeper === dishA ? dishB : keeper === dishB ? dishA : null;
-
-  const reset = () => { setDishA(null); setDishB(null); setKeeperId(null); setConfirming(false); };
+  const canMerge = selectedDuplicates.length > 0 && targetDish
+    && !selectedDuplicates.some(d => d.recipe_id === targetDish.recipe_id);
 
   const doMerge = async () => {
     setMerging(true);
-    try {
-      const res = await apiFetch("/auth/admin/merge-dishes", {
-        method: "POST",
-        body: JSON.stringify({ keeper_recipe_id: keeper.recipe_id, duplicate_recipe_id: duplicate.recipe_id })
-      });
-      onDone(res.message, null);
-      reset();
-    } catch (e) {
-      onDone(null, e.message || "Merge failed.");
-    } finally {
-      setMerging(false);
-    }
-  };
-
-  return (
-    <div style={{ background: C.card, borderRadius: 12, border: `0.5px solid ${C.border}`, padding: "12px 14px" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-        <div style={{ fontSize: 24, flexShrink: 0 }}>🔎</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Search & merge a specific pair</div>
-          <div style={{ fontSize: 11, color: C.muted, marginTop: 2, lineHeight: 1.4, marginBottom: 10 }}>
-            For a duplicate the automatic scan below doesn't catch — find two dishes by name and merge them manually.
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <DishPicker label="First dish" selected={dishA} onSelect={setDishA} />
-            <DishPicker label="Second dish" selected={dishB} onSelect={setDishB} />
-          </div>
-
-          {bothSelected && (
-            <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Which one do you want to keep?</div>
-              {[dishA, dishB].map(d => (
-                <div key={d.recipe_id} onClick={() => setKeeperId(d.recipe_id)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, marginBottom: 6, cursor: "pointer",
-                    background: keeperId === d.recipe_id ? C.successBg : "white",
-                    border: `0.5px solid ${keeperId === d.recipe_id ? C.mint : C.border}`,
-                  }}>
-                  <div style={{ width: 16, height: 16, borderRadius: "50%", border: `1.5px solid ${keeperId === d.recipe_id ? C.teal : C.border}`, background: keeperId === d.recipe_id ? C.teal : "transparent" }} />
-                  <div style={{ fontSize: 12, color: C.text }}>Keep <strong>{d.dish_name}</strong></div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {keeper && duplicate && !confirming && (
-            <button onClick={() => setConfirming(true)}
-              style={{ marginTop: 6, width: "100%", background: C.green, color: C.mint, border: "none", borderRadius: 8, padding: "8px", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
-              Merge
-            </button>
-          )}
-
-          {confirming && (
-            <div style={{ marginTop: 10, background: C.errorBg, border: "0.5px solid #F0997B", borderRadius: 10, padding: "10px 12px" }}>
-              <div style={{ fontSize: 12, color: C.errorText, marginBottom: 8 }}>
-                This will delete <strong>{duplicate.dish_name}</strong> and repoint its pairings to <strong>{keeper.dish_name}</strong>. This can't be undone.
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={doMerge} disabled={merging}
-                  style={{ flex: 1, background: "#E24B4A", color: "white", border: "none", borderRadius: 8, padding: "7px", fontSize: 12, fontWeight: 500, cursor: merging ? "not-allowed" : "pointer" }}>
-                  {merging ? "Merging…" : "Yes, merge"}
-                </button>
-                <button onClick={() => setConfirming(false)} disabled={merging}
-                  style={{ flex: 1, background: "white", color: C.text, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "7px", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Bulk duplicate review -- proactively scans for likely duplicate SIDE
-// dishes using trigram similarity (same mechanism already proven in the
-// reviewer search) instead of requiring one-at-a-time manual searching.
-// Each row is a candidate PAIR (not a full N-way group) -- if three
-// dishes are really the same thing, merging any one pair naturally
-// folds the rest together on the next scan.
-function DuplicateReview({ apiFetch, onDone }) {
-  const [groups, setGroups] = useState(null); // null = not loaded yet
-  const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  // One entry per group: { checked: Set<recipe_id>, selectedApprovedId, newName, merging }
-  const [groupStates, setGroupStates] = useState([]);
-
-  const shortestName = (members) =>
-    members.reduce((shortest, m) => (m.dish_name.length < shortest.length ? m.dish_name : shortest), members[0].dish_name);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch("/auth/admin/duplicate-candidates");
-      let gs = res.groups || [];
-
-      // Sort members within each group alphabetically, then sort the
-      // groups themselves by their first (now-alphabetically-first)
-      // member's name -- makes the list predictable to scan, and pairs
-      // naturally with the search box below.
-      const byName = (a, b) => a.dish_name.localeCompare(b.dish_name);
-      gs = gs.map(g => ({
-        approved_members: [...g.approved_members].sort(byName),
-        duplicate_members: [...g.duplicate_members].sort(byName),
-      }));
-      gs.sort((a, b) => {
-        const nameA = (a.approved_members[0] || a.duplicate_members[0]).dish_name;
-        const nameB = (b.approved_members[0] || b.duplicate_members[0]).dish_name;
-        return nameA.localeCompare(nameB);
-      });
-
-      setGroups(gs);
-      setGroupStates(gs.map(g => ({
-        checked: new Set(g.duplicate_members.map(m => m.recipe_id)), // pre-check everything found
-        selectedApprovedId: g.approved_members.length > 0 ? g.approved_members[0].recipe_id : null,
-        newName: g.approved_members.length === 0 ? shortestName(g.duplicate_members) : "",
-        merging: false,
-      })));
-    } catch {
-      setGroups([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [apiFetch]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const filteredIndices = groups
-    ? groups
-        .map((g, i) => ({ g, i }))
-        .filter(({ g }) => {
-          if (!searchQuery.trim()) return true;
-          const q = searchQuery.trim().toLowerCase();
-          return [...g.approved_members, ...g.duplicate_members].some(m => m.dish_name.toLowerCase().includes(q));
-        })
-        .map(({ i }) => i)
-    : [];
-
-  const updateGroup = (i, patch) => setGroupStates(gs => gs.map((g, idx) => idx === i ? { ...g, ...patch } : g));
-
-  const toggleChecked = (i, recipeId) => {
-    setGroupStates(gs => gs.map((g, idx) => {
-      if (idx !== i) return g;
-      const next = new Set(g.checked);
-      next.has(recipeId) ? next.delete(recipeId) : next.add(recipeId);
-      return { ...g, checked: next };
-    }));
-  };
-
-  const mergeGroup = async (i) => {
-    const group = groups[i];
-    const state = groupStates[i];
-    const hasApproved = group.approved_members.length > 0;
-    const checkedIds = [...state.checked];
-
-    if (hasApproved) {
-      if (checkedIds.length === 0) return;
-      updateGroup(i, { merging: true });
-      let done = 0, failed = 0;
-      for (const dupId of checkedIds) {
-        try {
-          await apiFetch("/auth/admin/merge-dishes", {
-            method: "POST",
-            body: JSON.stringify({ keeper_recipe_id: state.selectedApprovedId, duplicate_recipe_id: dupId })
-          });
-          done++;
-        } catch { failed++; }
+    let done = 0, failed = 0;
+    for (const dup of selectedDuplicates) {
+      setProgress(`Merging ${done + failed + 1} / ${selectedDuplicates.length}…`);
+      try {
+        await apiFetch("/auth/admin/merge-dishes", {
+          method: "POST",
+          body: JSON.stringify({ keeper_recipe_id: targetDish.recipe_id, duplicate_recipe_id: dup.recipe_id })
+        });
+        done++;
+      } catch {
+        failed++;
       }
-      onDone(`Merged ${done} duplicate(s) into the approved dish${failed ? `, ${failed} failed` : ""}.`, null);
-    } else {
-      if (checkedIds.length < 2) return;
-      updateGroup(i, { merging: true });
-      const [keeperId, ...rest] = checkedIds;
-      let done = 0, failed = 0;
-      for (const dupId of rest) {
-        try {
-          await apiFetch("/auth/admin/merge-dishes", {
-            method: "POST",
-            body: JSON.stringify({ keeper_recipe_id: keeperId, duplicate_recipe_id: dupId, new_name: state.newName })
-          });
-          done++;
-        } catch { failed++; }
-      }
-      onDone(`Merged ${done + 1} dish(es) into "${state.newName}"${failed ? `, ${failed} failed` : ""}.`, null);
     }
-
-    load(); // refresh -- merging can resolve or reveal other candidate groups
+    setProgress(null);
+    setMerging(false);
+    setConfirming(false);
+    onDone(`Merged ${done} dish(es) into "${targetDish.dish_name}"${failed ? `, ${failed} failed` : ""}.`, null);
+    setSelectedDuplicates([]);
+    setTargetDish(null);
   };
 
   return (
@@ -281,106 +95,108 @@ function DuplicateReview({ apiFetch, onDone }) {
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
         <div style={{ fontSize: 24, flexShrink: 0 }}>🔀</div>
         <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Review possible duplicates</div>
-            <span onClick={load} style={{ fontSize: 11, color: C.teal, cursor: "pointer" }}>↻ Rescan</span>
-          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Merge duplicate dishes</div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 2, lineHeight: 1.4, marginBottom: 10 }}>
-            Automatically grouped by similar names. Check which duplicates to merge on the left; pick the target on the right (an approved dish if one exists, otherwise name the new combined record yourself).
+            Search and check off any dishes on the left that are duplicates. Search and pick the one dish on the right to merge them into.
           </div>
 
-          {!loading && groups && groups.length > 0 && (
-            <input
-              placeholder={`Search ${groups.length} group${groups.length === 1 ? "" : "s"} by dish name…`}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: `0.5px solid ${C.border}`, fontSize: 12, boxSizing: "border-box", marginBottom: 10 }}
-            />
-          )}
-
-          {loading && <div style={{ fontSize: 12, color: C.muted }}>Scanning…</div>}
-          {!loading && groups && groups.length === 0 && (
-            <div style={{ fontSize: 12, color: C.muted }}>No likely duplicates found right now.</div>
-          )}
-          {!loading && groups && groups.length > 0 && filteredIndices.length === 0 && (
-            <div style={{ fontSize: 12, color: C.muted }}>No groups match "{searchQuery}".</div>
-          )}
-
-          {!loading && filteredIndices.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 420, overflowY: "auto" }}>
-              {filteredIndices.map(i => {
-                const g = groups[i];
-                const state = groupStates[i];
-                if (!state) return null;
-                const hasApproved = g.approved_members.length > 0;
-                const canMerge = hasApproved ? state.checked.size > 0 : state.checked.size >= 2 && state.newName.trim();
-
-                return (
-                  <div key={i} style={{ border: `0.5px solid ${C.border}`, borderRadius: 10, padding: "10px", background: "white" }}>
-                    <div style={{ display: "flex", gap: 10 }}>
-
-                      {/* Left: duplicates to check off */}
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>
-                          {hasApproved ? "Merge these in:" : "All copies found:"}
-                        </div>
-                        {g.duplicate_members.map(m => (
-                          <div key={m.recipe_id} onClick={() => toggleChecked(i, m.recipe_id)}
-                            style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0", cursor: "pointer" }}>
-                            <div style={{
-                              width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                              border: `1.5px solid ${state.checked.has(m.recipe_id) ? C.teal : C.border}`,
-                              background: state.checked.has(m.recipe_id) ? C.teal : "transparent",
-                              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "white"
-                            }}>{state.checked.has(m.recipe_id) ? "✓" : ""}</div>
-                            <div style={{ fontSize: 12, color: C.text }}>
-                              {m.dish_name} <span style={{ color: C.muted, fontSize: 10 }}>({m.review_status})</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Right: merge target */}
-                      <div style={{ flex: 1, borderLeft: `0.5px solid ${C.border}`, paddingLeft: 10 }}>
-                        {hasApproved ? (
-                          <>
-                            <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>Merge into:</div>
-                            {g.approved_members.map(m => (
-                              <div key={m.recipe_id} onClick={() => updateGroup(i, { selectedApprovedId: m.recipe_id })}
-                                style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0", cursor: "pointer" }}>
-                                <div style={{
-                                  width: 12, height: 12, borderRadius: "50%", flexShrink: 0,
-                                  border: `1.5px solid ${state.selectedApprovedId === m.recipe_id ? C.teal : C.border}`,
-                                  background: state.selectedApprovedId === m.recipe_id ? C.teal : "transparent",
-                                }} />
-                                <div style={{ fontSize: 12, color: C.text }}>{m.dish_name} <span style={{ color: C.muted, fontSize: 10 }}>(approved)</span></div>
-                              </div>
-                            ))}
-                          </>
-                        ) : (
-                          <>
-                            <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>No approved match — name the combined dish:</div>
-                            <input
-                              value={state.newName}
-                              onChange={e => updateGroup(i, { newName: e.target.value })}
-                              style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: `0.5px solid ${C.border}`, fontSize: 12, boxSizing: "border-box" }}
-                            />
-                          </>
-                        )}
-                      </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            {/* LEFT: duplicates, multi-select, accumulates across searches */}
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 6 }}>Duplicates to merge</div>
+              <input
+                placeholder="Search…"
+                value={leftQuery}
+                onChange={e => searchLeft(e.target.value)}
+                style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: `0.5px solid ${C.border}`, fontSize: 12, boxSizing: "border-box", marginBottom: 6 }}
+              />
+              {leftSearching && <div style={{ fontSize: 11, color: C.muted }}>Searching…</div>}
+              {!leftSearching && leftQuery.trim().length >= 2 && (
+                <div style={{ border: `0.5px solid ${C.border}`, borderRadius: 8, maxHeight: 130, overflowY: "auto", marginBottom: 8 }}>
+                  {leftResults.length === 0 && <div style={{ padding: 8, fontSize: 11, color: C.muted }}>No matches</div>}
+                  {leftResults.map(r => (
+                    <div key={r.recipe_id} onClick={() => toggleDuplicate(r)}
+                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", cursor: "pointer", borderBottom: `0.5px solid ${C.border}` }}>
+                      <div style={{
+                        width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                        border: `1.5px solid ${isSelected(r.recipe_id) ? C.teal : C.border}`,
+                        background: isSelected(r.recipe_id) ? C.teal : "transparent",
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "white"
+                      }}>{isSelected(r.recipe_id) ? "✓" : ""}</div>
+                      <div style={{ fontSize: 11, color: C.text }}>{r.dish_name} <span style={{ color: C.muted, fontSize: 9 }}>({r.review_status})</span></div>
                     </div>
+                  ))}
+                </div>
+              )}
 
-                    <button onClick={() => mergeGroup(i)} disabled={!canMerge || state.merging}
-                      style={{
-                        marginTop: 8, width: "100%", padding: "6px", borderRadius: 6, fontSize: 11, fontWeight: 500, border: "none",
-                        background: !canMerge || state.merging ? "#B4B2A9" : C.green, color: C.mint,
-                        cursor: !canMerge || state.merging ? "not-allowed" : "pointer",
-                      }}>
-                      {state.merging ? "Merging…" : "Merge This Group"}
-                    </button>
-                  </div>
-                );
-              })}
+              {selectedDuplicates.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>{selectedDuplicates.length} selected:</div>
+                  {selectedDuplicates.map(d => (
+                    <div key={d.recipe_id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.successBg, borderRadius: 6, padding: "4px 8px", marginBottom: 3 }}>
+                      <div style={{ fontSize: 11, color: C.text }}>{d.dish_name}</div>
+                      <span onClick={() => removeDuplicate(d.recipe_id)} style={{ cursor: "pointer", color: C.muted, fontSize: 12 }}>✕</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT: target, single-select */}
+            <div style={{ flex: 1, borderLeft: `0.5px solid ${C.border}`, paddingLeft: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 6 }}>Merge into</div>
+              {targetDish ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.successBg, border: `0.5px solid ${C.mint}`, borderRadius: 8, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 12, color: C.text }}>{targetDish.dish_name} <span style={{ color: C.muted, fontSize: 10 }}>({targetDish.review_status})</span></div>
+                  <span onClick={() => setTargetDish(null)} style={{ cursor: "pointer", color: C.muted, fontSize: 13 }}>✕</span>
+                </div>
+              ) : (
+                <>
+                  <input
+                    placeholder="Search…"
+                    value={rightQuery}
+                    onChange={e => searchRight(e.target.value)}
+                    style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: `0.5px solid ${C.border}`, fontSize: 12, boxSizing: "border-box", marginBottom: 6 }}
+                  />
+                  {rightSearching && <div style={{ fontSize: 11, color: C.muted }}>Searching…</div>}
+                  {!rightSearching && rightQuery.trim().length >= 2 && (
+                    <div style={{ border: `0.5px solid ${C.border}`, borderRadius: 8, maxHeight: 130, overflowY: "auto" }}>
+                      {rightResults.length === 0 && <div style={{ padding: 8, fontSize: 11, color: C.muted }}>No matches</div>}
+                      {rightResults.map(r => (
+                        <div key={r.recipe_id} onClick={() => { setTargetDish(r); setRightQuery(""); setRightResults([]); }}
+                          style={{ padding: "6px 8px", cursor: "pointer", borderBottom: `0.5px solid ${C.border}`, fontSize: 11, color: C.text }}>
+                          {r.dish_name} <span style={{ color: C.muted, fontSize: 9 }}>({r.review_status})</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          {canMerge && !confirming && (
+            <button onClick={() => setConfirming(true)}
+              style={{ marginTop: 10, width: "100%", background: C.green, color: C.mint, border: "none", borderRadius: 8, padding: "9px", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+              Merge {selectedDuplicates.length} into "{targetDish.dish_name}"
+            </button>
+          )}
+
+          {confirming && (
+            <div style={{ marginTop: 10, background: C.errorBg, border: "0.5px solid #F0997B", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 12, color: C.errorText, marginBottom: 8 }}>
+                This will delete {selectedDuplicates.length} dish(es) and repoint their pairings into <strong>{targetDish.dish_name}</strong>. This can't be undone.
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={doMerge} disabled={merging}
+                  style={{ flex: 1, background: "#E24B4A", color: "white", border: "none", borderRadius: 8, padding: "7px", fontSize: 12, fontWeight: 500, cursor: merging ? "not-allowed" : "pointer" }}>
+                  {merging ? (progress || "Merging…") : "Yes, merge"}
+                </button>
+                <button onClick={() => setConfirming(false)} disabled={merging}
+                  style={{ flex: 1, background: "white", color: C.text, border: `0.5px solid ${C.border}`, borderRadius: 8, padding: "7px", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -434,7 +250,7 @@ export default function PlatformAdmin({ onBack }) {
           <div style={{ flex: 1 }}>
             <div style={{ color: C.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>LADLEFUL · ADMIN</div>
             <div style={{ color: "#FDFCF8", fontSize: 17, fontWeight: 500, marginTop: 2 }}>Platform Admin</div>
-            <div style={{ color: C.teal, fontSize: 11, marginTop: 2 }}>{tools.length + 2} tools available</div>
+            <div style={{ color: C.teal, fontSize: 11, marginTop: 2 }}>{tools.length + 1} tools available</div>
           </div>
         </div>
       </div>
@@ -469,11 +285,6 @@ export default function PlatformAdmin({ onBack }) {
             </div>
           </div>
         ))}
-
-        <DuplicateReview
-          apiFetch={apiFetch}
-          onDone={(msg, err) => { setResult(msg); setError(err); }}
-        />
 
         <MergeDishesTool
           apiFetch={apiFetch}

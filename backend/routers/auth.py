@@ -374,87 +374,20 @@ async def merge_dishes(
     return {"message": f"Merged '{duplicate_name}' into the keeper dish. Pairings repointed or cleaned up."}
 
 
-@router.get("/admin/duplicate-candidates")
-async def get_duplicate_candidates(
-    threshold: float = 0.4,
-    current_user: dict = Depends(require_role("platform_admin")),
-    db: Session = Depends(get_db)
-):
-    """
-    Platform admin only. Proactively surfaces GROUPS of side dishes whose
-    names are similar enough to likely be the same dish (e.g. 'Peanut
-    chutney' vs 'Peanut Chutney' vs 'Peanut (groundnut) chutney'), using
-    the same trigram similarity already proven in /recipes/review's
-    search -- rather than requiring the admin to manually search for
-    each suspected duplicate one at a time.
-
-    Fixed from an earlier version that returned raw pairs: with 5 copies
-    of the same dish, pairwise output showed 10 near-identical cards
-    (5 choose 2), an unusable, confusing experience Vijey rejected on
-    sight. Now does real connected-components clustering (union-find)
-    over the pairwise similarity graph, so all mutually-similar dishes
-    collapse into ONE group.
-
-    Each group is split into:
-      - approved_members: any already-approved dish(es) in the group --
-        the natural merge target(s), since they're already trusted/live.
-      - duplicate_members: everything else in the group -- candidates to
-        check off and merge away. If NO approved member exists, ALL
-        group members land here instead (nothing to default-target;
-        the admin picks a survivor and renames it via merge-dishes'
-        new_name field).
-
-    Scoped to side dishes only (meal_role @> ['side']), since that's
-    where seed_recipe_pairings_groq.py actually creates duplicates.
-    """
-    rows = db.execute(text("""
-        SELECT
-            a.recipe_id AS id_a, a.dish_name AS name_a, a.review_status AS status_a,
-            b.recipe_id AS id_b, b.dish_name AS name_b, b.review_status AS status_b
-        FROM recipe_dna_master a
-        JOIN recipe_dna_master b
-            ON a.recipe_id < b.recipe_id
-            AND a.meal_role @> ARRAY['side']::text[]
-            AND b.meal_role @> ARRAY['side']::text[]
-            AND similarity(LOWER(a.dish_name), LOWER(b.dish_name)) > :threshold
-        WHERE a.review_status != 'rejected' AND b.review_status != 'rejected'
-    """), {"threshold": threshold}).fetchall()
-
-    # Union-find clustering over the pairwise similarity graph
-    parent = {}
-    def find(x):
-        parent.setdefault(x, x)
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]
-            x = parent[x]
-        return x
-    def union(x, y):
-        rx, ry = find(x), find(y)
-        if rx != ry:
-            parent[rx] = ry
-
-    dish_info = {}
-    for r in rows:
-        a_id, b_id = str(r.id_a), str(r.id_b)
-        union(a_id, b_id)
-        dish_info[a_id] = {"recipe_id": a_id, "dish_name": r.name_a, "review_status": r.status_a}
-        dish_info[b_id] = {"recipe_id": b_id, "dish_name": r.name_b, "review_status": r.status_b}
-
-    clusters = {}
-    for rid in dish_info:
-        clusters.setdefault(find(rid), []).append(dish_info[rid])
-
-    groups = []
-    for members in clusters.values():
-        if len(members) < 2:
-            continue  # a pair that only matched each other transitively cancelled out -- not a real group
-        approved = [m for m in members if m["review_status"] == "approved"]
-        groups.append({
-            "approved_members": approved,
-            "duplicate_members": [m for m in members if m["review_status"] != "approved"] if approved else members,
-        })
-
-    return {"groups": groups}
+# Note: an earlier /admin/duplicate-candidates endpoint attempted automatic
+# duplicate detection via trigram similarity + union-find clustering.
+# Removed after testing against real data confirmed it's fundamentally
+# unreliable for this domain -- Tamil dish names share so much common
+# "template" wording (curry, kootu, kuzhambu, poriyal) that genuinely
+# different dishes (e.g. 'Kadala black chickpea curry' vs 'Kadala black
+# gram curry' -- different legumes entirely) often score HIGHER in
+# similarity than real duplicates worded differently (e.g. 'Sambar (toor
+# dal with vegetables)' vs 'Sambar (vegetable lentil stew)' scored lower
+# than several false positives). No single threshold separates the two
+# cases -- confirmed empirically, not just a tuning problem. Replaced
+# with manual search-and-select on both sides (see /recipes/review's
+# search, already used by the merge-dishes picker), putting the actual
+# judgment call back with the admin instead of an unreliable algorithm.
 
 
 
