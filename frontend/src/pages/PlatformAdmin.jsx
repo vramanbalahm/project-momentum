@@ -27,23 +27,35 @@ function MergeDishesTool({ apiFetch, onDone }) {
   const [leftQuery, setLeftQuery] = useState("");
   const [leftResults, setLeftResults] = useState([]);
   const [leftSearching, setLeftSearching] = useState(false);
+  const [leftStatus, setLeftStatus] = useState("all"); // 'under_review' | 'approved' | 'all'
   const [selectedDuplicates, setSelectedDuplicates] = useState([]); // accumulates across searches
 
   const [rightQuery, setRightQuery] = useState("");
   const [rightResults, setRightResults] = useState([]);
   const [rightSearching, setRightSearching] = useState(false);
+  const [rightStatus, setRightStatus] = useState("all");
   const [targetDish, setTargetDish] = useState(null);
 
   const [confirming, setConfirming] = useState(false);
   const [merging, setMerging] = useState(false);
   const [progress, setProgress] = useState(null);
 
-  const runSearch = async (q, setResults, setSearching) => {
+  const runSearch = async (q, status, setResults, setSearching) => {
     if (q.trim().length < 2) { setResults([]); return; }
     setSearching(true);
     try {
-      const res = await apiFetch(`/recipes/review?q=${encodeURIComponent(q)}&status=all&page_size=15`);
-      setResults(res.recipes || []);
+      const res = await apiFetch(`/recipes/review?q=${encodeURIComponent(q)}&status=${status}&page_size=15`);
+      let recipes = res.recipes || [];
+      // When showing both statuses together, surface under_review first --
+      // that's the newer, unvetted content most likely to need attention.
+      if (status === "all") {
+        recipes = [...recipes].sort((a, b) => {
+          const aFirst = a.review_status === "under_review" ? 0 : 1;
+          const bFirst = b.review_status === "under_review" ? 0 : 1;
+          return aFirst - bFirst;
+        });
+      }
+      setResults(recipes);
     } catch {
       setResults([]);
     } finally {
@@ -51,8 +63,34 @@ function MergeDishesTool({ apiFetch, onDone }) {
     }
   };
 
-  const searchLeft = (q) => { setLeftQuery(q); runSearch(q, setLeftResults, setLeftSearching); };
-  const searchRight = (q) => { setRightQuery(q); runSearch(q, setRightResults, setRightSearching); };
+  const searchLeft = (q) => { setLeftQuery(q); runSearch(q, leftStatus, setLeftResults, setLeftSearching); };
+  const searchRight = (q) => { setRightQuery(q); runSearch(q, rightStatus, setRightResults, setRightSearching); };
+
+  // Re-run the current search when the status filter changes, so
+  // switching filters updates results immediately without retyping.
+  const changeLeftStatus = (status) => { setLeftStatus(status); if (leftQuery.trim().length >= 2) runSearch(leftQuery, status, setLeftResults, setLeftSearching); };
+  const changeRightStatus = (status) => { setRightStatus(status); if (rightQuery.trim().length >= 2) runSearch(rightQuery, status, setRightResults, setRightSearching); };
+
+  const STATUS_OPTIONS = [
+    { value: "under_review", label: "Under review" },
+    { value: "approved", label: "Approved" },
+    { value: "all", label: "All" },
+  ];
+
+  const StatusFilter = ({ value, onChange }) => (
+    <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
+      {STATUS_OPTIONS.map(opt => (
+        <div key={opt.value} onClick={() => onChange(opt.value)} style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+          <div style={{
+            width: 11, height: 11, borderRadius: "50%", flexShrink: 0,
+            border: `1.5px solid ${value === opt.value ? C.teal : C.border}`,
+            background: value === opt.value ? C.teal : "transparent",
+          }} />
+          <div style={{ fontSize: 10, color: C.muted }}>{opt.label}</div>
+        </div>
+      ))}
+    </div>
+  );
 
   const isSelected = (id) => selectedDuplicates.some(d => d.recipe_id === id);
   const toggleDuplicate = (dish) => {
@@ -104,6 +142,7 @@ function MergeDishesTool({ apiFetch, onDone }) {
             {/* LEFT: duplicates, multi-select, accumulates across searches */}
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 6 }}>Duplicates to merge</div>
+              <StatusFilter value={leftStatus} onChange={changeLeftStatus} />
               <input
                 placeholder="Search…"
                 value={leftQuery}
@@ -152,6 +191,7 @@ function MergeDishesTool({ apiFetch, onDone }) {
                 </div>
               ) : (
                 <>
+                  <StatusFilter value={rightStatus} onChange={changeRightStatus} />
                   <input
                     placeholder="Search…"
                     value={rightQuery}

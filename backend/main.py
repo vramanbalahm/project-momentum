@@ -346,6 +346,13 @@ async def get_recipes_for_review(
         conditions.append("(similarity(LOWER(r.dish_name), LOWER(:q)) > 0.1 OR LOWER(r.dish_name) LIKE LOWER(:q_pattern))")
         params["q"] = q
         params["q_pattern"] = f"%{q}%"
+        # Fixed real bug: status was silently ignored whenever a search
+        # query was present, applying only in the no-query branch below.
+        # The merge-duplicates tool's status filter (under_review /
+        # approved / all) depends on this actually working together with
+        # a search term, not just alone.
+        if status != "all":
+            conditions.append("r.review_status = :status")
         # Cross-status search — same visibility rule as the tab logic below,
         # just applied across all statuses instead of one at a time.
         if role != "platform_admin":
