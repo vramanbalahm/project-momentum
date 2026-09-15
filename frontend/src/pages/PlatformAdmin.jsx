@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 
 const C = {
@@ -27,7 +27,7 @@ function MergeDishesTool({ apiFetch, onDone }) {
   const [leftQuery, setLeftQuery] = useState("");
   const [leftResults, setLeftResults] = useState([]);
   const [leftSearching, setLeftSearching] = useState(false);
-  const [leftStatus, setLeftStatus] = useState("all"); // 'under_review' | 'approved' | 'all'
+  const [leftStatus, setLeftStatus] = useState("under_review"); // 'under_review' | 'approved' | 'all' -- defaults here since the left side auto-loads all under-review dishes on open
   const [selectedDuplicates, setSelectedDuplicates] = useState([]); // accumulates across searches
 
   const [rightQuery, setRightQuery] = useState("");
@@ -63,13 +63,45 @@ function MergeDishesTool({ apiFetch, onDone }) {
     }
   };
 
-  const searchLeft = (q) => { setLeftQuery(q); runSearch(q, leftStatus, setLeftResults, setLeftSearching); };
+  // No search text -- just list everything for a given status. Used to
+  // auto-load the left side on open (per Vijey: browsing the full
+  // under-review list beats having to search the review screen
+  // separately just to see what's pending).
+  const browse = async (status, setResults, setSearching) => {
+    setSearching(true);
+    try {
+      const res = await apiFetch(`/recipes/review?status=${status}&page_size=200`);
+      setResults(res.recipes || []);
+    } catch {
+      setResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const searchLeft = (q) => {
+    setLeftQuery(q);
+    if (q.trim().length === 0) browse(leftStatus, setLeftResults, setLeftSearching);
+    else runSearch(q, leftStatus, setLeftResults, setLeftSearching);
+  };
   const searchRight = (q) => { setRightQuery(q); runSearch(q, rightStatus, setRightResults, setRightSearching); };
 
-  // Re-run the current search when the status filter changes, so
-  // switching filters updates results immediately without retyping.
-  const changeLeftStatus = (status) => { setLeftStatus(status); if (leftQuery.trim().length >= 2) runSearch(leftQuery, status, setLeftResults, setLeftSearching); };
-  const changeRightStatus = (status) => { setRightStatus(status); if (rightQuery.trim().length >= 2) runSearch(rightQuery, status, setRightResults, setRightSearching); };
+  // Left side auto-loads under_review on open. Right side stays empty
+  // until the admin actually searches, per Vijey.
+  useEffect(() => { browse(leftStatus, setLeftResults, setLeftSearching); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-run when the status filter changes: browse (left, no query typed)
+  // or search (either side, with query text) -- right side does nothing
+  // if nothing's been typed yet.
+  const changeLeftStatus = (status) => {
+    setLeftStatus(status);
+    if (leftQuery.trim().length === 0) browse(status, setLeftResults, setLeftSearching);
+    else runSearch(leftQuery, status, setLeftResults, setLeftSearching);
+  };
+  const changeRightStatus = (status) => {
+    setRightStatus(status);
+    if (rightQuery.trim().length >= 2) runSearch(rightQuery, status, setRightResults, setRightSearching);
+  };
 
   const STATUS_OPTIONS = [
     { value: "under_review", label: "Under review" },
@@ -150,22 +182,27 @@ function MergeDishesTool({ apiFetch, onDone }) {
                 style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: `0.5px solid ${C.border}`, fontSize: 12, boxSizing: "border-box", marginBottom: 6 }}
               />
               {leftSearching && <div style={{ fontSize: 11, color: C.muted }}>Searching…</div>}
-              {!leftSearching && leftQuery.trim().length >= 2 && (
-                <div style={{ border: `0.5px solid ${C.border}`, borderRadius: 8, maxHeight: 130, overflowY: "auto", marginBottom: 8 }}>
-                  {leftResults.length === 0 && <div style={{ padding: 8, fontSize: 11, color: C.muted }}>No matches</div>}
-                  {leftResults.map(r => (
-                    <div key={r.recipe_id} onClick={() => toggleDuplicate(r)}
-                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", cursor: "pointer", borderBottom: `0.5px solid ${C.border}` }}>
-                      <div style={{
-                        width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                        border: `1.5px solid ${isSelected(r.recipe_id) ? C.teal : C.border}`,
-                        background: isSelected(r.recipe_id) ? C.teal : "transparent",
-                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "white"
-                      }}>{isSelected(r.recipe_id) ? "✓" : ""}</div>
-                      <div style={{ fontSize: 11, color: C.text }}>{r.dish_name} <span style={{ color: C.muted, fontSize: 9 }}>({r.review_status})</span></div>
-                    </div>
-                  ))}
-                </div>
+              {!leftSearching && (leftQuery.trim().length >= 2 || leftResults.length > 0) && (
+                <>
+                  {leftQuery.trim().length === 0 && (
+                    <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>Showing all {leftResults.length} {STATUS_OPTIONS.find(o => o.value === leftStatus)?.label.toLowerCase()}:</div>
+                  )}
+                  <div style={{ border: `0.5px solid ${C.border}`, borderRadius: 8, maxHeight: 130, overflowY: "auto", marginBottom: 8 }}>
+                    {leftResults.length === 0 && <div style={{ padding: 8, fontSize: 11, color: C.muted }}>Nothing here</div>}
+                    {leftResults.map(r => (
+                      <div key={r.recipe_id} onClick={() => toggleDuplicate(r)}
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", cursor: "pointer", borderBottom: `0.5px solid ${C.border}` }}>
+                        <div style={{
+                          width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                          border: `1.5px solid ${isSelected(r.recipe_id) ? C.teal : C.border}`,
+                          background: isSelected(r.recipe_id) ? C.teal : "transparent",
+                          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "white"
+                        }}>{isSelected(r.recipe_id) ? "✓" : ""}</div>
+                        <div style={{ fontSize: 11, color: C.text }}>{r.dish_name} <span style={{ color: C.muted, fontSize: 9 }}>({r.review_status})</span></div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
 
               {selectedDuplicates.length > 0 && (
