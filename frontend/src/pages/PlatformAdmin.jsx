@@ -259,6 +259,12 @@ function MergeDishesTool({ apiFetch, onDone }) {
             </button>
           )}
 
+          {targetDish && selectedDuplicates.some(d => d.recipe_id === targetDish.recipe_id) && (
+            <div style={{ marginTop: 10, fontSize: 11, color: C.errorText, background: C.errorBg, borderRadius: 8, padding: "8px 10px" }}>
+              "{targetDish.dish_name}" is both the target and checked as a duplicate on the left — uncheck it there first.
+            </div>
+          )}
+
           {confirming && (
             <div style={{ marginTop: 10, background: C.errorBg, border: "0.5px solid #F0997B", borderRadius: 10, padding: "10px 12px" }}>
               <div style={{ fontSize: 12, color: C.errorText, marginBottom: 8 }}>
