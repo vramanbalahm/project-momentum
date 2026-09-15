@@ -271,6 +271,7 @@ async def backfill_holidays(
 class MergeDishesRequest(BaseModel):
     keeper_recipe_id: str
     duplicate_recipe_id: str
+    new_name: Optional[str] = None  # when merging duplicates with no existing approved target, the admin names the surviving record themselves
 
 
 @router.post("/admin/merge-dishes")
@@ -357,6 +358,17 @@ async def merge_dishes(
     # at it (per-household ones, deliberately left alone above) cascade
     # automatically via ON DELETE CASCADE.
     db.execute(text("DELETE FROM recipe_dna_master WHERE recipe_id = CAST(:dup AS uuid)"), {"dup": duplicate_id})
+
+    # Optional rename of the surviving record -- used when a duplicate
+    # group has no existing approved dish to merge into, so the admin
+    # picks one of the group's own members to survive and names it
+    # themselves, rather than the group defaulting to whichever
+    # arbitrary member happened to be chosen as the technical keeper.
+    if req.new_name and req.new_name.strip():
+        db.execute(text("""
+            UPDATE recipe_dna_master SET dish_name = :name WHERE recipe_id = CAST(:keeper AS uuid)
+        """), {"name": req.new_name.strip(), "keeper": keeper_id})
+
     db.commit()
 
     return {"message": f"Merged '{duplicate_name}' into the keeper dish. Pairings repointed or cleaned up."}
@@ -369,28 +381,36 @@ async def get_duplicate_candidates(
     db: Session = Depends(get_db)
 ):
     """
-    Platform admin only. Proactively surfaces pairs of side dishes whose
+    Platform admin only. Proactively surfaces GROUPS of side dishes whose
     names are similar enough to likely be the same dish (e.g. 'Peanut
-    chutney' vs 'Peanut (groundnut) chutney'), using the same trigram
-    similarity already proven in /recipes/review's search -- rather than
-    requiring the admin to manually search for each suspected duplicate
-    one at a time.
+    chutney' vs 'Peanut Chutney' vs 'Peanut (groundnut) chutney'), using
+    the same trigram similarity already proven in /recipes/review's
+    search -- rather than requiring the admin to manually search for
+    each suspected duplicate one at a time.
+
+    Fixed from an earlier version that returned raw pairs: with 5 copies
+    of the same dish, pairwise output showed 10 near-identical cards
+    (5 choose 2), an unusable, confusing experience Vijey rejected on
+    sight. Now does real connected-components clustering (union-find)
+    over the pairwise similarity graph, so all mutually-similar dishes
+    collapse into ONE group.
+
+    Each group is split into:
+      - approved_members: any already-approved dish(es) in the group --
+        the natural merge target(s), since they're already trusted/live.
+      - duplicate_members: everything else in the group -- candidates to
+        check off and merge away. If NO approved member exists, ALL
+        group members land here instead (nothing to default-target;
+        the admin picks a survivor and renames it via merge-dishes'
+        new_name field).
 
     Scoped to side dishes only (meal_role @> ['side']), since that's
     where seed_recipe_pairings_groq.py actually creates duplicates.
-    Deliberately does NOT restrict to under_review -- a duplicate can
-    just as easily be a new dish matching something already approved.
-
-    Returns pairs, not full N-way clusters -- if three dishes are all
-    the same thing, they'll show up as separate pairs (A-B, B-C, A-C).
-    Merging any one pair naturally folds the rest together on a
-    follow-up pass, without needing full graph-clustering logic here.
     """
     rows = db.execute(text("""
         SELECT
             a.recipe_id AS id_a, a.dish_name AS name_a, a.review_status AS status_a,
-            b.recipe_id AS id_b, b.dish_name AS name_b, b.review_status AS status_b,
-            similarity(LOWER(a.dish_name), LOWER(b.dish_name)) AS sim
+            b.recipe_id AS id_b, b.dish_name AS name_b, b.review_status AS status_b
         FROM recipe_dna_master a
         JOIN recipe_dna_master b
             ON a.recipe_id < b.recipe_id
@@ -398,20 +418,44 @@ async def get_duplicate_candidates(
             AND b.meal_role @> ARRAY['side']::text[]
             AND similarity(LOWER(a.dish_name), LOWER(b.dish_name)) > :threshold
         WHERE a.review_status != 'rejected' AND b.review_status != 'rejected'
-        ORDER BY sim DESC
-        LIMIT 100
     """), {"threshold": threshold}).fetchall()
 
-    return {
-        "candidates": [
-            {
-                "dish_a": {"recipe_id": str(r.id_a), "dish_name": r.name_a, "review_status": r.status_a},
-                "dish_b": {"recipe_id": str(r.id_b), "dish_name": r.name_b, "review_status": r.status_b},
-                "similarity": round(float(r.sim), 3),
-            }
-            for r in rows
-        ]
-    }
+    # Union-find clustering over the pairwise similarity graph
+    parent = {}
+    def find(x):
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+    def union(x, y):
+        rx, ry = find(x), find(y)
+        if rx != ry:
+            parent[rx] = ry
+
+    dish_info = {}
+    for r in rows:
+        a_id, b_id = str(r.id_a), str(r.id_b)
+        union(a_id, b_id)
+        dish_info[a_id] = {"recipe_id": a_id, "dish_name": r.name_a, "review_status": r.status_a}
+        dish_info[b_id] = {"recipe_id": b_id, "dish_name": r.name_b, "review_status": r.status_b}
+
+    clusters = {}
+    for rid in dish_info:
+        clusters.setdefault(find(rid), []).append(dish_info[rid])
+
+    groups = []
+    for members in clusters.values():
+        if len(members) < 2:
+            continue  # a pair that only matched each other transitively cancelled out -- not a real group
+        approved = [m for m in members if m["review_status"] == "approved"]
+        groups.append({
+            "approved_members": approved,
+            "duplicate_members": [m for m in members if m["review_status"] != "approved"] if approved else members,
+        })
+
+    return {"groups": groups}
+
 
 
 @router.post("/login", response_model=TokenResponse)

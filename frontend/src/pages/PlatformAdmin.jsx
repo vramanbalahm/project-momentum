@@ -168,29 +168,28 @@ function MergeDishesTool({ apiFetch, onDone }) {
 // dishes are really the same thing, merging any one pair naturally
 // folds the rest together on the next scan.
 function DuplicateReview({ apiFetch, onDone }) {
-  const [candidates, setCandidates] = useState(null); // null = not loaded yet
+  const [groups, setGroups] = useState(null); // null = not loaded yet
   const [loading, setLoading] = useState(false);
-  const [selections, setSelections] = useState({}); // index -> { included, keeperSide }
-  const [merging, setMerging] = useState(false);
-  const [progress, setProgress] = useState(null);
+  // One entry per group: { checked: Set<recipe_id>, selectedApprovedId, newName, merging }
+  const [groupStates, setGroupStates] = useState([]);
+
+  const shortestName = (members) =>
+    members.reduce((shortest, m) => (m.dish_name.length < shortest.length ? m.dish_name : shortest), members[0].dish_name);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await apiFetch("/auth/admin/duplicate-candidates");
-      const cands = res.candidates || [];
-      setCandidates(cands);
-      // Default: include every suggestion, and default the keeper to
-      // whichever side is already approved (if statuses differ) since
-      // that's the one more likely to be the real, curated dish.
-      const initial = {};
-      cands.forEach((c, i) => {
-        const preferA = c.dish_a.review_status === "approved" && c.dish_b.review_status !== "approved";
-        initial[i] = { included: true, keeperSide: preferA ? "a" : "b" };
-      });
-      setSelections(initial);
+      const gs = res.groups || [];
+      setGroups(gs);
+      setGroupStates(gs.map(g => ({
+        checked: new Set(g.duplicate_members.map(m => m.recipe_id)), // pre-check everything found
+        selectedApprovedId: g.approved_members.length > 0 ? g.approved_members[0].recipe_id : null,
+        newName: g.approved_members.length === 0 ? shortestName(g.duplicate_members) : "",
+        merging: false,
+      })));
     } catch {
-      setCandidates([]);
+      setGroups([]);
     } finally {
       setLoading(false);
     }
@@ -198,37 +197,55 @@ function DuplicateReview({ apiFetch, onDone }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const includedCount = Object.values(selections).filter(s => s.included).length;
+  const updateGroup = (i, patch) => setGroupStates(gs => gs.map((g, idx) => idx === i ? { ...g, ...patch } : g));
 
-  const toggleIncluded = (i) => setSelections(s => ({ ...s, [i]: { ...s[i], included: !s[i].included } }));
-  const setKeeper = (i, side) => setSelections(s => ({ ...s, [i]: { ...s[i], keeperSide: side } }));
+  const toggleChecked = (i, recipeId) => {
+    setGroupStates(gs => gs.map((g, idx) => {
+      if (idx !== i) return g;
+      const next = new Set(g.checked);
+      next.has(recipeId) ? next.delete(recipeId) : next.add(recipeId);
+      return { ...g, checked: next };
+    }));
+  };
 
-  const mergeSelected = async () => {
-    setMerging(true);
-    let done = 0, failed = 0;
-    const toMerge = candidates
-      .map((c, i) => ({ c, sel: selections[i] }))
-      .filter(({ sel }) => sel && sel.included);
+  const mergeGroup = async (i) => {
+    const group = groups[i];
+    const state = groupStates[i];
+    const hasApproved = group.approved_members.length > 0;
+    const checkedIds = [...state.checked];
 
-    for (const { c, sel } of toMerge) {
-      const keeper = sel.keeperSide === "a" ? c.dish_a : c.dish_b;
-      const duplicate = sel.keeperSide === "a" ? c.dish_b : c.dish_a;
-      setProgress(`Merging ${done + failed + 1} / ${toMerge.length}…`);
-      try {
-        await apiFetch("/auth/admin/merge-dishes", {
-          method: "POST",
-          body: JSON.stringify({ keeper_recipe_id: keeper.recipe_id, duplicate_recipe_id: duplicate.recipe_id })
-        });
-        done++;
-      } catch {
-        failed++;
+    if (hasApproved) {
+      if (checkedIds.length === 0) return;
+      updateGroup(i, { merging: true });
+      let done = 0, failed = 0;
+      for (const dupId of checkedIds) {
+        try {
+          await apiFetch("/auth/admin/merge-dishes", {
+            method: "POST",
+            body: JSON.stringify({ keeper_recipe_id: state.selectedApprovedId, duplicate_recipe_id: dupId })
+          });
+          done++;
+        } catch { failed++; }
       }
+      onDone(`Merged ${done} duplicate(s) into the approved dish${failed ? `, ${failed} failed` : ""}.`, null);
+    } else {
+      if (checkedIds.length < 2) return;
+      updateGroup(i, { merging: true });
+      const [keeperId, ...rest] = checkedIds;
+      let done = 0, failed = 0;
+      for (const dupId of rest) {
+        try {
+          await apiFetch("/auth/admin/merge-dishes", {
+            method: "POST",
+            body: JSON.stringify({ keeper_recipe_id: keeperId, duplicate_recipe_id: dupId, new_name: state.newName })
+          });
+          done++;
+        } catch { failed++; }
+      }
+      onDone(`Merged ${done + 1} dish(es) into "${state.newName}"${failed ? `, ${failed} failed` : ""}.`, null);
     }
 
-    setProgress(null);
-    setMerging(false);
-    onDone(`Merged ${done} pair(s)${failed ? `, ${failed} failed` : ""}.`, null);
-    load(); // refresh -- merging can resolve or reveal other candidate pairs
+    load(); // refresh -- merging can resolve or reveal other candidate groups
   };
 
   return (
@@ -241,66 +258,89 @@ function DuplicateReview({ apiFetch, onDone }) {
             <span onClick={load} style={{ fontSize: 11, color: C.teal, cursor: "pointer" }}>↻ Rescan</span>
           </div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 2, lineHeight: 1.4, marginBottom: 10 }}>
-            Automatically found by comparing dish names — uncheck anything that isn't really a duplicate, pick which side of each pair to keep, then merge them all at once.
+            Automatically grouped by similar names. Check which duplicates to merge on the left; pick the target on the right (an approved dish if one exists, otherwise name the new combined record yourself).
           </div>
 
           {loading && <div style={{ fontSize: 12, color: C.muted }}>Scanning…</div>}
-          {!loading && candidates && candidates.length === 0 && (
+          {!loading && groups && groups.length === 0 && (
             <div style={{ fontSize: 12, color: C.muted }}>No likely duplicates found right now.</div>
           )}
 
-          {!loading && candidates && candidates.length > 0 && (
-            <>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 360, overflowY: "auto" }}>
-                {candidates.map((c, i) => {
-                  const sel = selections[i] || { included: true, keeperSide: "a" };
-                  return (
-                    <div key={i} style={{
-                      display: "flex", gap: 8, padding: "8px 10px", borderRadius: 8,
-                      background: sel.included ? "white" : "#F1EFE8",
-                      border: `0.5px solid ${C.border}`, opacity: sel.included ? 1 : 0.6,
-                    }}>
-                      <div onClick={() => toggleIncluded(i)} style={{ cursor: "pointer", paddingTop: 2 }}>
-                        <div style={{
-                          width: 16, height: 16, borderRadius: 4,
-                          border: `1.5px solid ${sel.included ? C.teal : C.border}`,
-                          background: sel.included ? C.teal : "transparent",
-                          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "white"
-                        }}>{sel.included ? "✓" : ""}</div>
-                      </div>
+          {!loading && groups && groups.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 420, overflowY: "auto" }}>
+              {groups.map((g, i) => {
+                const state = groupStates[i];
+                if (!state) return null;
+                const hasApproved = g.approved_members.length > 0;
+                const canMerge = hasApproved ? state.checked.size > 0 : state.checked.size >= 2 && state.newName.trim();
+
+                return (
+                  <div key={i} style={{ border: `0.5px solid ${C.border}`, borderRadius: 10, padding: "10px", background: "white" }}>
+                    <div style={{ display: "flex", gap: 10 }}>
+
+                      {/* Left: duplicates to check off */}
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 10, color: C.muted, marginBottom: 3 }}>{Math.round(c.similarity * 100)}% similar — keep:</div>
-                        {[["a", c.dish_a], ["b", c.dish_b]].map(([side, d]) => (
-                          <div key={side} onClick={() => sel.included && setKeeper(i, side)}
-                            style={{
-                              display: "flex", alignItems: "center", gap: 6, padding: "3px 0",
-                              cursor: sel.included ? "pointer" : "default",
-                            }}>
+                        <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>
+                          {hasApproved ? "Merge these in:" : "All copies found:"}
+                        </div>
+                        {g.duplicate_members.map(m => (
+                          <div key={m.recipe_id} onClick={() => toggleChecked(i, m.recipe_id)}
+                            style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0", cursor: "pointer" }}>
                             <div style={{
-                              width: 12, height: 12, borderRadius: "50%",
-                              border: `1.5px solid ${sel.keeperSide === side ? C.teal : C.border}`,
-                              background: sel.keeperSide === side ? C.teal : "transparent", flexShrink: 0
-                            }} />
+                              width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                              border: `1.5px solid ${state.checked.has(m.recipe_id) ? C.teal : C.border}`,
+                              background: state.checked.has(m.recipe_id) ? C.teal : "transparent",
+                              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "white"
+                            }}>{state.checked.has(m.recipe_id) ? "✓" : ""}</div>
                             <div style={{ fontSize: 12, color: C.text }}>
-                              {d.dish_name} <span style={{ color: C.muted, fontSize: 10 }}>({d.review_status})</span>
+                              {m.dish_name} <span style={{ color: C.muted, fontSize: 10 }}>({m.review_status})</span>
                             </div>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
 
-              <button onClick={mergeSelected} disabled={merging || includedCount === 0}
-                style={{
-                  marginTop: 10, width: "100%", background: merging || includedCount === 0 ? "#B4B2A9" : C.green,
-                  color: C.mint, border: "none", borderRadius: 8, padding: "9px", fontSize: 12, fontWeight: 500,
-                  cursor: merging || includedCount === 0 ? "not-allowed" : "pointer"
-                }}>
-                {merging ? (progress || "Merging…") : `Merge ${includedCount} selected`}
-              </button>
-            </>
+                      {/* Right: merge target */}
+                      <div style={{ flex: 1, borderLeft: `0.5px solid ${C.border}`, paddingLeft: 10 }}>
+                        {hasApproved ? (
+                          <>
+                            <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>Merge into:</div>
+                            {g.approved_members.map(m => (
+                              <div key={m.recipe_id} onClick={() => updateGroup(i, { selectedApprovedId: m.recipe_id })}
+                                style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0", cursor: "pointer" }}>
+                                <div style={{
+                                  width: 12, height: 12, borderRadius: "50%", flexShrink: 0,
+                                  border: `1.5px solid ${state.selectedApprovedId === m.recipe_id ? C.teal : C.border}`,
+                                  background: state.selectedApprovedId === m.recipe_id ? C.teal : "transparent",
+                                }} />
+                                <div style={{ fontSize: 12, color: C.text }}>{m.dish_name} <span style={{ color: C.muted, fontSize: 10 }}>(approved)</span></div>
+                              </div>
+                            ))}
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>No approved match — name the combined dish:</div>
+                            <input
+                              value={state.newName}
+                              onChange={e => updateGroup(i, { newName: e.target.value })}
+                              style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: `0.5px solid ${C.border}`, fontSize: 12, boxSizing: "border-box" }}
+                            />
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <button onClick={() => mergeGroup(i)} disabled={!canMerge || state.merging}
+                      style={{
+                        marginTop: 8, width: "100%", padding: "6px", borderRadius: 6, fontSize: 11, fontWeight: 500, border: "none",
+                        background: !canMerge || state.merging ? "#B4B2A9" : C.green, color: C.mint,
+                        cursor: !canMerge || state.merging ? "not-allowed" : "pointer",
+                      }}>
+                      {state.merging ? "Merging…" : "Merge This Group"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
