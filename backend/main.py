@@ -337,8 +337,15 @@ async def get_recipes_for_review(
     params = {"status": status, "offset": (page - 1) * page_size, "limit": page_size, "user_id": user_id}
 
     if q:
-        conditions.append("r.dish_name ILIKE :q")
-        params["q"] = f"%{q}%"
+        # Trigram similarity, not just substring ILIKE -- catches spelling
+        # variants ILIKE alone misses (e.g. "Avial" vs "Aviyal", "Kulambu"
+        # vs "Kuzhambu"). Same threshold already proven working in
+        # /recipes/search. Matters most for the merge-duplicates tool,
+        # which depends on this search actually surfacing near-spellings
+        # of the same dish, not just exact substrings.
+        conditions.append("(similarity(LOWER(r.dish_name), LOWER(:q)) > 0.1 OR LOWER(r.dish_name) LIKE LOWER(:q_pattern))")
+        params["q"] = q
+        params["q_pattern"] = f"%{q}%"
         # Cross-status search — same visibility rule as the tab logic below,
         # just applied across all statuses instead of one at a time.
         if role != "platform_admin":
@@ -372,6 +379,11 @@ async def get_recipes_for_review(
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
+    # When searching, show the closest matches first (trigram similarity);
+    # otherwise keep the existing alphabetical browse order.
+    sim_score_select = "similarity(LOWER(r.dish_name), LOWER(:q)) AS sim_score," if q else "0 AS sim_score,"
+    order_clause = "sim_score DESC, r.dish_name" if q else "r.sub_region, r.dish_name"
+
     rows = db.execute(text(f"""
         SELECT
             r.recipe_id, r.dish_name, r.regional_name, r.sub_region,
@@ -380,12 +392,13 @@ async def get_recipes_for_review(
             r.reviewed_at, r.review_notes,
             u.name as reviewed_by_name,
             v.hero_image_url, v.image_generation_count,
+            {sim_score_select}
             COUNT(*) OVER() as total_count
         FROM recipe_dna_master r
         LEFT JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
         LEFT JOIN users u ON u.user_id = r.reviewed_by
         {where}
-        ORDER BY r.sub_region, r.dish_name
+        ORDER BY {order_clause}
         LIMIT :limit OFFSET :offset
     """), params).fetchall()
 
