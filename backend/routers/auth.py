@@ -268,6 +268,100 @@ async def backfill_holidays(
     }
 
 
+class MergeDishesRequest(BaseModel):
+    keeper_recipe_id: str
+    duplicate_recipe_id: str
+
+
+@router.post("/admin/merge-dishes")
+async def merge_dishes(
+    req: MergeDishesRequest,
+    current_user: dict = Depends(require_role("platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Platform admin only. Merges duplicate_recipe_id into keeper_recipe_id --
+    repoints any shared (house_id IS NULL) recipe_pairing rows referencing
+    the duplicate, in either direction (as a main or as a side), to point
+    at the keeper instead, then deletes the duplicate dish entirely.
+
+    Where repointing would collide with an existing pairing already
+    involving the keeper (violating the partial unique index on
+    (main_recipe_id, side_recipe_id) WHERE house_id IS NULL), the
+    duplicate's conflicting row is dropped instead of repointed -- the
+    keeper's existing pairing already covers that relationship.
+
+    Scoped to shared pairing rows only (house_id IS NULL) -- this tool
+    was built specifically to clean up duplicates created by
+    seed_recipe_pairings_groq.py, which only ever creates shared dishes
+    and shared pairings. Per-household custom pairing rows are left
+    untouched.
+    """
+    keeper_id    = req.keeper_recipe_id
+    duplicate_id = req.duplicate_recipe_id
+
+    if keeper_id == duplicate_id:
+        raise HTTPException(status_code=400, detail="Keeper and duplicate must be different dishes.")
+
+    check = db.execute(text("""
+        SELECT recipe_id, dish_name FROM recipe_dna_master
+        WHERE recipe_id IN (CAST(:keeper AS uuid), CAST(:dup AS uuid))
+    """), {"keeper": keeper_id, "dup": duplicate_id}).fetchall()
+    found = {str(r[0]): r[1] for r in check}
+    if keeper_id not in found or duplicate_id not in found:
+        raise HTTPException(status_code=404, detail="One or both dishes not found.")
+    duplicate_name = found[duplicate_id]
+
+    # Repoint as SIDE: drop conflicting rows first, then repoint the rest
+    db.execute(text("""
+        DELETE FROM recipe_pairing rp
+        WHERE rp.side_recipe_id = CAST(:dup AS uuid)
+        AND rp.house_id IS NULL
+        AND EXISTS (
+            SELECT 1 FROM recipe_pairing rp2
+            WHERE rp2.main_recipe_id = rp.main_recipe_id
+            AND rp2.side_recipe_id = CAST(:keeper AS uuid)
+            AND rp2.house_id IS NULL
+        )
+    """), {"dup": duplicate_id, "keeper": keeper_id})
+    db.execute(text("""
+        UPDATE recipe_pairing SET side_recipe_id = CAST(:keeper AS uuid)
+        WHERE side_recipe_id = CAST(:dup AS uuid) AND house_id IS NULL
+    """), {"dup": duplicate_id, "keeper": keeper_id})
+
+    # Repoint as MAIN: same logic, other direction
+    db.execute(text("""
+        DELETE FROM recipe_pairing rp
+        WHERE rp.main_recipe_id = CAST(:dup AS uuid)
+        AND rp.house_id IS NULL
+        AND EXISTS (
+            SELECT 1 FROM recipe_pairing rp2
+            WHERE rp2.side_recipe_id = rp.side_recipe_id
+            AND rp2.main_recipe_id = CAST(:keeper AS uuid)
+            AND rp2.house_id IS NULL
+        )
+    """), {"dup": duplicate_id, "keeper": keeper_id})
+    db.execute(text("""
+        UPDATE recipe_pairing SET main_recipe_id = CAST(:keeper AS uuid)
+        WHERE main_recipe_id = CAST(:dup AS uuid) AND house_id IS NULL
+    """), {"dup": duplicate_id, "keeper": keeper_id})
+
+    # Clear dependent references that don't cascade automatically
+    db.execute(text("DELETE FROM recipe_content_vault WHERE recipe_id = CAST(:dup AS uuid)"), {"dup": duplicate_id})
+    db.execute(text("""
+        DELETE FROM meal_event_detail
+        WHERE recipe_id = CAST(:dup AS uuid) OR original_suggested_recipe_id = CAST(:dup AS uuid)
+    """), {"dup": duplicate_id})
+
+    # Now safe to delete -- recipe_pairing/ingredient rows still pointing
+    # at it (per-household ones, deliberately left alone above) cascade
+    # automatically via ON DELETE CASCADE.
+    db.execute(text("DELETE FROM recipe_dna_master WHERE recipe_id = CAST(:dup AS uuid)"), {"dup": duplicate_id})
+    db.commit()
+
+    return {"message": f"Merged '{duplicate_name}' into the keeper dish. Pairings repointed or cleaned up."}
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     check_rate_limit(request.client.host)
