@@ -363,7 +363,8 @@ def main():
             WHERE pairing_confirmed_no_sides = TRUE
         """)
         already_done |= {str(r[0]) for r in cur.fetchall()}
-        print(f"Already AI-reviewed or confirmed no-sides: {len(already_done)} main dishes - skipping these\n")
+        remaining = len(mains) - len(already_done)
+        print(f"Already done: {len(already_done)} / {len(mains)} main dishes.  Remaining: {remaining}\n")
 
     processed = 0
     for idx, (main_id, main_name, main_cat) in enumerate(mains):
@@ -473,12 +474,16 @@ def main():
 
         time.sleep(12)  # paced to roughly stay under the model's 8000 TPM free-tier limit -- the retry-after handling above is the real safety net, this just reduces how often it's needed
 
+    newly_completed = processed - total_skipped
+    remaining_after = len(mains) - len(already_done) - newly_completed
+
     print(f"\n{'='*60}")
     print(f"Summary:")
     print(f"  Pairings inserted:      {total_inserted}")
     print(f"  Main dishes processed:  {processed}")
     print(f"  Main dishes failed:     {total_skipped}")
     print(f"  New side dishes created: {new_dishes_created}")
+    print(f"  Remaining after this run: {remaining_after} / {len(mains)}")
     print(f"{'='*60}\n")
 
     if created_this_run:
