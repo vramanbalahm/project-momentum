@@ -169,6 +169,7 @@ function MergeDishesTool({ apiFetch, onDone }) {
 // folds the rest together on the next scan.
 function DuplicateReview({ apiFetch, onDone }) {
   const [groups, setGroups] = useState(null); // null = not loaded yet
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   // One entry per group: { checked: Set<recipe_id>, selectedApprovedId, newName, merging }
   const [groupStates, setGroupStates] = useState([]);
@@ -180,7 +181,23 @@ function DuplicateReview({ apiFetch, onDone }) {
     setLoading(true);
     try {
       const res = await apiFetch("/auth/admin/duplicate-candidates");
-      const gs = res.groups || [];
+      let gs = res.groups || [];
+
+      // Sort members within each group alphabetically, then sort the
+      // groups themselves by their first (now-alphabetically-first)
+      // member's name -- makes the list predictable to scan, and pairs
+      // naturally with the search box below.
+      const byName = (a, b) => a.dish_name.localeCompare(b.dish_name);
+      gs = gs.map(g => ({
+        approved_members: [...g.approved_members].sort(byName),
+        duplicate_members: [...g.duplicate_members].sort(byName),
+      }));
+      gs.sort((a, b) => {
+        const nameA = (a.approved_members[0] || a.duplicate_members[0]).dish_name;
+        const nameB = (b.approved_members[0] || b.duplicate_members[0]).dish_name;
+        return nameA.localeCompare(nameB);
+      });
+
       setGroups(gs);
       setGroupStates(gs.map(g => ({
         checked: new Set(g.duplicate_members.map(m => m.recipe_id)), // pre-check everything found
@@ -196,6 +213,17 @@ function DuplicateReview({ apiFetch, onDone }) {
   }, [apiFetch]);
 
   useEffect(() => { load(); }, [load]);
+
+  const filteredIndices = groups
+    ? groups
+        .map((g, i) => ({ g, i }))
+        .filter(({ g }) => {
+          if (!searchQuery.trim()) return true;
+          const q = searchQuery.trim().toLowerCase();
+          return [...g.approved_members, ...g.duplicate_members].some(m => m.dish_name.toLowerCase().includes(q));
+        })
+        .map(({ i }) => i)
+    : [];
 
   const updateGroup = (i, patch) => setGroupStates(gs => gs.map((g, idx) => idx === i ? { ...g, ...patch } : g));
 
@@ -261,14 +289,27 @@ function DuplicateReview({ apiFetch, onDone }) {
             Automatically grouped by similar names. Check which duplicates to merge on the left; pick the target on the right (an approved dish if one exists, otherwise name the new combined record yourself).
           </div>
 
+          {!loading && groups && groups.length > 0 && (
+            <input
+              placeholder={`Search ${groups.length} group${groups.length === 1 ? "" : "s"} by dish name…`}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: `0.5px solid ${C.border}`, fontSize: 12, boxSizing: "border-box", marginBottom: 10 }}
+            />
+          )}
+
           {loading && <div style={{ fontSize: 12, color: C.muted }}>Scanning…</div>}
           {!loading && groups && groups.length === 0 && (
             <div style={{ fontSize: 12, color: C.muted }}>No likely duplicates found right now.</div>
           )}
+          {!loading && groups && groups.length > 0 && filteredIndices.length === 0 && (
+            <div style={{ fontSize: 12, color: C.muted }}>No groups match "{searchQuery}".</div>
+          )}
 
-          {!loading && groups && groups.length > 0 && (
+          {!loading && filteredIndices.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 420, overflowY: "auto" }}>
-              {groups.map((g, i) => {
+              {filteredIndices.map(i => {
+                const g = groups[i];
                 const state = groupStates[i];
                 if (!state) return null;
                 const hasApproved = g.approved_members.length > 0;
