@@ -118,18 +118,37 @@ Return ONLY valid JSON, no explanation, no markdown:
         print("  ERROR: GROQ_API_KEY not set in backend/.env")
         return None
 
-    response = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-        json={
-            "model": "openai/gpt-oss-120b",
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.4,
-            "max_tokens": 6000,  # reasoning model -- lower values risk it spending the whole budget on hidden reasoning and returning empty visible output (confirmed: "Kothu Parotta" got 0 sides at max_tokens=1500)
-            "reasoning_effort": "low"
-        },
-        timeout=45
-    )
+    # Groq's free tier for this model caps at 8000 tokens/minute -- a
+    # single call with max_tokens=6000 can consume most of that budget
+    # on its own, so hitting a 429 is expected under real batch use, not
+    # exceptional. Groq returns a 'retry-after' header (seconds) on 429
+    # responses specifically -- wait exactly that long (plus a small
+    # safety buffer) and retry, rather than giving up on the dish.
+    max_retries = 4
+    for attempt in range(max_retries + 1):
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "model": "openai/gpt-oss-120b",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.4,
+                "max_tokens": 6000,  # reasoning model -- lower values risk it spending the whole budget on hidden reasoning and returning empty visible output (confirmed: "Kothu Parotta" got 0 sides at max_tokens=1500)
+                "reasoning_effort": "low"
+            },
+            timeout=45
+        )
+
+        if response.status_code == 429:
+            if attempt >= max_retries:
+                print(f"  ERROR: still rate-limited after {max_retries} retries, giving up on this dish")
+                return None
+            wait_s = int(response.headers.get("retry-after", 15)) + 2
+            print(f"  Rate limited -- waiting {wait_s}s (attempt {attempt+1}/{max_retries})...")
+            time.sleep(wait_s)
+            continue
+
+        break
 
     if response.status_code != 200:
         print(f"  ERROR {response.status_code}: {response.text[:200]}")
@@ -452,7 +471,7 @@ def main():
             except Exception:
                 pass
 
-        time.sleep(0.3)  # Groq is fast, but stay gentle
+        time.sleep(12)  # paced to roughly stay under the model's 8000 TPM free-tier limit -- the retry-after handling above is the real safety net, this just reduces how often it's needed
 
     print(f"\n{'='*60}")
     print(f"Summary:")
