@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 
 const C = {
@@ -9,10 +9,11 @@ const C = {
   successBg: "#E1F5EE", successText: "#085041",
 };
 
-// Small dish search box used twice by the merge tool below -- searches
-// across ALL review statuses (via /recipes/review, the same endpoint the
-// reviewer queue uses) since duplicates often involve under_review dishes
-// that /recipes/search would never surface (it only shows approved ones).
+// Small dish search box used by the manual merge tool -- searches across
+// ALL review statuses (via /recipes/review, the same endpoint the
+// reviewer queue uses) since duplicates often involve under_review
+// dishes that /recipes/search would never surface (it only shows
+// approved ones).
 function DishPicker({ label, selected, onSelect }) {
   const { apiFetch } = useAuth();
   const [query, setQuery] = useState("");
@@ -101,11 +102,11 @@ function MergeDishesTool({ apiFetch, onDone }) {
   return (
     <div style={{ background: C.card, borderRadius: 12, border: `0.5px solid ${C.border}`, padding: "12px 14px" }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-        <div style={{ fontSize: 24, flexShrink: 0 }}>🔀</div>
+        <div style={{ fontSize: 24, flexShrink: 0 }}>🔎</div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Merge duplicate dishes</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Search & merge a specific pair</div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 2, lineHeight: 1.4, marginBottom: 10 }}>
-            Find two dishes that are really the same thing, pick which one to keep — pairings pointing at the other get repointed automatically, then it's deleted.
+            For a duplicate the automatic scan below doesn't catch — find two dishes by name and merge them manually.
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -160,6 +161,153 @@ function MergeDishesTool({ apiFetch, onDone }) {
   );
 }
 
+// Bulk duplicate review -- proactively scans for likely duplicate SIDE
+// dishes using trigram similarity (same mechanism already proven in the
+// reviewer search) instead of requiring one-at-a-time manual searching.
+// Each row is a candidate PAIR (not a full N-way group) -- if three
+// dishes are really the same thing, merging any one pair naturally
+// folds the rest together on the next scan.
+function DuplicateReview({ apiFetch, onDone }) {
+  const [candidates, setCandidates] = useState(null); // null = not loaded yet
+  const [loading, setLoading] = useState(false);
+  const [selections, setSelections] = useState({}); // index -> { included, keeperSide }
+  const [merging, setMerging] = useState(false);
+  const [progress, setProgress] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch("/auth/admin/duplicate-candidates");
+      const cands = res.candidates || [];
+      setCandidates(cands);
+      // Default: include every suggestion, and default the keeper to
+      // whichever side is already approved (if statuses differ) since
+      // that's the one more likely to be the real, curated dish.
+      const initial = {};
+      cands.forEach((c, i) => {
+        const preferA = c.dish_a.review_status === "approved" && c.dish_b.review_status !== "approved";
+        initial[i] = { included: true, keeperSide: preferA ? "a" : "b" };
+      });
+      setSelections(initial);
+    } catch {
+      setCandidates([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [apiFetch]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const includedCount = Object.values(selections).filter(s => s.included).length;
+
+  const toggleIncluded = (i) => setSelections(s => ({ ...s, [i]: { ...s[i], included: !s[i].included } }));
+  const setKeeper = (i, side) => setSelections(s => ({ ...s, [i]: { ...s[i], keeperSide: side } }));
+
+  const mergeSelected = async () => {
+    setMerging(true);
+    let done = 0, failed = 0;
+    const toMerge = candidates
+      .map((c, i) => ({ c, sel: selections[i] }))
+      .filter(({ sel }) => sel && sel.included);
+
+    for (const { c, sel } of toMerge) {
+      const keeper = sel.keeperSide === "a" ? c.dish_a : c.dish_b;
+      const duplicate = sel.keeperSide === "a" ? c.dish_b : c.dish_a;
+      setProgress(`Merging ${done + failed + 1} / ${toMerge.length}…`);
+      try {
+        await apiFetch("/auth/admin/merge-dishes", {
+          method: "POST",
+          body: JSON.stringify({ keeper_recipe_id: keeper.recipe_id, duplicate_recipe_id: duplicate.recipe_id })
+        });
+        done++;
+      } catch {
+        failed++;
+      }
+    }
+
+    setProgress(null);
+    setMerging(false);
+    onDone(`Merged ${done} pair(s)${failed ? `, ${failed} failed` : ""}.`, null);
+    load(); // refresh -- merging can resolve or reveal other candidate pairs
+  };
+
+  return (
+    <div style={{ background: C.card, borderRadius: 12, border: `0.5px solid ${C.border}`, padding: "12px 14px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <div style={{ fontSize: 24, flexShrink: 0 }}>🔀</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Review possible duplicates</div>
+            <span onClick={load} style={{ fontSize: 11, color: C.teal, cursor: "pointer" }}>↻ Rescan</span>
+          </div>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 2, lineHeight: 1.4, marginBottom: 10 }}>
+            Automatically found by comparing dish names — uncheck anything that isn't really a duplicate, pick which side of each pair to keep, then merge them all at once.
+          </div>
+
+          {loading && <div style={{ fontSize: 12, color: C.muted }}>Scanning…</div>}
+          {!loading && candidates && candidates.length === 0 && (
+            <div style={{ fontSize: 12, color: C.muted }}>No likely duplicates found right now.</div>
+          )}
+
+          {!loading && candidates && candidates.length > 0 && (
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 360, overflowY: "auto" }}>
+                {candidates.map((c, i) => {
+                  const sel = selections[i] || { included: true, keeperSide: "a" };
+                  return (
+                    <div key={i} style={{
+                      display: "flex", gap: 8, padding: "8px 10px", borderRadius: 8,
+                      background: sel.included ? "white" : "#F1EFE8",
+                      border: `0.5px solid ${C.border}`, opacity: sel.included ? 1 : 0.6,
+                    }}>
+                      <div onClick={() => toggleIncluded(i)} style={{ cursor: "pointer", paddingTop: 2 }}>
+                        <div style={{
+                          width: 16, height: 16, borderRadius: 4,
+                          border: `1.5px solid ${sel.included ? C.teal : C.border}`,
+                          background: sel.included ? C.teal : "transparent",
+                          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "white"
+                        }}>{sel.included ? "✓" : ""}</div>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 10, color: C.muted, marginBottom: 3 }}>{Math.round(c.similarity * 100)}% similar — keep:</div>
+                        {[["a", c.dish_a], ["b", c.dish_b]].map(([side, d]) => (
+                          <div key={side} onClick={() => sel.included && setKeeper(i, side)}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 6, padding: "3px 0",
+                              cursor: sel.included ? "pointer" : "default",
+                            }}>
+                            <div style={{
+                              width: 12, height: 12, borderRadius: "50%",
+                              border: `1.5px solid ${sel.keeperSide === side ? C.teal : C.border}`,
+                              background: sel.keeperSide === side ? C.teal : "transparent", flexShrink: 0
+                            }} />
+                            <div style={{ fontSize: 12, color: C.text }}>
+                              {d.dish_name} <span style={{ color: C.muted, fontSize: 10 }}>({d.review_status})</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button onClick={mergeSelected} disabled={merging || includedCount === 0}
+                style={{
+                  marginTop: 10, width: "100%", background: merging || includedCount === 0 ? "#B4B2A9" : C.green,
+                  color: C.mint, border: "none", borderRadius: 8, padding: "9px", fontSize: 12, fontWeight: 500,
+                  cursor: merging || includedCount === 0 ? "not-allowed" : "pointer"
+                }}>
+                {merging ? (progress || "Merging…") : `Merge ${includedCount} selected`}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PlatformAdmin({ onBack }) {
   const { apiFetch } = useAuth();
   const [runningId, setRunningId] = useState(null);
@@ -182,7 +330,8 @@ export default function PlatformAdmin({ onBack }) {
 
   // Add future simple (single-button) admin tools here — each renders as
   // its own list item below. Tools needing their own richer UI (like
-  // MergeDishesTool) render as separate dedicated components instead.
+  // DuplicateReview, MergeDishesTool) render as separate dedicated
+  // components instead.
   const tools = [
     {
       id: "backfill_holidays",
@@ -204,7 +353,7 @@ export default function PlatformAdmin({ onBack }) {
           <div style={{ flex: 1 }}>
             <div style={{ color: C.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>LADLEFUL · ADMIN</div>
             <div style={{ color: "#FDFCF8", fontSize: 17, fontWeight: 500, marginTop: 2 }}>Platform Admin</div>
-            <div style={{ color: C.teal, fontSize: 11, marginTop: 2 }}>{tools.length + 1} tools available</div>
+            <div style={{ color: C.teal, fontSize: 11, marginTop: 2 }}>{tools.length + 2} tools available</div>
           </div>
         </div>
       </div>
@@ -239,6 +388,11 @@ export default function PlatformAdmin({ onBack }) {
             </div>
           </div>
         ))}
+
+        <DuplicateReview
+          apiFetch={apiFetch}
+          onDone={(msg, err) => { setResult(msg); setError(err); }}
+        />
 
         <MergeDishesTool
           apiFetch={apiFetch}

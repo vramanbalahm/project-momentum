@@ -362,6 +362,58 @@ async def merge_dishes(
     return {"message": f"Merged '{duplicate_name}' into the keeper dish. Pairings repointed or cleaned up."}
 
 
+@router.get("/admin/duplicate-candidates")
+async def get_duplicate_candidates(
+    threshold: float = 0.4,
+    current_user: dict = Depends(require_role("platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Platform admin only. Proactively surfaces pairs of side dishes whose
+    names are similar enough to likely be the same dish (e.g. 'Peanut
+    chutney' vs 'Peanut (groundnut) chutney'), using the same trigram
+    similarity already proven in /recipes/review's search -- rather than
+    requiring the admin to manually search for each suspected duplicate
+    one at a time.
+
+    Scoped to side dishes only (meal_role @> ['side']), since that's
+    where seed_recipe_pairings_groq.py actually creates duplicates.
+    Deliberately does NOT restrict to under_review -- a duplicate can
+    just as easily be a new dish matching something already approved.
+
+    Returns pairs, not full N-way clusters -- if three dishes are all
+    the same thing, they'll show up as separate pairs (A-B, B-C, A-C).
+    Merging any one pair naturally folds the rest together on a
+    follow-up pass, without needing full graph-clustering logic here.
+    """
+    rows = db.execute(text("""
+        SELECT
+            a.recipe_id AS id_a, a.dish_name AS name_a, a.review_status AS status_a,
+            b.recipe_id AS id_b, b.dish_name AS name_b, b.review_status AS status_b,
+            similarity(LOWER(a.dish_name), LOWER(b.dish_name)) AS sim
+        FROM recipe_dna_master a
+        JOIN recipe_dna_master b
+            ON a.recipe_id < b.recipe_id
+            AND a.meal_role @> ARRAY['side']::text[]
+            AND b.meal_role @> ARRAY['side']::text[]
+            AND similarity(LOWER(a.dish_name), LOWER(b.dish_name)) > :threshold
+        WHERE a.review_status != 'rejected' AND b.review_status != 'rejected'
+        ORDER BY sim DESC
+        LIMIT 100
+    """), {"threshold": threshold}).fetchall()
+
+    return {
+        "candidates": [
+            {
+                "dish_a": {"recipe_id": str(r.id_a), "dish_name": r.name_a, "review_status": r.status_a},
+                "dish_b": {"recipe_id": str(r.id_b), "dish_name": r.name_b, "review_status": r.status_b},
+                "similarity": round(float(r.sim), 3),
+            }
+            for r in rows
+        ]
+    }
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     check_rate_limit(request.client.host)
