@@ -158,6 +158,13 @@ function MergeDishesTool({ apiFetch, onDone }) {
     onDone(`Merged ${done} dish(es) into "${targetDish.dish_name}"${failed ? `, ${failed} failed` : ""}.`, null);
     setSelectedDuplicates([]);
     setTargetDish(null);
+
+    // Refresh the left side -- it was never re-fetched after merging,
+    // so it kept showing the just-deleted duplicates as if they were
+    // still there (confirmed real bug: Vijey merged 'Banana Chips'
+    // duplicates and still saw them listed afterward).
+    if (leftQuery.trim().length === 0) browse(leftStatus, setLeftResults, setLeftSearching);
+    else runSearch(leftQuery, leftStatus, setLeftResults, setLeftSearching);
   };
 
   return (
