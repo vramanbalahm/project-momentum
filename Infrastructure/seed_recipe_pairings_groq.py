@@ -363,8 +363,21 @@ def main():
             WHERE pairing_confirmed_no_sides = TRUE
         """)
         already_done |= {str(r[0]) for r in cur.fetchall()}
-        remaining = len(mains) - len(already_done)
-        print(f"Already done: {len(already_done)} / {len(mains)} main dishes.  Remaining: {remaining}\n")
+
+    # Real bug found by Vijey: already_done was computed globally, with
+    # no meal-slot scoping at all -- so after Breakfast was fully done,
+    # running --meal-slot Lunch showed 'Already done: 133 / 126' with a
+    # negative remaining count, since it included Breakfast-only dishes
+    # that don't even belong to the current 126-dish Lunch list. The
+    # actual skip logic below was already correct (it only checks
+    # membership, unaffected by extra irrelevant entries in the set) --
+    # this only fixes the misleading reported counts. Computed
+    # unconditionally here (not inside either branch above) so both the
+    # --new_sides path and the normal path get a correctly-scoped count.
+    main_ids_in_scope = {str(m[0]) for m in mains}
+    already_done_in_scope = already_done & main_ids_in_scope
+    remaining = len(mains) - len(already_done_in_scope)
+    print(f"Already done: {len(already_done_in_scope)} / {len(mains)} main dishes.  Remaining: {remaining}\n")
 
     processed = 0
     for idx, (main_id, main_name, main_cat) in enumerate(mains):
@@ -475,7 +488,7 @@ def main():
         time.sleep(12)  # paced to roughly stay under the model's 8000 TPM free-tier limit -- the retry-after handling above is the real safety net, this just reduces how often it's needed
 
     newly_completed = processed - total_skipped
-    remaining_after = len(mains) - len(already_done) - newly_completed
+    remaining_after = len(mains) - len(already_done_in_scope) - newly_completed
 
     print(f"\n{'='*60}")
     print(f"Summary:")
