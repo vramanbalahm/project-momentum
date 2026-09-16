@@ -295,6 +295,136 @@ function MergeDishesTool({ apiFetch, onDone }) {
   );
 }
 
+// AI-verified duplicate suggestions -- a separate, proactive tile from
+// the manual search-based MergeDishesTool above. find_duplicate_sides_ai.py
+// (run separately, not from this UI) does the actual AI-judgment work in
+// the background and stores confirmed groups here; this component just
+// displays and acts on what's already been found -- no live AI calls at
+// review time, keeping the screen fast and responsive.
+function AiDuplicateSuggestions({ apiFetch, onDone }) {
+  const [suggestions, setSuggestions] = useState(null); // null = not loaded yet
+  const [loading, setLoading] = useState(false);
+  // One entry per suggestion: { keeperId, merging }
+  const [states, setStates] = useState([]);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch("/auth/admin/duplicate-suggestions");
+      const sugs = res.suggestions || [];
+      setSuggestions(sugs);
+      setStates(sugs.map(s => {
+        const approved = s.members.find(m => m.review_status === "approved");
+        return { keeperId: (approved || s.members[0]).recipe_id, merging: false };
+      }));
+    } catch {
+      setSuggestions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setKeeper = (i, recipeId) => setStates(s => s.map((st, idx) => idx === i ? { ...st, keeperId: recipeId } : st));
+  const setMerging = (i, val) => setStates(s => s.map((st, idx) => idx === i ? { ...st, merging: val } : st));
+
+  const mergeSuggestion = async (i) => {
+    const sug = suggestions[i];
+    const state = states[i];
+    setMerging(i, true);
+    let done = 0, failed = 0;
+    for (const m of sug.members) {
+      if (m.recipe_id === state.keeperId) continue;
+      try {
+        await apiFetch("/auth/admin/merge-dishes", {
+          method: "POST",
+          body: JSON.stringify({ keeper_recipe_id: state.keeperId, duplicate_recipe_id: m.recipe_id })
+        });
+        done++;
+      } catch { failed++; }
+    }
+    try {
+      await apiFetch(`/auth/admin/duplicate-suggestions/${sug.suggestion_id}/mark-merged`, { method: "POST" });
+    } catch { /* non-fatal -- the merges themselves already succeeded */ }
+    onDone(`Merged ${done} dish(es)${failed ? `, ${failed} failed` : ""}.`, null);
+    setMerging(i, false);
+    load(); // refresh -- this suggestion is now resolved, may reveal others
+  };
+
+  const dismissSuggestion = async (i) => {
+    const sug = suggestions[i];
+    try {
+      await apiFetch(`/auth/admin/duplicate-suggestions/${sug.suggestion_id}/dismiss`, { method: "POST" });
+      onDone(`Dismissed "${sug.canonical_name}".`, null);
+      load();
+    } catch (e) {
+      onDone(null, e.message || "Failed to dismiss.");
+    }
+  };
+
+  return (
+    <div style={{ background: C.card, borderRadius: 12, border: `0.5px solid ${C.border}`, padding: "12px 14px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <div style={{ fontSize: 24, flexShrink: 0 }}>🤖</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>AI-suggested duplicates</div>
+            <span onClick={load} style={{ fontSize: 11, color: C.teal, cursor: "pointer" }}>↻ Refresh</span>
+          </div>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 2, lineHeight: 1.4, marginBottom: 10 }}>
+            Run find_duplicate_sides_ai.py to scan for new suggestions -- shown here for you to confirm or dismiss, nothing merges automatically.
+          </div>
+
+          {loading && <div style={{ fontSize: 12, color: C.muted }}>Loading…</div>}
+          {!loading && suggestions && suggestions.length === 0 && (
+            <div style={{ fontSize: 12, color: C.muted }}>No pending suggestions. Run the scan script to find more.</div>
+          )}
+
+          {!loading && suggestions && suggestions.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 420, overflowY: "auto" }}>
+              {suggestions.map((sug, i) => {
+                const state = states[i];
+                if (!state) return null;
+                return (
+                  <div key={sug.suggestion_id} style={{ border: `0.5px solid ${C.border}`, borderRadius: 10, padding: "10px", background: "white" }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 2 }}>{sug.canonical_name}</div>
+                    {sug.reasoning && <div style={{ fontSize: 10, color: C.muted, marginBottom: 6, fontStyle: "italic" }}>{sug.reasoning}</div>}
+
+                    <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>Keep:</div>
+                    {sug.members.map(m => (
+                      <div key={m.recipe_id} onClick={() => setKeeper(i, m.recipe_id)}
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0", cursor: "pointer" }}>
+                        <div style={{
+                          width: 12, height: 12, borderRadius: "50%", flexShrink: 0,
+                          border: `1.5px solid ${state.keeperId === m.recipe_id ? C.teal : C.border}`,
+                          background: state.keeperId === m.recipe_id ? C.teal : "transparent",
+                        }} />
+                        <div style={{ fontSize: 12, color: C.text }}>{m.dish_name} <span style={{ color: C.muted, fontSize: 10 }}>({m.review_status})</span></div>
+                      </div>
+                    ))}
+
+                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                      <button onClick={() => mergeSuggestion(i)} disabled={state.merging}
+                        style={{ flex: 1, background: state.merging ? "#B4B2A9" : C.green, color: C.mint, border: "none", borderRadius: 6, padding: "6px", fontSize: 11, fontWeight: 500, cursor: state.merging ? "not-allowed" : "pointer" }}>
+                        {state.merging ? "Merging…" : "Merge"}
+                      </button>
+                      <button onClick={() => dismissSuggestion(i)} disabled={state.merging}
+                        style={{ flex: 1, background: "white", color: C.text, border: `0.5px solid ${C.border}`, borderRadius: 6, padding: "6px", fontSize: 11, fontWeight: 500, cursor: "pointer" }}>
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PlatformAdmin({ onBack }) {
   const { apiFetch } = useAuth();
   const [runningId, setRunningId] = useState(null);
@@ -340,7 +470,7 @@ export default function PlatformAdmin({ onBack }) {
           <div style={{ flex: 1 }}>
             <div style={{ color: C.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>LADLEFUL · ADMIN</div>
             <div style={{ color: "#FDFCF8", fontSize: 17, fontWeight: 500, marginTop: 2 }}>Platform Admin</div>
-            <div style={{ color: C.teal, fontSize: 11, marginTop: 2 }}>{tools.length + 1} tools available</div>
+            <div style={{ color: C.teal, fontSize: 11, marginTop: 2 }}>{tools.length + 2} tools available</div>
           </div>
         </div>
       </div>
@@ -375,6 +505,11 @@ export default function PlatformAdmin({ onBack }) {
             </div>
           </div>
         ))}
+
+        <AiDuplicateSuggestions
+          apiFetch={apiFetch}
+          onDone={(msg, err) => { setResult(msg); setError(err); }}
+        />
 
         <MergeDishesTool
           apiFetch={apiFetch}

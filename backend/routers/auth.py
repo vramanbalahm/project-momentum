@@ -388,6 +388,100 @@ async def merge_dishes(
 # with manual search-and-select on both sides (see /recipes/review's
 # search, already used by the merge-dishes picker), putting the actual
 # judgment call back with the admin instead of an unreliable algorithm.
+#
+# Later reinstated in a different, validated form: find_duplicate_sides_ai.py
+# uses loose trigram similarity purely for CANDIDATE generation (accepting
+# false positives), then has the AI itself judge each candidate cluster
+# using real food knowledge -- tested against a deliberately hard set
+# (Avial/Aviyal spelling variant, look-alikes like different-legume Kadala
+# curries) before building. Results land in ai_duplicate_suggestions for
+# human review via the two endpoints below -- never auto-merged.
+
+
+@router.get("/admin/duplicate-suggestions")
+async def get_duplicate_suggestions(
+    current_user: dict = Depends(require_role("platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Platform admin only. Returns pending AI-verified duplicate group
+    suggestions, with each member's CURRENT dish name and review_status
+    looked up fresh (not just what was stored at scan time, since a
+    dish could have been renamed, approved, or merged into something
+    else since the suggestion was created).
+    """
+    cur = db.execute(text("""
+        SELECT id, member_ids, canonical_name, reasoning
+        FROM ai_duplicate_suggestions
+        WHERE status = 'pending'
+        ORDER BY created_at
+    """)).fetchall()
+
+    suggestions = []
+    for row in cur:
+        member_ids = [str(m) for m in row.member_ids]
+        members_rows = db.execute(text("""
+            SELECT recipe_id, dish_name, review_status
+            FROM recipe_dna_master
+            WHERE recipe_id = ANY(CAST(:ids AS uuid[]))
+        """), {"ids": member_ids}).fetchall()
+
+        # A member could have been deleted/merged elsewhere since this
+        # suggestion was created -- skip a suggestion that's no longer
+        # fully valid rather than show a broken partial group.
+        if len(members_rows) != len(member_ids):
+            db.execute(text("UPDATE ai_duplicate_suggestions SET status = 'dismissed', resolved_at = NOW() WHERE id = :id"), {"id": row.id})
+            db.commit()
+            continue
+
+        suggestions.append({
+            "suggestion_id": str(row.id),
+            "canonical_name": row.canonical_name,
+            "reasoning": row.reasoning,
+            "members": [{"recipe_id": str(m.recipe_id), "dish_name": m.dish_name, "review_status": m.review_status} for m in members_rows],
+        })
+
+    return {"suggestions": suggestions}
+
+
+@router.post("/admin/duplicate-suggestions/{suggestion_id}/dismiss")
+async def dismiss_duplicate_suggestion(
+    suggestion_id: str,
+    current_user: dict = Depends(require_role("platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """Platform admin only. Marks a suggestion as dismissed -- the admin
+    disagreed with the AI's judgment, so it won't be shown again."""
+    result = db.execute(text("""
+        UPDATE ai_duplicate_suggestions
+        SET status = 'dismissed', resolved_at = NOW()
+        WHERE id = CAST(:id AS uuid) AND status = 'pending'
+    """), {"id": suggestion_id})
+    db.commit()
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Suggestion not found or already resolved.")
+    return {"message": "Suggestion dismissed."}
+
+
+@router.post("/admin/duplicate-suggestions/{suggestion_id}/mark-merged")
+async def mark_duplicate_suggestion_merged(
+    suggestion_id: str,
+    current_user: dict = Depends(require_role("platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """Platform admin only. Marks a suggestion as merged -- called by the
+    frontend after it has actually performed the merge(s) via the
+    existing /admin/merge-dishes endpoint, so this suggestion doesn't
+    keep showing up as pending."""
+    result = db.execute(text("""
+        UPDATE ai_duplicate_suggestions
+        SET status = 'merged', resolved_at = NOW()
+        WHERE id = CAST(:id AS uuid) AND status = 'pending'
+    """), {"id": suggestion_id})
+    db.commit()
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Suggestion not found or already resolved.")
+    return {"message": "Suggestion marked as merged."}
 
 
 
