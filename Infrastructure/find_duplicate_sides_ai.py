@@ -233,7 +233,7 @@ def main():
             if not args.preview:
                 cur.execute("""
                     INSERT INTO ai_duplicate_suggestions (id, member_ids, canonical_name, reasoning)
-                    VALUES (%s, %s, %s, %s)
+                    VALUES (%s, %s::uuid[], %s, %s)
                 """, (str(uuid.uuid4()), g["member_ids"], g["canonical_name"], g["reasoning"]))
                 conn.commit()
             total_groups += 1
