@@ -172,6 +172,7 @@ Every dish number from 1 to {len(dishes)} must appear exactly once, either insid
             continue
         real_groups.append({
             "member_ids": [cluster[i-1]["recipe_id"] for i in members if 1 <= i <= len(cluster)],
+            "member_names": [dishes[i-1] for i in members if 1 <= i <= len(cluster)],
             "canonical_name": g.get("canonical_name", dishes[members[0]-1]),
             "reasoning": g.get("reasoning", ""),
         })
@@ -227,7 +228,8 @@ def main():
                 print(f"  (already suggested, skipping) {g['canonical_name']}")
                 continue
 
-            print(f"  -> DUPLICATE GROUP: {g['canonical_name']} -- {g['reasoning']}")
+            print(f"  -> DUPLICATE GROUP: {g['canonical_name']} -- {g['member_names']}")
+            print(f"     ({g['reasoning']})")
             if not args.preview:
                 cur.execute("""
                     INSERT INTO ai_duplicate_suggestions (id, member_ids, canonical_name, reasoning)
