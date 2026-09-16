@@ -21,47 +21,19 @@ export default function Dashboard({ onNavigate }) {
   const { t, i18n } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [checkingAvailability, setCheckingAvailability] = useState(false);
 
   const isAdmin = user?.role === "household_admin" || user?.role === "platform_admin";
   const isReviewer = user?.role === "platform_admin" || user?.role === "reviewer";
   const isPlatformAdmin = user?.role === "platform_admin";
   const isReviewerOnly = user?.role === "reviewer"; // pure reviewer — no household access
 
-  // Smart Weekly Plan navigation — admin checks availability first, member goes straight to planner
-  const handleWeeklyPlanTap = async () => {
-    // reviewers now navigate via Recipe Review tile
-    if (!isAdmin) {
-      onNavigate("weekly_plan");
-      return;
-    }
-    setCheckingAvailability(true);
-    try {
-      const token = localStorage.getItem("access_token");
-      const today = new Date();
-      const day = today.getDay();
-      const diff = day === 0 ? -6 : 1 - day;
-      const monday = new Date(today);
-      monday.setDate(today.getDate() + diff);
-      const yyyy = monday.getFullYear();
-      const mm = String(monday.getMonth() + 1).padStart(2, "0");
-      const dd = String(monday.getDate()).padStart(2, "0");
-      const weekStart = `${yyyy}-${mm}-${dd}`;
-      const res = await fetch(`${API_BASE}/availability/week?week_start=${weekStart}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        // has_saved = true means rows exist in DB for this week — go straight to planner
-        onNavigate(data.has_saved ? "weekly_plan" : "member_availability");
-      } else {
-        onNavigate("member_availability");
-      }
-    } catch {
-      onNavigate("member_availability");
-    } finally {
-      setCheckingAvailability(false);
-    }
+  // Availability now lives inside the Weekly Plan screen itself (an
+  // overlay reached via its own icon, with a red-dot indicator when not
+  // yet configured) -- this used to pre-check availability and redirect
+  // to a separate screen first, but that screen no longer exists and
+  // the check is redundant with what Weekly Plan already handles itself.
+  const handleWeeklyPlanTap = () => {
+    onNavigate("weekly_plan");
   };
 
   const tiles = [
@@ -79,14 +51,6 @@ export default function Dashboard({ onNavigate }) {
       label: t("dashboard.tiles.weeklyPlan"),
       desc: t("dashboard.tiles.weeklyPlanDesc"),
       color: "#E1F5EE",
-      available: true,
-    },
-    {
-      id: "member_availability",
-      icon: "🗓️",
-      label: t("dashboard.tiles.availability"),
-      desc: t("dashboard.tiles.availabilityDesc"),
-      color: "#FFF3DC",
       available: true,
     },
     {
@@ -367,7 +331,7 @@ export default function Dashboard({ onNavigate }) {
                 {tile.icon}
               </div>
               <div style={{ fontSize: 13, fontWeight: 600, color: tile.available ? COLORS.text : COLORS.muted }}>
-                {tile.id === "weekly_plan" && checkingAvailability ? "Checking…" : tile.label}
+                {tile.label}
               </div>
               <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4, lineHeight: 1.4 }}>
                 {tile.desc}
