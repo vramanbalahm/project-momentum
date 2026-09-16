@@ -201,9 +201,20 @@ def find_or_create_side(cur, side_name, side_name_to_id, created_this_run):
 
     Checks, in order: sides already in the vault at the start of this run
     (exact, then case-insensitive, then fuzzy substring match) -- then
-    sides created earlier in THIS SAME run (so if the same new side is
-    suggested for multiple different mains in one execution, it's reused
-    rather than inserted again as a duplicate row).
+    sides created earlier in THIS SAME run -- then a live trigram
+    similarity check against the database (catches genuine spelling
+    variants like 'Avial' vs 'Aviyal' that the substring checks above
+    miss entirely, confirmed as a real cause of duplicates in practice).
+
+    Threshold for the trigram check is deliberately conservative (0.55,
+    higher than the 0.1 used for name search elsewhere) -- testing
+    earlier this session found trigram similarity alone isn't reliable
+    enough to safely auto-merge at a looser threshold (genuinely
+    different Tamil dishes sharing common template words like 'curry'
+    or 'kuzhambu' can score close to real duplicates). A missed match
+    here just means an occasional extra duplicate for the merge tool to
+    catch later -- a false POSITIVE (silently treating two different
+    dishes as the same, no human ever reviewing it) is worse.
 
     If truly not found anywhere, inserts it as a new recipe_dna_master
     row with review_status='under_review' -- lands in the existing
@@ -234,7 +245,23 @@ def find_or_create_side(cur, side_name, side_name_to_id, created_this_run):
         if side_name.lower() in sn.lower() or sn.lower() in side_name.lower():
             return sid, False
 
-    # 5. Genuinely new -- create it
+    # 5. Live trigram similarity check -- catches spelling variants the
+    # substring checks above can't (e.g. Avial vs Aviyal share no clean
+    # substring relationship despite being the same dish).
+    row = cur.execute("""
+        SELECT recipe_id, similarity(LOWER(dish_name), LOWER(%s)) AS sim
+        FROM recipe_dna_master
+        WHERE meal_role @> ARRAY['side']::text[]
+        AND review_status != 'rejected'
+        AND similarity(LOWER(dish_name), LOWER(%s)) > 0.55
+        ORDER BY sim DESC
+        LIMIT 1
+    """, (side_name, side_name))
+    row = cur.fetchone()
+    if row:
+        return str(row[0]), False
+
+    # 6. Genuinely new -- create it
     import uuid
     new_id = str(uuid.uuid4())
     diet_type = infer_diet_type(side_name)
@@ -310,7 +337,7 @@ def main():
     cur.execute("""
         SELECT recipe_id, dish_name, dish_category
         FROM recipe_dna_master
-        WHERE review_status = 'approved'
+        WHERE review_status != 'rejected'
         AND meal_role @> ARRAY['side']::text[]
         ORDER BY dish_name
     """)
