@@ -51,6 +51,7 @@ async def get_pantry_ingredients(
             ic.name_ta,
             ic.category,
             ic.emoji,
+            ic.image_url,
             COALESCE(hp.is_available, false) AS is_available
         FROM ingredient_catalog ic
         LEFT JOIN household_pantry hp
@@ -70,6 +71,7 @@ async def get_pantry_ingredients(
             "name_en":      r.name_en,
             "name_ta":      r.name_ta,
             "emoji":        r.emoji or "🥬",
+            "image_url":    r.image_url,
             "is_available": r.is_available,
         })
 

@@ -274,7 +274,11 @@ export default function MyPantry({ onBack }) {
                             <div key={ing.id} onClick={() => toggle(ing.id, avail)}
                               style={{ background: avail ? C.selected : C.bg, border: `${avail ? "1.5px" : "0.5px"} solid ${avail ? C.selBorder : C.border}`, borderRadius: 10, overflow: "hidden", cursor: "pointer", position: "relative" }}
                             >
-                              <div style={{ height: 64, background: avail ? "#d0ede4" : "#EEEBE4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32 }}>{ing.emoji}</div>
+                              <div style={{ height: 64, background: avail ? "#d0ede4" : "#EEEBE4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, overflow: "hidden" }}>
+                                {ing.image_url
+                                  ? <img src={`${ing.image_url.startsWith("http") ? ing.image_url : (import.meta.env.VITE_API_BASE || "http://localhost:8000") + ing.image_url}`} alt={ing.name_en} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                  : ing.emoji}
+                              </div>
                               <div style={{ padding: "6px 8px" }}>
                                 <div style={{ fontSize: 11, fontWeight: 500, color: avail ? C.deepTeal : C.text }}>{ing.name_en}</div>
                                 {ing.name_ta && <div style={{ fontSize: 9, color: avail ? C.midTeal : C.muted }}>{ing.name_ta}</div>}
@@ -298,7 +302,11 @@ export default function MyPantry({ onBack }) {
                           <div key={ing.id} onClick={() => toggle(ing.id, avail)}
                             style={{ background: avail ? C.selected : C.bg, border: `${avail ? "1.5px" : "0.5px"} solid ${avail ? C.selBorder : C.border}`, borderRadius: 10, overflow: "hidden", cursor: "pointer", position: "relative" }}
                           >
-                            <div style={{ height: 64, background: avail ? "#d0ede4" : "#EEEBE4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32 }}>{ing.emoji}</div>
+                            <div style={{ height: 64, background: avail ? "#d0ede4" : "#EEEBE4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, overflow: "hidden" }}>
+                              {ing.image_url
+                                ? <img src={`${ing.image_url.startsWith("http") ? ing.image_url : (import.meta.env.VITE_API_BASE || "http://localhost:8000") + ing.image_url}`} alt={ing.name_en} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                : ing.emoji}
+                            </div>
                             <div style={{ padding: "6px 8px" }}>
                               <div style={{ fontSize: 11, fontWeight: 500, color: avail ? C.deepTeal : C.text }}>{ing.name_en}</div>
                               {ing.name_ta && <div style={{ fontSize: 9, color: avail ? C.midTeal : C.muted }}>{ing.name_ta}</div>}

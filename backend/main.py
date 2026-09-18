@@ -40,6 +40,11 @@ RECIPE_IMAGES_DIR = Path(__file__).resolve().parent / "recipe_images"
 RECIPE_IMAGES_DIR.mkdir(exist_ok=True)
 app.mount("/recipe_images", StaticFiles(directory=str(RECIPE_IMAGES_DIR)), name="recipe_images")
 
+# Serve ingredient images as static files — http://localhost:8000/ingredient_images/{filename}.jpg
+INGREDIENT_IMAGES_DIR = Path(__file__).resolve().parent / "ingredient_images"
+INGREDIENT_IMAGES_DIR.mkdir(exist_ok=True)
+app.mount("/ingredient_images", StaticFiles(directory=str(INGREDIENT_IMAGES_DIR)), name="ingredient_images")
+
 # Allow frontend origin to talk to backend
 import os
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
