@@ -13,6 +13,22 @@ Versions are tagged in git at the exact commit deployed to QA
   local checkouts. Removed the exclusion; `recipe_images/` stays
   excluded since that's correctly handled via GCS separately.
 
+**Data migration (no code change, same version):**
+- Exported and imported today's AI-generated dishes (126 new),
+  pairings (874), and duplicate suggestions (2) from local into QA —
+  built `export_new_data.py` / `import_new_data.py` for this, since
+  `psql` wasn't available locally
+- Found and fixed a real sequence-drift issue on QA's `recipe_pairing`
+  table (auto-increment counter was behind the actual max id, from an
+  earlier bulk load that bypassed the sequence) — one-time `setval()`
+  fix
+- Cleaned up bad `matrix_seeded` pairing data on both local and QA:
+  deleted entirely, after confirming (via `pairing_confirmed_no_sides`)
+  that every dish which would lose its only side coverage had already
+  been correctly judged by the AI pipeline as genuinely needing no
+  side (continental dishes, cereals, etc.) — nothing left without
+  legitimate coverage
+
 ## v0.9.1-beta — 2026-09-19
 
 - Fixed QA's holiday backfill returning zero rows — the holiday
