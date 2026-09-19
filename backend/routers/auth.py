@@ -6,6 +6,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 from uuid import uuid4
 import hashlib
+import json
 import os
 import secrets
 
@@ -214,6 +215,82 @@ async def register(req: RegisterRequest, request: Request, db: Session = Depends
     """), {"hid": house_id, "year": current_year})
 
     return issue_tokens(db, user_id, house_id, "household_admin")
+
+
+@router.post("/admin/seed-holiday-templates")
+async def seed_holiday_templates(
+    year: int = None,
+    current_user: dict = Depends(require_role("platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Platform admin only. Reads backend/scripts/data/tn_holidays_{year}.json
+    and upserts the template holiday rows (house_id IS NULL, source='ADMIN')
+    into event_master -- the same rows /admin/backfill-holidays then copies
+    into every household.
+
+    This is the same logic as scripts/seed_tn_holidays.py, exposed as a
+    button here per Vijey -- so a new year's holidays (or re-running QA's
+    setup, which is what surfaced the need for this) doesn't require
+    manually running a script with a raw DB connection string.
+
+    Safe to re-run: upserts by (event_code, event_year) via the partial
+    unique index from schema v34, so running it again for the same year
+    updates existing rows rather than duplicating them.
+    """
+    year = year or datetime.now().year
+    json_path = os.path.join(os.path.dirname(__file__), "..", "scripts", "data", f"tn_holidays_{year}.json")
+
+    if not os.path.exists(json_path):
+        raise HTTPException(status_code=404, detail=f"No holiday data file found for {year} (expected scripts/data/tn_holidays_{year}.json).")
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    holidays = data.get("holidays", [])
+    if not holidays:
+        raise HTTPException(status_code=400, detail=f"Holiday data file for {year} has no holidays listed.")
+
+    inserted = updated = 0
+    for h in holidays:
+        result = db.execute(text("""
+            INSERT INTO event_master
+                (house_id, event_name, local_name, event_date, event_type,
+                 is_sattvic_required, recurring_annual, event_code,
+                 source, event_year, is_active)
+            VALUES
+                (NULL, :event_name, :event_name, CAST(:event_date AS date), :event_type,
+                 :is_sattvic_required, true, :event_code,
+                 'ADMIN', :event_year, true)
+            ON CONFLICT (event_code, event_year) WHERE house_id IS NULL
+            DO UPDATE SET
+                event_name = EXCLUDED.event_name,
+                event_date = EXCLUDED.event_date,
+                event_type = EXCLUDED.event_type,
+                is_sattvic_required = EXCLUDED.is_sattvic_required,
+                is_active = true
+            RETURNING (xmax = 0) AS was_insert
+        """), {
+            "event_name": h["event_name"],
+            "event_date": h["event_date"],
+            "event_type": h["event_type"],
+            "is_sattvic_required": h.get("is_sattvic_required", False),
+            "event_code": h["event_code"],
+            "event_year": year,
+        })
+        was_insert = result.fetchone()[0]
+        if was_insert:
+            inserted += 1
+        else:
+            updated += 1
+    db.commit()
+
+    return {
+        "message": f"Seeded {year} holiday templates: {inserted} inserted, {updated} updated ({inserted + updated} total).",
+        "inserted": inserted,
+        "updated": updated,
+        "year": year,
+    }
 
 
 @router.post("/admin/backfill-holidays")

@@ -451,6 +451,14 @@ export default function PlatformAdmin({ onBack }) {
   // components instead.
   const tools = [
     {
+      id: "seed_holiday_templates",
+      icon: "🗓️",
+      title: "Seed holiday templates",
+      desc: "Loads this year's government holiday data into the shared template calendar — run this first on a fresh environment, before Backfill. Safe to run more than once.",
+      endpoint: "/auth/admin/seed-holiday-templates",
+      actionLabel: "Run seeding",
+    },
+    {
       id: "backfill_holidays",
       icon: "📅",
       title: "Backfill holiday events",
