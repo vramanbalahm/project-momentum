@@ -4,6 +4,15 @@ All notable changes to Ladleful are documented here, one entry per version.
 Versions are tagged in git at the exact commit deployed to QA
 (`git tag`, or `git describe --tags` to see what's currently checked out).
 
+## v0.9.2-beta — 2026-09-19
+
+- Fixed "Seed holiday templates" failing on QA with a file-not-found
+  error — `backend/.dockerignore` had a blanket exclusion on the whole
+  `scripts/` folder, so `tn_holidays_2026.json` (and every script built
+  this session) never actually reached the deployed container, only
+  local checkouts. Removed the exclusion; `recipe_images/` stays
+  excluded since that's correctly handled via GCS separately.
+
 ## v0.9.1-beta — 2026-09-19
 
 - Fixed QA's holiday backfill returning zero rows — the holiday
