@@ -613,15 +613,18 @@ def recommend_sides(
         AND r.review_status = 'approved'
         AND (r.created_by_house_id IS NULL OR r.created_by_house_id = CAST(:house_id AS uuid))
         AND r.diet_type::text = ANY(:diets)
-        AND (r.meal_slots = '{}'::text[] OR r.meal_slots IS NULL OR r.meal_slots @> ARRAY[:slot]::text[])
-        AND (
-            -- Continental mains ONLY get continental-appropriate sides
-            -- (condiment category with continental sub_region, or dry/wet that are continental)
-            CASE WHEN :main_category = 'continental'
-                THEN r.sub_region = 'Continental'
-                ELSE TRUE
-            END
-        )
+        -- No meal_slots or sub_region/continental re-filtering here, per
+        -- Vijey: recipe_pairing IS the source of truth for whether a side
+        -- goes with this main. Confirmed both were actively wrong for real
+        -- cases -- French Toast's own tagging has sub_region='Thanjavur'
+        -- despite dish_category='continental' (a genuine data
+        -- inconsistency), and the sub_region check excluded 5 of its 7
+        -- AI-judged sides (Fresh Fruit Salad, Masala Omelette, etc.) for
+        -- having no/wrong sub_region of their own, even though the AI
+        -- specifically paired them with this exact main. Diet and
+        -- allergen/Satvik/no-repeat filtering below still apply --
+        -- removed only the two checks that second-guessed the pairing
+        -- itself against unrelated tags on the side dish.
         ORDER BY
             CASE WHEN rp.house_id IS NOT NULL THEN 0 ELSE 1 END,
             CASE WHEN rp.source = 'ai_seeded'      THEN 1
