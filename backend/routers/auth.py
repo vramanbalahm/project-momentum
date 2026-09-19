@@ -565,6 +565,7 @@ async def mark_duplicate_suggestion_merged(
 async def pairing_review(
     q: str = None,
     limit: int = 30,
+    offset: int = 0,
     current_user: dict = Depends(require_role("platform_admin")),
     db: Session = Depends(get_db)
 ):
@@ -574,11 +575,15 @@ async def pairing_review(
     real batch-quality issue (Stir Fry Noodles paired with a full Tamil
     rice+rasam meal instead of anything actually complementary).
 
-    With no search term: shows mains ordered by their most recent
-    pairing's created_at, most recent first -- surfaces whichever AI
-    batch was run last, without needing to know its exact timestamp.
+    With no search term: shows mains alphabetically by dish name, with
+    offset for paging through sequentially -- per Vijey, this is a long
+    manual process, and alphabetical order with paging lets him track
+    exactly where he left off across sessions, rather than always
+    re-seeing the same "most recent" set.
     With a search term: finds mains by name instead (trigram, same
-    approach already proven in the merge-duplicates search).
+    approach already proven in the merge-duplicates search) -- ignores
+    offset, since a search is a one-off lookup, not part of the
+    sequential review.
     """
     if q:
         main_rows = db.execute(text("""
@@ -592,7 +597,14 @@ async def pairing_review(
             ORDER BY similarity(LOWER(r.dish_name), LOWER(:q)) DESC
             LIMIT :limit
         """), {"q": q, "q_pattern": f"%{q}%", "limit": limit}).fetchall()
+        total_count = len(main_rows)
     else:
+        total_count = db.execute(text("""
+            SELECT COUNT(DISTINCT r.recipe_id)
+            FROM recipe_dna_master r
+            JOIN recipe_pairing rp ON rp.main_recipe_id = r.recipe_id
+            WHERE r.meal_role @> ARRAY['main']::text[]
+        """)).scalar()
         main_rows = db.execute(text("""
             SELECT r.recipe_id, r.dish_name, r.dish_category,
                    MAX(rp.created_at) AS last_paired
@@ -600,13 +612,13 @@ async def pairing_review(
             JOIN recipe_pairing rp ON rp.main_recipe_id = r.recipe_id
             WHERE r.meal_role @> ARRAY['main']::text[]
             GROUP BY r.recipe_id, r.dish_name, r.dish_category
-            ORDER BY last_paired DESC
-            LIMIT :limit
-        """), {"limit": limit}).fetchall()
+            ORDER BY r.dish_name ASC
+            LIMIT :limit OFFSET :offset
+        """), {"limit": limit, "offset": offset}).fetchall()
 
     main_ids = [str(r.recipe_id) for r in main_rows]
     if not main_ids:
-        return {"mains": []}
+        return {"mains": [], "total_count": total_count, "offset": offset}
 
     side_rows = db.execute(text("""
         SELECT rp.id, rp.main_recipe_id, s.recipe_id AS side_recipe_id,
@@ -639,7 +651,9 @@ async def pairing_review(
                 "sides": sides_by_main.get(str(m.recipe_id), []),
             }
             for m in main_rows
-        ]
+        ],
+        "total_count": total_count,
+        "offset": offset,
     }
 
 

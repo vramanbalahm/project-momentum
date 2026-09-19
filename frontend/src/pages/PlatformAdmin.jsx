@@ -435,30 +435,42 @@ function AiDuplicateSuggestions({ apiFetch, onDone }) {
 function PairingReview({ apiFetch, onDone }) {
   const [query, setQuery] = useState("");
   const [mains, setMains] = useState(null); // null = not loaded yet
+  const [totalCount, setTotalCount] = useState(0);
+  const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const PAGE_SIZE = 30;
 
-  const load = async (q) => {
-    setLoading(true);
+  // append=true adds to the existing list (Load more); false replaces it
+  // (a fresh search, or the initial load) -- alphabetical order with
+  // paging per Vijey, so he can track exactly where he left off across
+  // a long, multi-sitting review instead of always seeing the same set.
+  const load = async (q, newOffset, append) => {
+    append ? setLoadingMore(true) : setLoading(true);
     try {
-      const url = q && q.trim().length >= 2
-        ? `/auth/admin/pairing-review?q=${encodeURIComponent(q)}`
-        : `/auth/admin/pairing-review`;
-      const res = await apiFetch(url);
-      setMains(res.mains || []);
+      const params = new URLSearchParams();
+      if (q && q.trim().length >= 2) params.set("q", q);
+      else params.set("offset", String(newOffset));
+      const res = await apiFetch(`/auth/admin/pairing-review?${params.toString()}`);
+      setMains(prev => append ? [...(prev || []), ...(res.mains || [])] : (res.mains || []));
+      setTotalCount(res.total_count || 0);
+      setOffset(newOffset);
     } catch {
-      setMains([]);
+      if (!append) setMains([]);
     } finally {
-      setLoading(false);
+      append ? setLoadingMore(false) : setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load("", 0, false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = (val) => {
     setQuery(val);
-    load(val);
+    load(val, 0, false);
   };
+
+  const loadMore = () => load(query, offset + PAGE_SIZE, true);
 
   const deleteSide = async (pairingId, mainRecipeId) => {
     setDeletingId(pairingId);
@@ -503,33 +515,47 @@ function PairingReview({ apiFetch, onDone }) {
           )}
 
           {!loading && mains && mains.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 480, overflowY: "auto" }}>
-              {mains.map(m => (
-                <div key={m.recipe_id} style={{ border: `0.5px solid ${C.border}`, borderRadius: 10, padding: "10px", background: "white" }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>
-                    {m.dish_name} <span style={{ color: C.muted, fontWeight: 400, fontSize: 10 }}>({m.dish_category})</span>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
-                    {m.sides.length === 0 && <div style={{ fontSize: 11, color: C.muted }}>No sides.</div>}
-                    {m.sides.map(s => (
-                      <div key={s.pairing_id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.bg, borderRadius: 6, padding: "5px 8px" }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, color: C.text }}>{s.side_name}</div>
-                          {s.notes && <div style={{ fontSize: 10, color: C.muted, fontStyle: "italic", marginTop: 1 }}>{s.notes}</div>}
-                          <div style={{ fontSize: 9, color: C.muted, marginTop: 1 }}>{s.source} · {Math.round(s.confidence * 100)}%</div>
-                        </div>
-                        <span
-                          onClick={() => deletingId !== s.pairing_id && deleteSide(s.pairing_id, m.recipe_id)}
-                          style={{ cursor: deletingId === s.pairing_id ? "not-allowed" : "pointer", color: "#E24B4A", fontSize: 16, padding: "0 4px", flexShrink: 0 }}
-                        >
-                          {deletingId === s.pairing_id ? "…" : "✕"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+            <>
+              {!(query.trim().length >= 2) && (
+                <div style={{ fontSize: 10, color: C.muted, marginBottom: 6 }}>
+                  Showing {mains.length} of {totalCount} mains
                 </div>
-              ))}
-            </div>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 480, overflowY: "auto" }}>
+                {mains.map(m => (
+                  <div key={m.recipe_id} style={{ border: `0.5px solid ${C.border}`, borderRadius: 10, padding: "10px", background: "white" }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>
+                      {m.dish_name} <span style={{ color: C.muted, fontWeight: 400, fontSize: 10 }}>({m.dish_category})</span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
+                      {m.sides.length === 0 && <div style={{ fontSize: 11, color: C.muted }}>No sides.</div>}
+                      {m.sides.map(s => (
+                        <div key={s.pairing_id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.bg, borderRadius: 6, padding: "5px 8px" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, color: C.text }}>{s.side_name}</div>
+                            {s.notes && <div style={{ fontSize: 10, color: C.muted, fontStyle: "italic", marginTop: 1 }}>{s.notes}</div>}
+                            <div style={{ fontSize: 9, color: C.muted, marginTop: 1 }}>{s.source} · {Math.round(s.confidence * 100)}%</div>
+                          </div>
+                          <span
+                            onClick={() => deletingId !== s.pairing_id && deleteSide(s.pairing_id, m.recipe_id)}
+                            style={{ cursor: deletingId === s.pairing_id ? "not-allowed" : "pointer", color: "#E24B4A", fontSize: 16, padding: "0 4px", flexShrink: 0 }}
+                          >
+                            {deletingId === s.pairing_id ? "…" : "✕"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {!(query.trim().length >= 2) && mains.length < totalCount && (
+                <button onClick={loadMore} disabled={loadingMore}
+                  style={{ marginTop: 8, width: "100%", background: loadingMore ? "#B4B2A9" : C.green, color: C.mint, border: "none", borderRadius: 8, padding: "8px", fontSize: 12, fontWeight: 500, cursor: loadingMore ? "not-allowed" : "pointer" }}>
+                  {loadingMore ? "Loading…" : `Load next ${Math.min(PAGE_SIZE, totalCount - mains.length)}`}
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
