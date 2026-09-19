@@ -90,6 +90,7 @@ def import_table(cur, filename, table, conflict_clause, exclude_columns=None):
 
     query = build_insert(table, columns, conflict_clause)
     inserted = 0
+    failed = 0
 
     for row in rows:
         values = [row[i] if row[i] != "" else None for i in keep_indices]
@@ -97,11 +98,23 @@ def import_table(cur, filename, table, conflict_clause, exclude_columns=None):
             inserted += 1
             continue
         try:
+            # A savepoint isolates this one row's failure from the rest
+            # of the transaction -- without it, one bad row poisons
+            # every subsequent row too (confirmed: this was happening,
+            # every row after the first failure showed
+            # InFailedSqlTransaction, meaning nothing was actually
+            # getting inserted from that point on).
+            cur.execute("SAVEPOINT row_import")
             cur.execute(query, values)
             inserted += cur.rowcount
+            cur.execute("RELEASE SAVEPOINT row_import")
         except Exception as e:
+            cur.execute("ROLLBACK TO SAVEPOINT row_import")
+            failed += 1
             print(f"  ERROR on a row: {type(e).__name__}: {e}")
 
+    if failed:
+        print(f"  ({failed} row(s) failed -- see errors above)")
     return inserted
 
 
@@ -118,6 +131,7 @@ def main():
     n_dishes = import_table(
         cur, "new_dishes.csv", "recipe_dna_master",
         conflict_clause="ON CONFLICT (recipe_id) DO NOTHING",
+        exclude_columns={"pairing_ai_checked_at"},  # untracked local-only column, confirmed absent from every migration -- schema drift, not part of the real schema
     )
     print(f"  {n_dishes} row(s) inserted\n")
     if not args.preview:
