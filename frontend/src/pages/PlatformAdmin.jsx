@@ -519,6 +519,9 @@ export default function PlatformAdmin({ onBack }) {
         <div style={{ fontSize: 11, color: C.muted, textAlign: "center", marginTop: 8 }}>
           More admin tools will appear here over time.
         </div>
+        <div style={{ fontSize: 10, color: C.muted, textAlign: "center", marginTop: 4, opacity: 0.7 }}>
+          Ladleful v{import.meta.env.VITE_APP_VERSION || "dev"}
+        </div>
       </div>
     </div>
   );
