@@ -569,7 +569,9 @@ def recommend_sides(
     2. Filter by: diet, Satvik, meal slot, allergens, no-repeat (week)
     3. Reject sides previously rejected by this household (behavioral_tracker)
     4. Pick up to 2 sides — different dish_category, no ingredient overlap
-    Falls back to matrix-based selection if no pairings found.
+    No fallback to the old category-matching system (removed per Vijey,
+    after it produced nonsensical pairings like French Toast + Ash Gourd
+    Kootu) -- if nothing qualifies here, this returns an empty list.
     """
     t0 = time.time()
 
@@ -670,65 +672,17 @@ def recommend_sides(
     # No-repeat filter — exclude sides used this week
     sides = [s for s in sides if s["recipe_id"] not in used_this_week]
 
-    # ── Step 3: Fall back to matrix if no pairings found ─────────────────────
-    if not sides:
-        matrix_rows = db.execute(text("""
-            SELECT side_category, compatibility
-            FROM dish_pairing_matrix
-            WHERE main_category = :mc
-            AND compatibility != 'never'
-            ORDER BY CASE compatibility
-                WHEN 'perfect'    THEN 1
-                WHEN 'good'       THEN 2
-                WHEN 'acceptable' THEN 3
-                ELSE 4 END
-        """), {"mc": main_category}).fetchall()
-
-        if matrix_rows:
-            compatible_cats = [r.side_category for r in matrix_rows]
-            fb_rows = db.execute(text("""
-                SELECT r.recipe_id, r.dish_name, r.diet_type,
-                       r.intensity_level, r.dish_category, r.meal_slots,
-                       r.is_sattvic,
-                       v.carousel_thumb_url as thumb, v.hero_image_url as hero,
-                       COALESCE(
-                           ARRAY(SELECT ri.ingredient_id FROM recipe_ingredients ri
-                                 WHERE ri.recipe_id = r.recipe_id),
-                           '{}'::integer[]
-                       ) AS ingredient_ids
-                FROM recipe_dna_master r
-                LEFT JOIN recipe_content_vault v ON v.recipe_id = r.recipe_id
-                WHERE r.review_status = 'approved'
-                AND (r.created_by_house_id IS NULL OR r.created_by_house_id = CAST(:house_id AS uuid))
-                AND r.meal_role @> ARRAY['side']::text[]
-                AND r.dish_category = ANY(:cats)
-                AND r.diet_type::text = ANY(:diets)
-                AND r.meal_slots @> ARRAY[:slot]::text[]
-            """), {"cats": compatible_cats, "diets": allowed_diets, "slot": slot, "house_id": house_id}).fetchall()
-
-            sides = [
-                {
-                    "recipe_id":       str(r.recipe_id),
-                    "dish_name":       r.dish_name,
-                    "diet_type":       str(r.diet_type) if r.diet_type else "Veg",
-                    "intensity_level": r.intensity_level or "Light",
-                    "dish_category":   r.dish_category,
-                    "meal_slots":      list(r.meal_slots) if r.meal_slots else [],
-                    "is_sattvic":      r.is_sattvic or False,
-                    "thumb":           r.thumb or r.hero,
-                    "hero":            r.hero or r.thumb,
-                    "ingredient_ids":  list(r.ingredient_ids) if r.ingredient_ids else [],
-                    "confidence":      0.65,
-                    "source":          "matrix_fallback",
-                }
-                for r in fb_rows
-            ]
-
-            if is_satvik and satvik_avoided:
-                sides = [s for s in sides if not (set(s["ingredient_ids"]) & satvik_avoided)]
-            if allergen_ids:
-                sides = [s for s in sides if not (set(s["ingredient_ids"]) & allergen_ids)]
-            sides = [s for s in sides if s["recipe_id"] not in used_this_week]
+    # Per Vijey: no fallback to the old category-matching dish_pairing_matrix
+    # system -- sides come only from recipe_pairing (ai_seeded/user sources).
+    # This is exactly what caused the French Toast + Ash Gourd Kootu bug: all
+    # 7 of French Toast's real ai_seeded pairings got excluded by the
+    # meal_slots filter above (the sides weren't individually tagged
+    # 'Breakfast', even though the AI specifically judged them a good match
+    # for this exact main), leaving `sides` empty and triggering this
+    # fallback -- a completely separate table from recipe_pairing, which is
+    # why deleting recipe_pairing's matrix_seeded rows earlier never touched
+    # this. If genuinely nothing qualifies now, the "no sides found" check
+    # right below correctly returns an empty list instead.
 
     if not sides:
         _log(db, house_id, week_start, day, slot, "RA-F16", "pair_side_dishes",
