@@ -4,6 +4,24 @@ All notable changes to Ladleful are documented here, one entry per version.
 Versions are tagged in git at the exact commit deployed to QA
 (`git tag`, or `git describe --tags` to see what's currently checked out).
 
+## v0.9.1-beta — 2026-09-19
+
+- Fixed QA's holiday backfill returning zero rows — the holiday
+  templates had never been seeded there (only the lunar/Panchangam
+  ones had), traced via a precise diagnostic query rather than
+  assumption
+- New "Seed holiday templates" button in Platform Admin, so this no
+  longer requires manually running a script with a raw database
+  connection string — matches the same self-service pattern as the
+  existing Backfill button
+- Clarified the `event_master` architecture: it holds a household's
+  full calendar (lunar observances, government holidays, and personal
+  events together, distinguished by `source`/`event_type`), while
+  `panchangam_master` is the separate, platform-wide lunar template
+  table — noted a future optimization idea (store only what a
+  household has opted *out* of, rather than a full copy per household)
+  as a backlog item to revisit once real usage justifies it
+
 ## v0.9.0-beta — 2026-09-19
 
 **Original 10-item bug list — all resolved:**
