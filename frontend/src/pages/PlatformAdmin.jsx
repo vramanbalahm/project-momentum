@@ -425,6 +425,118 @@ function AiDuplicateSuggestions({ apiFetch, onDone }) {
   );
 }
 
+// Manual pairing quality review -- built after finding a real batch
+// quality issue (Stir Fry Noodles paired with a full Tamil rice+rasam
+// meal, from a specific AI batch run). Shows main dishes with their
+// full side list, each with a delete button, so Vijey can spot-check
+// and prune bad pairings directly -- defaults to showing the most
+// recently paired mains first, so whichever batch ran last surfaces
+// immediately without needing to know its exact timestamp.
+function PairingReview({ apiFetch, onDone }) {
+  const [query, setQuery] = useState("");
+  const [mains, setMains] = useState(null); // null = not loaded yet
+  const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  const load = async (q) => {
+    setLoading(true);
+    try {
+      const url = q && q.trim().length >= 2
+        ? `/auth/admin/pairing-review?q=${encodeURIComponent(q)}`
+        : `/auth/admin/pairing-review`;
+      const res = await apiFetch(url);
+      setMains(res.mains || []);
+    } catch {
+      setMains([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSearch = (val) => {
+    setQuery(val);
+    load(val);
+  };
+
+  const deleteSide = async (pairingId, mainRecipeId) => {
+    setDeletingId(pairingId);
+    try {
+      await apiFetch(`/auth/admin/pairing/${pairingId}`, { method: "DELETE" });
+      setMains(prev => prev.map(m =>
+        m.recipe_id === mainRecipeId
+          ? { ...m, sides: m.sides.filter(s => s.pairing_id !== pairingId) }
+          : m
+      ));
+      onDone("Removed.", null);
+    } catch (e) {
+      onDone(null, e.message || "Failed to delete.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <div style={{ background: C.card, borderRadius: 12, border: `0.5px solid ${C.border}`, padding: "12px 14px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <div style={{ fontSize: 24, flexShrink: 0 }}>🔍</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Review pairing quality</div>
+            <span onClick={() => load(query)} style={{ fontSize: 11, color: C.teal, cursor: "pointer" }}>↻ Refresh</span>
+          </div>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 2, lineHeight: 1.4, marginBottom: 10 }}>
+            Shows the most recently AI-paired mains by default — search to check a specific dish. Click ✕ to remove an irrelevant side.
+          </div>
+
+          <input
+            placeholder="Search a main dish…"
+            value={query}
+            onChange={e => handleSearch(e.target.value)}
+            style={{ width: "100%", padding: "7px 10px", borderRadius: 8, border: `0.5px solid ${C.border}`, fontSize: 12, boxSizing: "border-box", marginBottom: 10 }}
+          />
+
+          {loading && <div style={{ fontSize: 12, color: C.muted }}>Loading…</div>}
+          {!loading && mains && mains.length === 0 && (
+            <div style={{ fontSize: 12, color: C.muted }}>No mains found.</div>
+          )}
+
+          {!loading && mains && mains.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 480, overflowY: "auto" }}>
+              {mains.map(m => (
+                <div key={m.recipe_id} style={{ border: `0.5px solid ${C.border}`, borderRadius: 10, padding: "10px", background: "white" }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>
+                    {m.dish_name} <span style={{ color: C.muted, fontWeight: 400, fontSize: 10 }}>({m.dish_category})</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
+                    {m.sides.length === 0 && <div style={{ fontSize: 11, color: C.muted }}>No sides.</div>}
+                    {m.sides.map(s => (
+                      <div key={s.pairing_id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.bg, borderRadius: 6, padding: "5px 8px" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, color: C.text }}>{s.side_name}</div>
+                          {s.notes && <div style={{ fontSize: 10, color: C.muted, fontStyle: "italic", marginTop: 1 }}>{s.notes}</div>}
+                          <div style={{ fontSize: 9, color: C.muted, marginTop: 1 }}>{s.source} · {Math.round(s.confidence * 100)}%</div>
+                        </div>
+                        <span
+                          onClick={() => deletingId !== s.pairing_id && deleteSide(s.pairing_id, m.recipe_id)}
+                          style={{ cursor: deletingId === s.pairing_id ? "not-allowed" : "pointer", color: "#E24B4A", fontSize: 16, padding: "0 4px", flexShrink: 0 }}
+                        >
+                          {deletingId === s.pairing_id ? "…" : "✕"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PlatformAdmin({ onBack }) {
   const { apiFetch } = useAuth();
   const [runningId, setRunningId] = useState(null);
@@ -478,7 +590,7 @@ export default function PlatformAdmin({ onBack }) {
           <div style={{ flex: 1 }}>
             <div style={{ color: C.mint, fontSize: 11, fontWeight: 500, letterSpacing: "0.05em" }}>LADLEFUL · ADMIN</div>
             <div style={{ color: "#FDFCF8", fontSize: 17, fontWeight: 500, marginTop: 2 }}>Platform Admin</div>
-            <div style={{ color: C.teal, fontSize: 11, marginTop: 2 }}>{tools.length + 2} tools available</div>
+            <div style={{ color: C.teal, fontSize: 11, marginTop: 2 }}>{tools.length + 3} tools available</div>
           </div>
         </div>
       </div>
@@ -513,6 +625,11 @@ export default function PlatformAdmin({ onBack }) {
             </div>
           </div>
         ))}
+
+        <PairingReview
+          apiFetch={apiFetch}
+          onDone={(msg, err) => { setResult(msg); setError(err); }}
+        />
 
         <AiDuplicateSuggestions
           apiFetch={apiFetch}

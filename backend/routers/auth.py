@@ -561,6 +561,104 @@ async def mark_duplicate_suggestion_merged(
     return {"message": "Suggestion marked as merged."}
 
 
+@router.get("/admin/pairing-review")
+async def pairing_review(
+    q: str = None,
+    limit: int = 30,
+    current_user: dict = Depends(require_role("platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """
+    Platform admin only. Returns main dishes with their full list of
+    paired sides, for manual quality review -- built after finding a
+    real batch-quality issue (Stir Fry Noodles paired with a full Tamil
+    rice+rasam meal instead of anything actually complementary).
+
+    With no search term: shows mains ordered by their most recent
+    pairing's created_at, most recent first -- surfaces whichever AI
+    batch was run last, without needing to know its exact timestamp.
+    With a search term: finds mains by name instead (trigram, same
+    approach already proven in the merge-duplicates search).
+    """
+    if q:
+        main_rows = db.execute(text("""
+            SELECT r.recipe_id, r.dish_name, r.dish_category,
+                   MAX(rp.created_at) AS last_paired
+            FROM recipe_dna_master r
+            JOIN recipe_pairing rp ON rp.main_recipe_id = r.recipe_id
+            WHERE r.meal_role @> ARRAY['main']::text[]
+            AND (similarity(LOWER(r.dish_name), LOWER(:q)) > 0.1 OR LOWER(r.dish_name) LIKE LOWER(:q_pattern))
+            GROUP BY r.recipe_id, r.dish_name, r.dish_category
+            ORDER BY similarity(LOWER(r.dish_name), LOWER(:q)) DESC
+            LIMIT :limit
+        """), {"q": q, "q_pattern": f"%{q}%", "limit": limit}).fetchall()
+    else:
+        main_rows = db.execute(text("""
+            SELECT r.recipe_id, r.dish_name, r.dish_category,
+                   MAX(rp.created_at) AS last_paired
+            FROM recipe_dna_master r
+            JOIN recipe_pairing rp ON rp.main_recipe_id = r.recipe_id
+            WHERE r.meal_role @> ARRAY['main']::text[]
+            GROUP BY r.recipe_id, r.dish_name, r.dish_category
+            ORDER BY last_paired DESC
+            LIMIT :limit
+        """), {"limit": limit}).fetchall()
+
+    main_ids = [str(r.recipe_id) for r in main_rows]
+    if not main_ids:
+        return {"mains": []}
+
+    side_rows = db.execute(text("""
+        SELECT rp.id, rp.main_recipe_id, s.recipe_id AS side_recipe_id,
+               s.dish_name AS side_name, rp.source, rp.confidence, rp.notes, rp.created_at
+        FROM recipe_pairing rp
+        JOIN recipe_dna_master s ON s.recipe_id = rp.side_recipe_id
+        WHERE rp.main_recipe_id = ANY(CAST(:ids AS uuid[]))
+        ORDER BY rp.confidence DESC
+    """), {"ids": main_ids}).fetchall()
+
+    sides_by_main = {}
+    for r in side_rows:
+        sides_by_main.setdefault(str(r.main_recipe_id), []).append({
+            "pairing_id": r.id,
+            "side_recipe_id": str(r.side_recipe_id),
+            "side_name": r.side_name,
+            "source": r.source,
+            "confidence": float(r.confidence),
+            "notes": r.notes,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        })
+
+    return {
+        "mains": [
+            {
+                "recipe_id": str(m.recipe_id),
+                "dish_name": m.dish_name,
+                "dish_category": m.dish_category,
+                "last_paired": m.last_paired.isoformat() if m.last_paired else None,
+                "sides": sides_by_main.get(str(m.recipe_id), []),
+            }
+            for m in main_rows
+        ]
+    }
+
+
+@router.delete("/admin/pairing/{pairing_id}")
+async def delete_pairing(
+    pairing_id: int,
+    current_user: dict = Depends(require_role("platform_admin")),
+    db: Session = Depends(get_db)
+):
+    """Platform admin only. Deletes a single recipe_pairing row -- for
+    manual quality review, per Vijey: removing one irrelevant side from
+    a main dish's pairing list."""
+    result = db.execute(text("DELETE FROM recipe_pairing WHERE id = :id"), {"id": pairing_id})
+    db.commit()
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Pairing not found.")
+    return {"message": "Pairing deleted."}
+
+
 
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
