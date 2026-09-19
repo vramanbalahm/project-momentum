@@ -258,12 +258,22 @@ def _log(
     filtered_ids: List[str], filter_reason: str,
     selected_id: Optional[str] = None,
     execution_ms: int = 0,
-    run_id: Optional[str] = None
+    run_id: Optional[str] = None,
+    succeeded: bool = True,
+    error_detail: Optional[str] = None,
 ):
     """
     Writes to plan_audit_log using an ISOLATED session — never shares the
     caller's transaction. This guarantees a logging failure can never
     roll back or poison the main plan-generation transaction.
+
+    succeeded/error_detail (schema v38): every existing call site omits
+    these and gets succeeded=True, error_detail=None, matching their
+    prior behavior exactly. Only the failure-path call from
+    generate_plan()'s pipeline loop passes succeeded=False — see there
+    for why this exists: a filter that raises an exception was
+    previously invisible in this table entirely, not just marked as
+    having run with no effect.
     """
     log_db = SessionLocal()
     try:
@@ -273,14 +283,15 @@ def _log(
                 (run_id, house_id, week_start, day_name, meal_slot,
                  feature_code, function_name,
                  recipes_in, recipes_out, filtered_count,
-                 filter_reason, filtered_ids, selected_id, execution_ms)
+                 filter_reason, filtered_ids, selected_id, execution_ms,
+                 succeeded, error_detail)
             VALUES
                 (CAST(:rid AS uuid), CAST(:hid AS uuid), :ws, :day, :slot,
                  :fc, :fn, :rin, :rout, :fcnt,
                  :reason,
                  CAST(:fids AS uuid[]),
                  CAST(:sel AS uuid),
-                 :ms)
+                 :ms, :succeeded, :error_detail)
             ON CONFLICT DO NOTHING
         """), {
             "rid":    run_id or str(uuid.uuid4()),
@@ -290,6 +301,8 @@ def _log(
             "reason": filter_reason, "fids": fids,
             "sel":    str(selected_id) if selected_id else None,
             "ms":     execution_ms,
+            "succeeded": succeeded,
+            "error_detail": error_detail,
         })
         log_db.commit()
     except Exception as e:
@@ -885,6 +898,18 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                     candidates, ctx = fn(candidates, day, slot, ctx, week_ctx, db, house_id, week_start, run_id)
                 except Exception as e:
                     print(f"[recommendation] {fn_name} failed: {e}")
+                    # Real gap this fixes (schema v38): previously this
+                    # failure was invisible in plan_audit_log entirely --
+                    # each filter's own _log() call sits at the end of its
+                    # normal path, so a crash meant no row at all, not a
+                    # marked failure. The plan still generates using
+                    # whatever candidates existed before the crash, as if
+                    # this filter never ran -- worth a real, queryable
+                    # record given some of these are safety checks
+                    # (allergies, diet, Satvik).
+                    _log(db, house_id, week_start, day, slot, "RA-ERROR", fn_name,
+                         len(candidates), len(candidates), [], f"Filter crashed, skipped: {type(e).__name__}",
+                         None, 0, run_id=run_id, succeeded=False, error_detail=str(e))
 
             # Apply millet boost — move millet recipes to front if preferred
             if prefer_millet:
