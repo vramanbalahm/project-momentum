@@ -125,19 +125,26 @@ export default function MyPantry({ onBack }) {
     return count;
   }, [categories, changes]);
 
-  // Flat, alphabetical list of everything currently marked available —
-  // lets the user scan "what do I have" without browsing categories.
+  // Everything currently marked available, grouped by category (same
+  // categories as the sidebar tabs) and alphabetical within each group —
+  // lets the user scan "what do I have" per category without browsing.
   const [availableExpanded, setAvailableExpanded] = useState(true);
-  const availableList = useMemo(() => {
-    const list = [];
+  const availableByCategory = useMemo(() => {
+    const groups = [];
     categories.forEach(cat => {
-      cat.ingredients.forEach(ing => {
-        const avail = changes[ing.id] !== undefined ? changes[ing.id] : ing.is_available;
-        if (avail) list.push({ ...ing, categoryEmoji: cat.emoji, categoryLabel: cat.label });
-      });
+      const items = cat.ingredients
+        .filter(ing => (changes[ing.id] !== undefined ? changes[ing.id] : ing.is_available))
+        .sort((a, b) => a.name_en.localeCompare(b.name_en));
+      if (items.length > 0) {
+        groups.push({ key: cat.key, label: cat.label, emoji: cat.emoji, items });
+      }
     });
-    return list.sort((a, b) => a.name_en.localeCompare(b.name_en));
+    return groups;
   }, [categories, changes]);
+  const availableCount = useMemo(
+    () => availableByCategory.reduce((sum, g) => sum + g.items.length, 0),
+    [availableByCategory]
+  );
 
   // Save
   const handleSave = async () => {
@@ -217,40 +224,49 @@ export default function MyPantry({ onBack }) {
           style={{ padding: "9px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
         >
           <span style={{ fontSize: 12, fontWeight: 500, color: C.text }}>
-            Available now <span style={{ color: C.muted, fontWeight: 400 }}>({availableList.length})</span>
+            Available now <span style={{ color: C.muted, fontWeight: 400 }}>({availableCount})</span>
           </span>
           <span style={{ fontSize: 11, color: C.muted }}>{availableExpanded ? "Hide ▲" : "Show ▼"}</span>
         </div>
         {availableExpanded && (
-          availableList.length === 0 ? (
+          availableByCategory.length === 0 ? (
             <div style={{ padding: "0 12px 12px", fontSize: 12, color: C.muted }}>
               Nothing marked available yet — browse categories below to get started.
             </div>
           ) : (
-            <div style={{ maxHeight: 160, overflowY: "auto", padding: "0 10px 10px", display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {availableList.map(ing => (
-                <div
-                  key={ing.id}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    background: C.selected, border: `1px solid ${C.selBorder}`,
-                    borderRadius: 14, padding: "4px 6px 4px 10px",
-                    fontSize: 11.5, color: C.deepTeal, fontWeight: 500,
-                  }}
-                >
-                  <span>{ing.emoji} {ing.name_en}</span>
-                  <span
-                    onClick={() => toggle(ing.id, true)}
-                    title={`Mark ${ing.name_en} as not available`}
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      width: 16, height: 16, borderRadius: "50%",
-                      background: C.deepTeal, color: "white", fontSize: 9, cursor: "pointer",
-                      flexShrink: 0,
-                    }}
-                  >
-                    ✕
-                  </span>
+            <div style={{ maxHeight: 220, overflowY: "auto", padding: "0 10px 10px" }}>
+              {availableByCategory.map(group => (
+                <div key={group.key} style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 600, color: C.muted, margin: "6px 2px 4px" }}>
+                    {group.emoji} {group.label} <span style={{ fontWeight: 400 }}>({group.items.length})</span>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {group.items.map(ing => (
+                      <div
+                        key={ing.id}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 5,
+                          background: C.selected, border: `1px solid ${C.selBorder}`,
+                          borderRadius: 14, padding: "4px 6px 4px 10px",
+                          fontSize: 11.5, color: C.deepTeal, fontWeight: 500,
+                        }}
+                      >
+                        <span>{ing.emoji} {ing.name_en}</span>
+                        <span
+                          onClick={() => toggle(ing.id, true)}
+                          title={`Mark ${ing.name_en} as not available`}
+                          style={{
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            width: 16, height: 16, borderRadius: "50%",
+                            background: C.deepTeal, color: "white", fontSize: 9, cursor: "pointer",
+                            flexShrink: 0,
+                          }}
+                        >
+                          ✕
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
