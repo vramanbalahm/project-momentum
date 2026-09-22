@@ -876,7 +876,12 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                 candidates = millet_recipes + other_recipes
 
             # Apply pantry filter — strict mode when user selects pantry_only
-            # Filters to only dishes with pantry ingredients, scored by overlap
+            # Requires ALL non-optional ingredients to be in pantry (not just
+            # any overlap) — otherwise a dish can pass on one matching staple
+            # while missing the ingredient that actually defines it (e.g.
+            # "Seppankizhangu Pulao" passing on rice alone, with no Colocasia).
+            # A recipe with no linked ingredient data still passes, since
+            # there's nothing to verify it against.
             # If no matches — slot marked as "pantry_exhausted", not filled
             if pantry_only:
                 pantry_match = []
@@ -890,9 +895,9 @@ def generate_plan(db: Session, house_id: str, week_start: date, fill_empty_only:
                             WHERE recipe_id = CAST(:rid AS uuid) AND is_optional = FALSE
                         """), {"rid": recipe_id}).fetchall()
                         primary_ids = {r[0] for r in ing_rows}
-                        overlap = primary_ids & pantry_ingredient_ids
-                        if overlap or not primary_ids:  # match or no ingredient data
-                            recipe["pantry_score"] = len(overlap)
+                        all_present = primary_ids.issubset(pantry_ingredient_ids)
+                        if all_present or not primary_ids:  # full match or no ingredient data
+                            recipe["pantry_score"] = len(primary_ids)
                             pantry_match.append(recipe)
                     except Exception:
                         pass  # skip on error — don't include unverified
