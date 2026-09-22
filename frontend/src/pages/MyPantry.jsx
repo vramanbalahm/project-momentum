@@ -129,6 +129,8 @@ export default function MyPantry({ onBack }) {
   // categories as the sidebar tabs) and alphabetical within each group —
   // lets the user scan "what do I have" per category without browsing.
   const [availableExpanded, setAvailableExpanded] = useState(true);
+  const [collapsedCats, setCollapsedCats] = useState({}); // { categoryKey: true } = collapsed
+  const toggleCatCollapse = (key) => setCollapsedCats(prev => ({ ...prev, [key]: !prev[key] }));
   const availableByCategory = useMemo(() => {
     const groups = [];
     categories.forEach(cat => {
@@ -235,11 +237,20 @@ export default function MyPantry({ onBack }) {
             </div>
           ) : (
             <div style={{ maxHeight: 220, overflowY: "auto", padding: "0 10px 10px" }}>
-              {availableByCategory.map(group => (
+              {availableByCategory.map(group => {
+                const isCollapsed = !!collapsedCats[group.key];
+                return (
                 <div key={group.key} style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 10.5, fontWeight: 600, color: C.muted, margin: "6px 2px 4px" }}>
-                    {group.emoji} {group.label} <span style={{ fontWeight: 400 }}>({group.items.length})</span>
+                  <div
+                    onClick={() => toggleCatCollapse(group.key)}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", margin: "6px 2px 4px" }}
+                  >
+                    <span style={{ fontSize: 10.5, fontWeight: 600, color: C.muted }}>
+                      {group.emoji} {group.label} <span style={{ fontWeight: 400 }}>({group.items.length})</span>
+                    </span>
+                    <span style={{ fontSize: 10, color: C.muted }}>{isCollapsed ? "▼" : "▲"}</span>
                   </div>
+                  {!isCollapsed && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {group.items.map(ing => (
                       <div
@@ -267,8 +278,10 @@ export default function MyPantry({ onBack }) {
                       </div>
                     ))}
                   </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )
         )}
