@@ -6,6 +6,33 @@ __pycache__/
 venv/
 .venv/
 *.egg-info/
+env.*
+backend/original-images-backup/
+backend/recipe_images/
+backend/ingredient_images/
+
+.env
+.env.*
+backend/recipe_images/
+backend/original-images-backup/
+backend/test_results.txt
+docs/Ladleful.PNG
+
+# One-off analysis/test output — not source
+*_test_results.txt
+*_playwright_results.txt
+*.docx
+debug-*.png
+Infrastructure/pairing_analysis_*.xlsx
+Infrastructure/*_review.xlsx
+Infrastructure/pairing_review_rice_*.xlsx
+Infrastructure/pairing_review.pdf
+Infrastructure/momentum_backup.sql
+Infrastructure/duplicate_suggestions.csv
+Infrastructure/new_dishes.csv
+Infrastructure/new_pairings.csv
+Infrastructure/test_duplicate_grouping.py
+test_breakfast_prompt.py
 
 # Node
 node_modules/
