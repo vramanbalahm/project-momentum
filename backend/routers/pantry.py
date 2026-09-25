@@ -1,10 +1,11 @@
 # routers/pantry.py — My Pantry endpoints
 #
-# GET  /pantry/ingredients  — returns all ingredients grouped by category
-#                             with household's current availability status
-# POST /pantry/save         — save household's ingredient availability
+# GET  /pantry/ingredients        — returns all ingredients grouped by category
+#                                   with household's current availability status
+# GET  /pantry/ingredients/search — smart multi-language ingredient search
+# POST /pantry/save               — save household's ingredient availability
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
@@ -92,6 +93,87 @@ async def get_pantry_ingredients(
         })
 
     return {"categories": categories}
+
+
+# ── GET /pantry/ingredients/search ──────────────────────────────────────────────
+
+@router.get("/ingredients/search", status_code=200)
+async def search_pantry_ingredients(
+    q: str = Query(..., min_length=1),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Smart multi-language ingredient search. Matches on English name,
+    Tamil names, Tamil transliterations, and English synonyms -- so
+    "ulundhu", "ulutham paruppu" and "urad dal" all find the same
+    ingredient, whatever language the person types in.
+
+    Same two-stage soundex-then-trigram approach as /recipes/search:
+      1. soundex() -- coarse match, catches vowel-heavy transliteration
+         drift (thayir / thair / thyar / thayair)
+      2. similarity() (trigram) -- confirms the match is real, filters
+         out unrelated words that happen to share a soundex code
+    A name counts as a match if trigram alone clears 0.1, OR soundex
+    matches AND trigram clears a lower sanity floor of 0.08.
+
+    Replaces the old client-side substring filter in IngredientSelector.jsx.
+    """
+    house_id = current_user["house_id"]
+
+    rows = db.execute(text("""
+        WITH name_candidates AS (
+            SELECT id, name_en AS candidate_name FROM ingredient_catalog
+            UNION ALL
+            SELECT id, unnest(ta_names) FROM ingredient_catalog WHERE ta_names IS NOT NULL
+            UNION ALL
+            SELECT id, unnest(ta_names_translit) FROM ingredient_catalog WHERE ta_names_translit IS NOT NULL
+            UNION ALL
+            SELECT id, unnest(en_synonyms) FROM ingredient_catalog WHERE en_synonyms IS NOT NULL
+        ),
+        scored AS (
+            SELECT id,
+                   similarity(LOWER(candidate_name), LOWER(:q)) AS sim_score,
+                   soundex(candidate_name) = soundex(:q) AS soundex_hit
+            FROM name_candidates
+            WHERE candidate_name IS NOT NULL AND candidate_name != ''
+        ),
+        best AS (
+            SELECT id, MAX(sim_score) AS best_score
+            FROM scored
+            WHERE sim_score > 0.1 OR (soundex_hit AND sim_score >= 0.08)
+            GROUP BY id
+        )
+        SELECT
+            ic.id, ic.name_en, ic.name_ta, ic.ta_names, ic.ta_names_translit,
+            ic.category, ic.emoji, ic.image_url,
+            COALESCE(hp.is_available, false) AS is_available,
+            b.best_score
+        FROM best b
+        JOIN ingredient_catalog ic ON ic.id = b.id
+        LEFT JOIN household_pantry hp
+            ON hp.ingredient_id = ic.id
+            AND hp.house_id = CAST(:hid AS uuid)
+        ORDER BY b.best_score DESC, ic.name_en
+        LIMIT 30
+    """), {"q": q, "hid": house_id}).fetchall()
+
+    return {
+        "results": [
+            {
+                "id":                r.id,
+                "name_en":           r.name_en,
+                "name_ta":           r.name_ta,
+                "ta_names":          list(r.ta_names) if r.ta_names else [],
+                "ta_names_translit": list(r.ta_names_translit) if r.ta_names_translit else [],
+                "category":          r.category,
+                "emoji":             r.emoji or "🥬",
+                "image_url":         r.image_url,
+                "is_available":      r.is_available,
+            }
+            for r in rows
+        ]
+    }
 
 
 # ── POST /pantry/save ─────────────────────────────────────────────────────────

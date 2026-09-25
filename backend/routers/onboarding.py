@@ -202,7 +202,8 @@ async def get_satvik_ingredients(
     Used to populate the Satvik selection toggles.
     """
     rows = db.execute(text("""
-        SELECT id, name_en, name_ta, category, is_sattvic, is_vegan
+        SELECT id, name_en, name_ta, ta_names, ta_names_translit, en_synonyms,
+               category, is_sattvic, is_vegan
         FROM ingredient_catalog
         WHERE name_en IS NOT NULL
         ORDER BY category, name_en
@@ -215,12 +216,15 @@ async def get_satvik_ingredients(
         if cat not in grouped:
             grouped[cat] = []
         grouped[cat].append({
-            "id":         r.id,
-            "name_en":    r.name_en,
-            "name_ta":    r.name_ta,
-            "category":   r.category,
-            "is_sattvic": r.is_sattvic,
-            "is_vegan":   r.is_vegan,
+            "id":                r.id,
+            "name_en":           r.name_en,
+            "name_ta":           r.name_ta,
+            "ta_names":          list(r.ta_names) if r.ta_names else [],
+            "ta_names_translit": list(r.ta_names_translit) if r.ta_names_translit else [],
+            "en_synonyms":       list(r.en_synonyms) if r.en_synonyms else [],
+            "category":          r.category,
+            "is_sattvic":        r.is_sattvic,
+            "is_vegan":          r.is_vegan,
         })
 
     return grouped

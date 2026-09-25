@@ -1060,21 +1060,83 @@ def search_recipes(
     else:
         params["q"] = q
         params["pattern"] = f"%{q}%"
+        # Multi-language, multi-source fuzzy search.
+        #
+        # Matches against: the dish's own English name, its Tamil names and
+        # transliterations (ta_names / ta_names_translit), AND the names of
+        # every ingredient used in the dish (English, Tamil, transliteration,
+        # English synonyms) -- so typing an ingredient name in any language
+        # surfaces dishes that use it, not just dishes named after it.
+        #
+        # Two-stage matching per candidate name:
+        #   1. soundex() -- catches heavy vowel drift in transliteration
+        #      (thayir / thair / thyar / thayair all collapse to the same code)
+        #   2. similarity() (trigram) -- confirms the match is real and not
+        #      an unrelated word that happens to share a soundex code
+        # A candidate counts as a match if trigram alone clears the normal
+        # bar (0.1), OR soundex matches AND trigram clears a lower sanity
+        # floor (0.08) -- soundex alone is too loose to trust by itself.
         sql = text(f"""
-            SELECT
-                r.recipe_id, r.dish_name, r.diet_type, r.is_sattvic,
-                r.intensity_level, r.sub_region,
-                v.carousel_thumb_url, v.hero_image_url,
-                v.prep_steps, v.ingredients_json, r.meal_role, r.dish_category,
-                similarity(LOWER(r.dish_name), LOWER(:q)) AS sim_score
-            FROM recipe_dna_master r
-            LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
-            WHERE {where}
-            AND (
-                similarity(LOWER(r.dish_name), LOWER(:q)) > 0.1
-                OR LOWER(r.dish_name) LIKE LOWER(:pattern)
+            WITH filtered_recipes AS (
+                SELECT r.recipe_id, r.dish_name, r.diet_type, r.is_sattvic,
+                       r.intensity_level, r.sub_region, r.meal_role, r.dish_category,
+                       r.ta_names, r.ta_names_translit
+                FROM recipe_dna_master r
+                WHERE {where}
+            ),
+            name_candidates AS (
+                SELECT recipe_id, dish_name AS candidate_name FROM filtered_recipes
+                UNION ALL
+                SELECT recipe_id, unnest(ta_names) FROM filtered_recipes WHERE ta_names IS NOT NULL
+                UNION ALL
+                SELECT recipe_id, unnest(ta_names_translit) FROM filtered_recipes WHERE ta_names_translit IS NOT NULL
+                UNION ALL
+                SELECT fr.recipe_id, ic.name_en
+                FROM filtered_recipes fr
+                JOIN recipe_ingredients ri ON ri.recipe_id = fr.recipe_id
+                JOIN ingredient_catalog ic ON ic.id = ri.ingredient_id
+                UNION ALL
+                SELECT fr.recipe_id, unnest(ic.ta_names)
+                FROM filtered_recipes fr
+                JOIN recipe_ingredients ri ON ri.recipe_id = fr.recipe_id
+                JOIN ingredient_catalog ic ON ic.id = ri.ingredient_id
+                WHERE ic.ta_names IS NOT NULL
+                UNION ALL
+                SELECT fr.recipe_id, unnest(ic.ta_names_translit)
+                FROM filtered_recipes fr
+                JOIN recipe_ingredients ri ON ri.recipe_id = fr.recipe_id
+                JOIN ingredient_catalog ic ON ic.id = ri.ingredient_id
+                WHERE ic.ta_names_translit IS NOT NULL
+                UNION ALL
+                SELECT fr.recipe_id, unnest(ic.en_synonyms)
+                FROM filtered_recipes fr
+                JOIN recipe_ingredients ri ON ri.recipe_id = fr.recipe_id
+                JOIN ingredient_catalog ic ON ic.id = ri.ingredient_id
+                WHERE ic.en_synonyms IS NOT NULL
+            ),
+            scored AS (
+                SELECT recipe_id,
+                       similarity(LOWER(candidate_name), LOWER(:q)) AS sim_score,
+                       soundex(candidate_name) = soundex(:q) AS soundex_hit
+                FROM name_candidates
+                WHERE candidate_name IS NOT NULL AND candidate_name != ''
+            ),
+            best AS (
+                SELECT recipe_id, MAX(sim_score) AS best_score
+                FROM scored
+                WHERE sim_score > 0.1 OR (soundex_hit AND sim_score >= 0.08)
+                GROUP BY recipe_id
             )
-            ORDER BY sim_score DESC, r.dish_name
+            SELECT
+                fr.recipe_id, fr.dish_name, fr.diet_type, fr.is_sattvic,
+                fr.intensity_level, fr.sub_region,
+                v.carousel_thumb_url, v.hero_image_url,
+                v.prep_steps, v.ingredients_json, fr.meal_role, fr.dish_category,
+                b.best_score AS sim_score
+            FROM best b
+            JOIN filtered_recipes fr ON fr.recipe_id = b.recipe_id
+            LEFT JOIN recipe_content_vault v ON v.recipe_id = fr.recipe_id
+            ORDER BY b.best_score DESC, fr.dish_name
             LIMIT 50
         """)
         rows = db.execute(sql, params).fetchall()

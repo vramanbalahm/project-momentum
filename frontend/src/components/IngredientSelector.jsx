@@ -71,7 +71,12 @@ export default function IngredientSelector({
     })();
   }, []);
 
-  // Filter by search
+  // Filter by search — checks English name, Tamil names, Tamil transliterations,
+  // and English synonyms, so a search matches whatever language the person
+  // types in (e.g. "ulundhu", "ulutham paruppu" or "urad dal" all match the
+  // same ingredient). This list is small and fully loaded up front, so the
+  // match stays client-side; the heavier soundex+trigram matching lives on
+  // the server for the main dish/pantry search surfaces.
   const filtered = useCallback(() => {
     if (!search.trim()) return grouped;
     const q = search.toLowerCase();
@@ -79,7 +84,10 @@ export default function IngredientSelector({
     Object.entries(grouped).forEach(([cat, items]) => {
       const matches = items.filter(i =>
         i.name_en.toLowerCase().includes(q) ||
-        (i.name_ta || "").includes(q)
+        (i.name_ta || "").includes(q) ||
+        (i.ta_names || []).some(n => (n || "").includes(q)) ||
+        (i.ta_names_translit || []).some(n => (n || "").toLowerCase().includes(q)) ||
+        (i.en_synonyms || []).some(n => (n || "").toLowerCase().includes(q))
       );
       if (matches.length) result[cat] = matches;
     });
