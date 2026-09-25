@@ -135,13 +135,6 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
                     {dish?.name || "Meal"}
                   </div>
                 </div>
-                {idx === 0 && dish?.is_sattvic && (
-                  <div style={{
-                    position: "absolute", bottom: 6, right: 4,
-                    background: "rgba(93,202,165,0.25)", color: "#085041",
-                    fontSize: 8, padding: "2px 5px", borderRadius: 20, fontWeight: 500
-                  }}>Satvik</div>
-                )}
               </div>
             ))
           )}

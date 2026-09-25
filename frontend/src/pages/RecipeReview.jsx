@@ -367,7 +367,6 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
                   <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 5 }}>
                     <Badge label={r.diet_type} style={dietStyle} />
                     {(r.meal_slots || []).map(s => <Badge key={s} label={s} style={{ bg: "#F0EFEC", background: "#F0EFEC", color: C.muted }} />)}
-                    {r.is_sattvic && <Badge label="Satvik" style={{ background: "#E6F1FB", color: "#0C447C" }} />}
                   </div>
                   <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
                     {r.sub_region || "General Tamil Nadu"} · {r.intensity_level}
@@ -527,7 +526,7 @@ export default function RecipeReview({ onBack, onHelp, helpReturnRecipeId, initi
                   </EditField>
                   <EditField label="Flags">
                     <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                      {[["is_sattvic", "Satvik"], ["is_vegan", "Vegan"], ["is_scalable", "Scalable"], ["is_regional_specific", "Regional specific"]].map(([key, label]) => (
+                      {[["is_vegan", "Vegan"], ["is_scalable", "Scalable"], ["is_regional_specific", "Regional specific"]].map(([key, label]) => (
                         <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.text, cursor: "pointer" }}>
                           <input type="checkbox" checked={!!editRecipe[key]}
                             onChange={e => setEditRecipe(p => ({ ...p, [key]: e.target.checked }))} />

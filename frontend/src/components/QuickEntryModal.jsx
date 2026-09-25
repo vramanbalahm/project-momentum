@@ -99,7 +99,6 @@ export default function QuickEntryModal({ initialDishName = '', initialMealSlot 
         recipe_id: res.recipe_id,
         name: res.dish_name,
         diet_type: dietType,
-        is_sattvic: false,
         intensity_level: "Medium",
         sub_region: null,
         thumb: null,

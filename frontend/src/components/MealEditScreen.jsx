@@ -12,11 +12,10 @@ const catLabel   = (c) => c.replace("_", " ");
 
 const SWAP_REASONS = ['Complexity', 'Inventory', 'Variety', 'Other'];
 
-const DietBadge = ({ dietType, isSattvic }) => {
-  const isSatvik = isSattvic;
-  const bg = isSatvik ? "#E1F5EE" : dietType === "Non-Veg" ? "#FAECE7" : "#F1EFE8";
-  const color = isSatvik ? "#085041" : dietType === "Non-Veg" ? "#712B13" : "#444441";
-  const label = isSatvik ? "Satvik" : dietType || "Veg";
+const DietBadge = ({ dietType }) => {
+  const bg = dietType === "Non-Veg" ? "#FAECE7" : "#F1EFE8";
+  const color = dietType === "Non-Veg" ? "#712B13" : "#444441";
+  const label = dietType || "Veg";
   return (
     <span style={{ fontSize: 9, background: bg, color, borderRadius: 6, padding: "2px 7px", fontWeight: 500, whiteSpace: "nowrap" }}>
       {label}
@@ -104,7 +103,7 @@ export function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(to top, rgba(26,58,46,0.9), transparent)", padding: "24px 14px 10px" }}>
             <div style={{ fontSize: 14, fontWeight: 500, color: "#FDFCF8" }}>{recipe?.name}</div>
             <div style={{ fontSize: 10, color: "#9FE1CB", marginTop: 2 }}>
-              {recipe?.diet_type}{recipe?.is_sattvic ? " · Satvik" : ""}{recipe?.intensity_level ? ` · ${recipe.intensity_level}` : ""}
+              {recipe?.diet_type}{recipe?.intensity_level ? ` · ${recipe.intensity_level}` : ""}
             </div>
           </div>
         </div>
@@ -427,12 +426,7 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
         )}
         {results.map(recipe => (
           <div key={recipe.recipe_id}
-            style={{ display: "flex", alignItems: "center", gap: 10, borderBottom: "0.5px solid #EDE8E0",
-              background: (!recipe.is_sattvic && recipe.diet_type === "Non-Veg") ? "#FAECE7" : "transparent",
-              borderRadius: (!recipe.is_sattvic && recipe.diet_type === "Non-Veg") ? 8 : 0,
-              marginBottom: (!recipe.is_sattvic && recipe.diet_type === "Non-Veg") ? 4 : 0,
-              padding: (!recipe.is_sattvic && recipe.diet_type === "Non-Veg") ? "9px 8px" : "9px 0"
-            }}>
+            style={{ display: "flex", alignItems: "center", gap: 10, borderBottom: "0.5px solid #EDE8E0", padding: "9px 0" }}>
             {/* Thumbnail */}
             <div style={{ width: 44, height: 44, borderRadius: 8, background: "#EDE8E0", flexShrink: 0, overflow: "hidden" }}>
               {recipe.thumb ? (
@@ -443,14 +437,11 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
             {/* Info */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: recipe.diet_type === "Non-Veg" ? "#712B13" : "#2C2C2A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{recipe.name}</div>
-              {recipe.diet_type === "Non-Veg" && !recipe.is_sattvic
-                ? <div style={{ fontSize: 10, color: "#993C1D" }}>⚠ Not Satvik today</div>
-                : <div style={{ fontSize: 10, color: "#888780" }}>{recipe.diet_type}{recipe.is_sattvic ? " · Satvik" : ""}{recipe.intensity_level ? ` · ${recipe.intensity_level}` : ""}{recipe.sub_region ? ` · ${recipe.sub_region}` : ""}</div>
-              }
+              <div style={{ fontSize: 10, color: "#888780" }}>{recipe.diet_type}{recipe.intensity_level ? ` · ${recipe.intensity_level}` : ""}{recipe.sub_region ? ` · ${recipe.sub_region}` : ""}</div>
             </div>
             {/* Badge + info button */}
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
-              <DietBadge dietType={recipe.diet_type} isSattvic={recipe.is_sattvic} />
+              <DietBadge dietType={recipe.diet_type} />
               <button onClick={() => setDetailRecipe(recipe)} style={{ width: 20, height: 20, borderRadius: "50%", border: "0.5px solid #B4B2A9", background: "none", fontSize: 10, color: "#888780", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>?</button>
               <button onClick={() => onSelect(recipe)} style={{ fontSize: 10, color: "#0F6E56", border: "0.5px solid #0F6E56", borderRadius: 6, padding: "3px 8px", background: "none", cursor: "pointer", whiteSpace: "nowrap" }}>Select</button>
             </div>
@@ -705,7 +696,7 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: "#2C2C2A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{dish.name}</div>
-                <div style={{ marginTop: 3 }}><DietBadge dietType={dish.diet_type} isSattvic={dish.is_sattvic} /></div>
+                <div style={{ marginTop: 3 }}><DietBadge dietType={dish.diet_type} /></div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end", flexShrink: 0 }}>
                 <button onClick={() => openSearch('replace-main', null, idx)} style={{ fontSize: 10, color: "#0F6E56", border: "0.5px solid #0F6E56", borderRadius: 6, padding: "3px 8px", background: "none", cursor: "pointer" }}>Replace</button>
