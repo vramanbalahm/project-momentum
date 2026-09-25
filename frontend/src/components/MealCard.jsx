@@ -134,6 +134,16 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
                   }}>
                     {dish?.name || "Meal"}
                   </div>
+                  {dish?.regional_name && dish.regional_name !== dish.name && (
+                    <div style={{
+                      color: "rgba(255,255,255,0.75)",
+                      fontSize: mains.length === 1 ? 10 : 8,
+                      lineHeight: 1.2,
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+                    }}>
+                      {dish.regional_name}
+                    </div>
+                  )}
                 </div>
               </div>
             ))
@@ -160,7 +170,12 @@ export default function MealCard({ day, type, meal, auditResult, onClick, isEdit
                         e.target.src = `https://placehold.co/36x28/E8D5B0/2C2C2A?text=${encodeURIComponent(side?.name?.substring(0, 3) || "Side")}`;
                       }}
                     />
-                    <span style={{ fontSize: 11, color: "#444441", fontWeight: 500 }}>{side?.name || "Side dish"}</span>
+                    <div>
+                      <span style={{ fontSize: 11, color: "#444441", fontWeight: 500 }}>{side?.name || "Side dish"}</span>
+                      {side?.regional_name && side.regional_name !== side.name && (
+                        <div style={{ fontSize: 9, color: "#888780" }}>{side.regional_name}</div>
+                      )}
+                    </div>
                   </div>
                 );
               })}

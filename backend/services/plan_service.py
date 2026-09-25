@@ -22,9 +22,10 @@ def fetch_active_plan(db: Session, h_id: str, week_start: str = None):
             h.event_date as date, 
             CAST(h.meal_slot AS text) as slot,
             h.event_id,
-            r.dish_name as name, 
-            r.recipe_code as code, 
-            v.hero_image_url as hero, 
+            r.dish_name as name,
+            r.regional_name as regional_name,
+            r.recipe_code as code,
+            v.hero_image_url as hero,
             v.carousel_thumb_url as thumb,
             v.prep_steps as steps,
             d.recipe_id,
@@ -58,6 +59,7 @@ def fetch_active_plan(db: Session, h_id: str, week_start: str = None):
             }
         dish = {
             "name": r.name if r.name else "Skipped",
+            "regional_name": r.regional_name,
             "recipe_id": str(r.recipe_id) if r.recipe_id else "",
             "hero": r.hero,
             "thumb": r.thumb,

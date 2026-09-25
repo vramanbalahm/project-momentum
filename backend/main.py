@@ -1049,7 +1049,8 @@ def search_recipes(
                 r.recipe_id, r.dish_name, r.diet_type, r.is_sattvic,
                 r.intensity_level, r.sub_region,
                 v.carousel_thumb_url, v.hero_image_url,
-                v.prep_steps, v.ingredients_json, r.meal_role, r.dish_category
+                v.prep_steps, v.ingredients_json, r.meal_role, r.dish_category,
+                r.regional_name
             FROM recipe_dna_master r
             LEFT JOIN recipe_content_vault v ON r.recipe_id = v.recipe_id
             WHERE {where}
@@ -1080,7 +1081,7 @@ def search_recipes(
             WITH filtered_recipes AS (
                 SELECT r.recipe_id, r.dish_name, r.diet_type, r.is_sattvic,
                        r.intensity_level, r.sub_region, r.meal_role, r.dish_category,
-                       r.ta_names, r.ta_names_translit
+                       r.ta_names, r.ta_names_translit, r.regional_name
                 FROM recipe_dna_master r
                 WHERE {where}
             ),
@@ -1132,7 +1133,7 @@ def search_recipes(
                 fr.intensity_level, fr.sub_region,
                 v.carousel_thumb_url, v.hero_image_url,
                 v.prep_steps, v.ingredients_json, fr.meal_role, fr.dish_category,
-                b.best_score AS sim_score
+                fr.regional_name, b.best_score AS sim_score
             FROM best b
             JOIN filtered_recipes fr ON fr.recipe_id = b.recipe_id
             LEFT JOIN recipe_content_vault v ON v.recipe_id = fr.recipe_id
@@ -1155,6 +1156,7 @@ def search_recipes(
             "ingredients_json":row[9],
             "meal_role":       list(row[10]) if row[10] else ["main"],
             "dish_category":   row[11] if len(row) > 11 else None,
+            "regional_name":   row[12] if len(row) > 12 else None,
         }
         for row in rows
     ]

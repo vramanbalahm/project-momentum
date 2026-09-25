@@ -102,6 +102,9 @@ export function DishDetailPanel({ recipe, onBack, onSelect, selectLabel }) {
           )}
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(to top, rgba(26,58,46,0.9), transparent)", padding: "24px 14px 10px" }}>
             <div style={{ fontSize: 14, fontWeight: 500, color: "#FDFCF8" }}>{recipe?.name}</div>
+            {recipe?.regional_name && recipe.regional_name !== recipe.name && (
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginTop: 1 }}>{recipe.regional_name}</div>
+            )}
             <div style={{ fontSize: 10, color: "#9FE1CB", marginTop: 2 }}>
               {recipe?.diet_type}{recipe?.intensity_level ? ` · ${recipe.intensity_level}` : ""}
             </div>
@@ -437,6 +440,9 @@ function SearchPanel({ context, onBack, onSelect, duplicateWarning, onClearWarni
             {/* Info */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: recipe.diet_type === "Non-Veg" ? "#712B13" : "#2C2C2A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{recipe.name}</div>
+              {recipe.regional_name && recipe.regional_name !== recipe.name && (
+                <div style={{ fontSize: 10, color: "#888780" }}>{recipe.regional_name}</div>
+              )}
               <div style={{ fontSize: 10, color: "#888780" }}>{recipe.diet_type}{recipe.intensity_level ? ` · ${recipe.intensity_level}` : ""}{recipe.sub_region ? ` · ${recipe.sub_region}` : ""}</div>
             </div>
             {/* Badge + info button */}
@@ -696,6 +702,9 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: "#2C2C2A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{dish.name}</div>
+                {dish.regional_name && dish.regional_name !== dish.name && (
+                  <div style={{ fontSize: 10, color: "#888780" }}>{dish.regional_name}</div>
+                )}
                 <div style={{ marginTop: 3 }}><DietBadge dietType={dish.diet_type} /></div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end", flexShrink: 0 }}>
@@ -733,6 +742,9 @@ export default function MealEditScreen({ selected, onClose, onSave }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 500, color: "#2C2C2A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{side.name || side.dish_name}</div>
+                {side.regional_name && side.regional_name !== (side.name || side.dish_name) && (
+                  <div style={{ fontSize: 10, color: "#888780" }}>{side.regional_name}</div>
+                )}
                 <div style={{ fontSize: 10, color: "#888780" }}>Side · {idx + 2}</div>
               </div>
               <div style={{ display: "flex", gap: 5, alignItems: "center", flexShrink: 0 }}>
